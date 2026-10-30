@@ -1,10 +1,11 @@
 import './sand.css';
 import { el, topBar } from '../../dom';
+import { difficultyName, difficultyPicker } from '../../difficulty';
 import { navigate } from '../../navigation';
 import { CONTAINERS, CONTAINER_IDS, JAR_HEIGHT, JAR_WIDTH, type ContainerId } from './containers';
 import { cellsFromColors } from './jar';
 import { JarPainter } from './jarPainter';
-import { SAND_COLORS, containerForLevel, generateLevel } from './levels';
+import { SAND_COLORS, SAND_LEVELS, containerForModel, generateLevel } from './levels';
 import { SandGame } from './sandGame';
 import { decodeColors, encodeColors, loadSand, saveSand, type CurrentBottle, type SandSave, type ShelfBottle } from './sandSave';
 
@@ -26,9 +27,9 @@ export function renderSand(root: HTMLElement, params: string[]): () => void {
 
 function startModel(save: SandSave): void {
   const level = save.modelsDone + 1;
-  const container = containerForLevel(level);
-  const { palette, target } = generateLevel(level, CONTAINERS[container]);
-  start(save, { level, container, palette, target: encodeColors(target), cells: emptyJar() });
+  const container = containerForModel(level);
+  const { theme, palette, target } = generateLevel(SAND_LEVELS[save.difficulty], CONTAINERS[container]);
+  start(save, { level, difficulty: save.difficulty, container, theme, palette, target: encodeColors(target), cells: emptyJar() });
 }
 
 function startFree(save: SandSave, container: ContainerId): void {
@@ -66,11 +67,17 @@ function renderMenu(root: HTMLElement, save: SandSave): void {
 
   const confirmReplace = () => !save.current || confirm('Abandonner la bouteille en cours ?');
   const nextLevel = save.modelsDone + 1;
-  const nextContainer = containerForLevel(nextLevel);
+  const nextContainer = containerForModel(nextLevel);
+  const picker = difficultyPicker(save.difficulty, (difficulty) => {
+    save.difficulty = difficulty;
+    saveSand(save);
+    root.replaceChildren();
+    renderMenu(root, save);
+  });
   const modelCard = menuCard(
     emptyContainerCanvas(nextContainer, 56),
     `Bouteille n°${nextLevel}`,
-    `Reproduis le modèle · ${CONTAINERS[nextContainer].name.toLowerCase()}`,
+    `${difficultyName(save.difficulty)} · ${CONTAINERS[nextContainer].name.toLowerCase()}`,
     () => {
       if (!confirmReplace()) return;
       modelCard.classList.add('is-loading');
@@ -79,7 +86,7 @@ function renderMenu(root: HTMLElement, save: SandSave): void {
       setTimeout(() => startModel(save), 30);
     },
   );
-  menu.append(modelCard, freeSection(confirmReplace, save), shelfSection(save.shelf));
+  menu.append(picker, modelCard, freeSection(confirmReplace, save), shelfSection(save.shelf));
 
   root.append(el('div', { class: 'sand' }, topBar('Bouteilles de sable'), menu));
 }

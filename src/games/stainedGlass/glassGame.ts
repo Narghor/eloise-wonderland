@@ -1,10 +1,13 @@
 import { el, topBar, type BackLink } from '../../dom';
 import { isDarkColor } from '../../color';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
+import { difficultyFromLevel, difficultyName, type Difficulty } from '../../difficulty';
+import { UNGRADED_STARS, earnCoins } from '../../companion/companionSave';
+import { rewardBanner } from '../../companion/reward';
 import { GLASS_HELP } from './glassHelp';
 import { paintWindow } from './glassPainter';
-import { GAME_WIDTH, generateLayout, rasterize, type Layout, type Raster } from './glassWindow';
-import { saveGlass, type CurrentWindow, type GlassSave } from './glassSave';
+import { GAME_WIDTH, GLASS_LEVELS, generateLayout, rasterize, type Layout, type Raster } from './glassWindow';
+import { saveGlass, windowNumber, type CurrentWindow, type GlassSave } from './glassSave';
 
 const BACK_GLASS: BackLink = { href: '#/vitrail', label: 'Vitraux' };
 const RULE = 'Deux morceaux qui se touchent ne doivent jamais avoir la même couleur. Le chiffre de chaque couleur dit combien il en reste à poser.';
@@ -16,6 +19,7 @@ export interface GlassGameActions {
 export class GlassGame {
   private readonly layout: Layout;
   private readonly raster: Raster;
+  private readonly difficulty: Difficulty;
   private readonly canvas = el('canvas', { class: 'glass-canvas' });
   private readonly status = el('p', { class: 'glass-status', role: 'status' });
   private readonly controls: HTMLElement;
@@ -29,8 +33,9 @@ export class GlassGame {
     private readonly current: CurrentWindow,
     private readonly actions: GlassGameActions,
   ) {
-    this.layout = generateLayout(current.seed, current.level);
-    this.raster = rasterize(this.layout.seeds, GAME_WIDTH, true);
+    this.difficulty = difficultyFromLevel(GLASS_LEVELS, current.level);
+    this.layout = generateLayout(current.seed, current.level, current.shape);
+    this.raster = rasterize(this.layout.seeds, GAME_WIDTH, current.shape, true);
     for (const piece of this.layout.hints) this.current.colors[piece] = this.layout.solution[piece];
 
     const restart = el('button', { class: 'button button-secondary', type: 'button' }, 'Recommencer');
@@ -41,7 +46,7 @@ export class GlassGame {
       el(
         'div',
         { class: 'glass-game' },
-        topBar(`Vitrail n°${current.level}`, helpSlot(GLASS_HELP), BACK_GLASS),
+        topBar(`Vitrail n°${windowNumber(current)} · ${difficultyName(this.difficulty)}`, helpSlot(GLASS_HELP), BACK_GLASS),
         el('div', { class: 'glass-stage' }, this.canvas),
         this.status,
         this.controls,
@@ -141,10 +146,12 @@ export class GlassGame {
 
   private win(): void {
     this.finished = true;
-    this.save.windowsDone = Math.max(this.save.windowsDone, this.current.level);
+    this.save.windowsDone = Math.max(this.save.windowsDone, windowNumber(this.current));
     this.save.chapel.push({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      number: windowNumber(this.current),
       level: this.current.level,
+      shape: this.current.shape,
       seeds: this.layout.seeds.map(([u, v]) => [round(u), round(v)]),
       palette: this.layout.palette,
       colors: [...this.current.colors],
@@ -152,6 +159,7 @@ export class GlassGame {
     });
     this.save.current = null;
     saveGlass(this.save);
+    const coins = earnCoins(UNGRADED_STARS, this.difficulty);
 
     this.canvas.classList.add('is-lit');
     const next = el('button', { class: 'button', type: 'button' }, 'Vitrail suivant');
@@ -159,6 +167,7 @@ export class GlassGame {
     this.status.textContent = '';
     this.controls.replaceChildren(
       el('p', { class: 'glass-result' }, el('strong', { text: 'Magnifique !' }), ' La lumière traverse ton vitrail.'),
+      rewardBanner(coins),
       el('div', { class: 'button-row' }, next, el('a', { class: 'button button-secondary', href: '#/vitrail' }, 'Ma chapelle')),
     );
   }

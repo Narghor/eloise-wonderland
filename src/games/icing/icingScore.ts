@@ -1,3 +1,4 @@
+import type { Difficulty } from '../../difficulty';
 import { sampleGuide, type Cookie, type Point } from './cookie';
 
 export interface Stroke {
@@ -5,11 +6,17 @@ export interface Stroke {
   points: Point[];
 }
 
-/** Icing this close to the guide (in cookie units, 1 = the whole picture) counts as on it. */
-const TOLERANCE = 0.03;
+/** Icing this close to the guide (in cookie units, 1 = the whole picture) counts as on it: about 6 px on a phone. */
+const TOLERANCE = 0.018;
+/** About 4 px: the only thing Expert changes. */
+const EXPERT_TOLERANCE = 0.012;
+
+export function toleranceFor(difficulty: Difficulty): number {
+  return difficulty === 4 ? EXPERT_TOLERANCE : TOLERANCE;
+}
 const SAMPLE_SPACING = 0.008;
-/** Covering the guides matters more than never leaving them. */
-const COVERAGE_WEIGHT = 0.7;
+/** Covering the guides and staying on them weigh almost the same: icing everywhere does not pay. */
+const COVERAGE_WEIGHT = 0.55;
 
 export interface IcingScore {
   /** Share of the guides covered by icing of their colour. */
@@ -19,7 +26,8 @@ export interface IcingScore {
   total: number;
 }
 
-export function scoreIcing(cookie: Cookie, strokes: readonly Stroke[]): IcingScore {
+export function scoreIcing(cookie: Cookie, strokes: readonly Stroke[], tolerance = TOLERANCE): IcingScore {
+  const near = ([x0, y0]: Point, [x1, y1]: Point) => (x1 - x0) ** 2 + (y1 - y0) ** 2 <= tolerance * tolerance;
   const guideSamples = cookie.guides.map((guide) => ({ color: guide.color, points: sampleGuide(guide, SAMPLE_SPACING) }));
   const icing = strokes.flatMap((stroke) => resample(stroke.points, SAMPLE_SPACING).map((point) => ({ color: stroke.color, point })));
   if (icing.length === 0) return { coverage: 0, accuracy: 0, total: 0 };
@@ -45,16 +53,10 @@ export function scoreIcing(cookie: Cookie, strokes: readonly Stroke[]): IcingSco
   return { coverage, accuracy, total: COVERAGE_WEIGHT * coverage + (1 - COVERAGE_WEIGHT) * accuracy };
 }
 
-export const STAR_THRESHOLDS = [0.55, 0.72, 0.86];
+export const STAR_THRESHOLDS = [0.6, 0.78, 0.9];
 
 export function starsFor(total: number): number {
   return STAR_THRESHOLDS.filter((threshold) => total >= threshold).length;
-}
-
-function near([x0, y0]: Point, [x1, y1]: Point): boolean {
-  const dx = x1 - x0;
-  const dy = y1 - y0;
-  return dx * dx + dy * dy <= TOLERANCE * TOLERANCE;
 }
 
 /** Evenly spaced points along a stroke: a slow finger must not weigh more than a fast one. */

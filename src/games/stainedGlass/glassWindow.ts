@@ -5,6 +5,7 @@
 // Pieces are Voronoi cells of seed points, evened out by Lloyd relaxation.
 
 import { mulberry32, shuffled } from '../../random';
+import type { LevelTable } from '../../difficulty';
 
 export const WINDOW_ASPECT = 1.5;
 /** Resolution of the playable window; also the one the neighbours are computed at. */
@@ -45,39 +46,70 @@ export interface Raster {
   radii: number[];
 }
 
-export function insideWindow(u: number, v: number): boolean {
-  if (u < FRAME_MARGIN || u > 1 - FRAME_MARGIN || v > WINDOW_ASPECT - FRAME_MARGIN) return false;
-  if (v >= 0.5) return true;
-  const radius = 0.5 - FRAME_MARGIN;
-  return (u - 0.5) ** 2 + (v - 0.5) ** 2 <= radius * radius;
+export const WINDOW_SHAPES = ['arch', 'rose', 'gothic', 'heart'] as const;
+export type WindowShape = (typeof WINDOW_SHAPES)[number];
+
+export function isWindowShape(value: unknown): value is WindowShape {
+  return typeof value === 'string' && (WINDOW_SHAPES as readonly string[]).includes(value);
+}
+
+export function insideWindow(shape: WindowShape, u: number, v: number): boolean {
+  if (u < FRAME_MARGIN || u > 1 - FRAME_MARGIN || v < FRAME_MARGIN || v > WINDOW_ASPECT - FRAME_MARGIN) return false;
+  switch (shape) {
+    case 'rose':
+      return (u - 0.5) ** 2 + (v - WINDOW_ASPECT / 2) ** 2 <= (0.5 - FRAME_MARGIN) ** 2;
+    case 'gothic': {
+      // Two arcs, each centred on the opposite side, meeting in a point at the top.
+      const springY = 0.62;
+      if (v >= springY) return true;
+      const radius = 0.6;
+      const left = (u - (FRAME_MARGIN + radius)) ** 2 + (v - springY) ** 2 <= radius * radius;
+      const right = (u - (1 - FRAME_MARGIN - radius)) ** 2 + (v - springY) ** 2 <= radius * radius;
+      return left && right;
+    }
+    case 'heart': {
+      // The curve spans x in [-1.14, 1.14] and y in [-1, 1.25]: scaled and centred in the frame.
+      const x = (u - 0.5) / 0.4;
+      const y = (0.82 - v) / 0.55;
+      return (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0;
+    }
+    default: {
+      if (v >= 0.5) return true;
+      const radius = 0.5 - FRAME_MARGIN;
+      return (u - 0.5) ** 2 + (v - 0.5) ** 2 <= radius * radius;
+    }
+  }
 }
 
 // -----------------------------------------------
 // GENERATION
 // -----------------------------------------------
 
+/** 10, 19, 28, 37 then 45 pieces, with fewer of them given as hints. */
+export const GLASS_LEVELS: LevelTable = [1, 4, 7, 10, 13];
+
 export function pieceCountFor(level: number): number {
   return Math.min(10 + 3 * (level - 1), 45);
 }
 
-/** Same seed and level, same window: only those two numbers need saving. */
-export function generateLayout(seed: number, level: number): Layout {
+/** Same seed, level and shape, same window: only those need saving. */
+export function generateLayout(seed: number, level: number, shape: WindowShape): Layout {
   const random = mulberry32(seed);
   const count = pieceCountFor(level);
 
   let seeds: Point[] = [];
   while (seeds.length < count) {
     const point: Point = [random(), random() * WINDOW_ASPECT];
-    if (insideWindow(point[0], point[1])) seeds.push(point);
+    if (insideWindow(shape, point[0], point[1])) seeds.push(point);
   }
   for (let i = 0; i < RELAX_ITERATIONS; i++) {
-    const raster = rasterize(seeds, RELAX_WIDTH);
+    const raster = rasterize(seeds, RELAX_WIDTH, shape);
     seeds = raster.centroids.map((centroid, piece) =>
       centroid[0] < 0 ? seeds[piece] : [(centroid[0] + 0.5) / RELAX_WIDTH, (centroid[1] + 0.5) / RELAX_WIDTH],
     );
   }
 
-  const neighbours = neighboursOf(rasterize(seeds, GAME_WIDTH), count);
+  const neighbours = neighboursOf(rasterize(seeds, GAME_WIDTH, shape), count);
   const palette = shuffled(JEWEL_COLORS, random).slice(0, COLORS_PER_WINDOW);
   const solution = colorGraph(neighbours, COLORS_PER_WINDOW, random);
   const quotas = palette.map((_, color) => solution.filter((c) => c === color).length);
@@ -113,7 +145,7 @@ function colorGraph(neighbours: number[][], colorCount: number, random: () => nu
 // -----------------------------------------------
 
 /** Assigns every pixel to its nearest seed. `thickLead` draws 2 px joints, for big renders. */
-export function rasterize(seeds: Point[], width: number, thickLead = false): Raster {
+export function rasterize(seeds: Point[], width: number, shape: WindowShape, thickLead = false): Raster {
   const height = Math.round(width * WINDOW_ASPECT);
   const region = new Int16Array(width * height).fill(-1);
   const sums = seeds.map(() => [0, 0, 0]);
@@ -122,7 +154,7 @@ export function rasterize(seeds: Point[], width: number, thickLead = false): Ras
     const v = (y + 0.5) / width;
     for (let x = 0; x < width; x++) {
       const u = (x + 0.5) / width;
-      if (!insideWindow(u, v)) continue;
+      if (!insideWindow(shape, u, v)) continue;
       let best = 0;
       let bestDistance = Infinity;
       for (let s = 0; s < seeds.length; s++) {

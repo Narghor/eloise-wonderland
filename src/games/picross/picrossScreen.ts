@@ -1,8 +1,11 @@
 import './picross.css';
 import { el, topBar } from '../../dom';
-import { createCreature } from '../../creatures/creature';
+import { createCreature, difficultyForSize } from '../../creatures/creature';
 import { addCreature } from '../../creatures/garden';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
+import { difficultyName } from '../../difficulty';
+import { UNGRADED_STARS, earnCoins } from '../../companion/companionSave';
+import { rewardBanner } from '../../companion/reward';
 import { PICROSS_HELP } from './picrossHelp';
 import { generatePuzzle, puzzleFrom, type Puzzle } from './generator';
 import { clueOf, sameClue } from './lines';
@@ -53,7 +56,7 @@ function sizePicker(save: PicrossSave, onPick: (size: number) => void): HTMLElem
       'button',
       { class: 'size-card', type: 'button' },
       el('strong', { text: label }),
-      el('span', { text: `${size} × ${size}` }),
+      el('span', { text: `${size} × ${size} · ${difficultyName(difficultyForSize(size))}` }),
       el('span', { class: 'size-card-count', text: solvedText(solved) }),
     );
     card.addEventListener('click', () => onPick(size));
@@ -136,7 +139,7 @@ class PicrossGame {
       el(
         'div',
         { class: 'picross' },
-        topBar(`Picross ${this.size}×${this.size}`, helpSlot(PICROSS_HELP, this.timerEl)),
+        topBar(`Picross ${this.size}×${this.size} · ${difficultyName(difficultyForSize(this.size))}`, helpSlot(PICROSS_HELP, this.timerEl)),
         el('div', { class: 'board-wrap' }, this.board),
         this.controls,
         el('p', { class: 'hint-mouse', text: 'Clic droit : poser une croix.' }),
@@ -384,6 +387,7 @@ class PicrossGame {
     addCreature(creature);
     this.save.current = null;
     savePicross(this.save);
+    const coins = earnCoins(UNGRADED_STARS, difficultyForSize(this.size));
 
     this.board.style.setProperty('--reveal-color', creature.palette[0]);
     this.board.classList.add('is-solved');
@@ -395,7 +399,13 @@ class PicrossGame {
     otherSize.addEventListener('click', () => this.actions.changeSize());
     this.controls.replaceChildren(
       el('p', { class: 'win-message' }, el('strong', { text: 'Bravo !' }), ` Grille terminée en ${time}.`),
-      el('p', { class: 'win-creature' }, 'Une petite bête est apparue : ', el('strong', { text: creature.name })),
+      el(
+        'p',
+        { class: 'win-creature' },
+        creature.rarity ? '✨ Une bête RARE est apparue : ' : 'Une petite bête est apparue : ',
+        el('strong', { text: creature.name }),
+      ),
+      rewardBanner(coins),
       el('div', { class: 'button-row' }, color, again, otherSize),
     );
   }

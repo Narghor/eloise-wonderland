@@ -3,6 +3,8 @@ import { exportSave, importSave } from './save';
 import { isColored } from './creatures/creature';
 import { creatureCanvas } from './creatures/creatureCanvas';
 import { loadGarden } from './creatures/garden';
+import { companionPortrait } from './companion/companionArt';
+import { loadCompanion } from './companion/companionSave';
 
 export function renderHome(root: HTMLElement): () => void {
   root.append(
@@ -14,6 +16,7 @@ export function renderHome(root: HTMLElement): () => void {
     el(
       'main',
       { class: 'home' },
+      companionCard(),
       el(
         'a',
         { class: 'game-card', href: '#/picross' },
@@ -70,6 +73,17 @@ export function renderHome(root: HTMLElement): () => void {
           el('span', { text: 'Décorer des biscuits en suivant les pointillés' }),
         ),
       ),
+      el(
+        'a',
+        { class: 'game-card', href: '#/fioles' },
+        el('span', { class: 'game-card-icon is-potions', 'aria-hidden': 'true' }),
+        el(
+          'span',
+          { class: 'game-card-text' },
+          el('strong', { text: 'Fioles' }),
+          el('span', { text: 'Trier les couleurs, une seule par fiole' }),
+        ),
+      ),
       savePanel(),
     ),
   );
@@ -108,6 +122,22 @@ function gardenCard(): HTMLElement {
     { class: 'game-card', href: '#/jardin' },
     icon,
     el('span', { class: 'game-card-text' }, el('strong', { text: 'Le Jardin' }), el('span', { text: summary })),
+  );
+}
+
+function companionCard(): HTMLElement {
+  const companion = loadCompanion();
+  return el(
+    'a',
+    { class: 'home-companion', href: '#/compagnon' },
+    companionPortrait(companion.look, 80),
+    el(
+      'span',
+      { class: 'home-companion-text' },
+      el('strong', { text: companion.name }),
+      el('span', { class: 'coin-pill', text: `${companion.coins} 🪙` }),
+      el('span', { text: 'Gagne des pièces en jouant pour l’habiller' }),
+    ),
   );
 }
 

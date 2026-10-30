@@ -1,4 +1,5 @@
 import { shuffled } from '../../random';
+import type { LevelTable } from '../../difficulty';
 import { CONTAINER_IDS, type Container, type ContainerId } from './containers';
 import { SandJar } from './jar';
 
@@ -22,7 +23,17 @@ const GENERATOR_GRAINS_PER_FRAME = 12;
 /** Frames without a single grain fitting before a layer gives up: its pile reached the opening. */
 const BLOCKED_FRAMES = 30;
 
+/** Model palettes: five colours that go together yet stay easy to tell apart in sand. */
+const THEMES: { name: string; colors: string[] }[] = [
+  { name: 'Coucher de soleil', colors: ['#ffe08a', '#f6b26b', '#f4877e', '#c25b7a', '#5e3b6e'] },
+  { name: 'Océan', colors: ['#f3ecd8', '#9fe3e0', '#4fb3d9', '#2f6fae', '#1f3f6e'] },
+  { name: 'Bonbons', colors: ['#ffc2e2', '#b9ecff', '#d8c2ff', '#fff0a8', '#ff8fbf'] },
+  { name: 'Forêt', colors: ['#eef5d0', '#a8d58a', '#5f9e57', '#c9a477', '#6b4e3d'] },
+  { name: 'Lavande', colors: ['#f6efff', '#d8c2ff', '#a98be0', '#7a5cb8', '#ffd6e8'] },
+];
+
 export interface Level {
+  theme: string;
   palette: string[];
   /** Colour per cell, see SandJar.colors(). */
   target: Uint8Array;
@@ -41,15 +52,19 @@ const PATTERNS: Pattern[] = [
 
 const TARGET_FILL = 0.9;
 
+/** 3 colours in 3 layers up to 5 colours in 8 layers. */
+export const SAND_LEVELS: LevelTable = [1, 3, 6, 8, 11];
+
 /** Models go round every container, starting with the plain jar. */
-export function containerForLevel(levelNumber: number): ContainerId {
-  return CONTAINER_IDS[(levelNumber - 1) % CONTAINER_IDS.length];
+export function containerForModel(modelNumber: number): ContainerId {
+  return CONTAINER_IDS[(modelNumber - 1) % CONTAINER_IDS.length];
 }
 
 export function generateLevel(levelNumber: number, container: Container): Level {
   const colorCount = Math.min(3 + Math.floor((levelNumber - 1) / 3), 5);
   const layerCount = Math.min(3 + Math.floor((levelNumber - 1) / 2), 8);
-  const palette = shuffled(SAND_COLORS).slice(0, colorCount);
+  const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+  const palette = shuffled(theme.colors).slice(0, colorCount);
 
   const layers: { color: number; pattern: Pattern; phase: number; weight: number }[] = [];
   for (let i = 0; i < layerCount; i++) {
@@ -80,5 +95,5 @@ export function generateLevel(levelNumber: number, container: Container): Level 
     }
   }
   jar.settle();
-  return { palette, target: jar.colors() };
+  return { theme: theme.name, palette, target: jar.colors() };
 }

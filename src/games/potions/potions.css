@@ -1,0 +1,139 @@
+.potion-game {
+  --unit: 34px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.potion-moves {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.potion-moves.is-over {
+  color: #d9433f;
+}
+
+.vials-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 28px 12px 8px;
+}
+
+.vials {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 22px 14px;
+  max-width: 400px;
+}
+
+/* A glass vial: liquid units stack from the bottom. */
+.vial {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  width: 46px;
+  height: calc(var(--unit) * 4 + 14px);
+  padding: 0 4px 5px;
+  border: 3px solid #c9d6e3;
+  border-top-width: 0;
+  border-radius: 4px 4px 22px 22px;
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.9), rgb(235 243 250 / 0.6) 60%, rgb(255 255 255 / 0.9));
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s ease-out;
+}
+
+.vial::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -3px;
+  right: -3px;
+  height: 5px;
+  border-radius: 3px;
+  background: #c9d6e3;
+}
+
+.vial.is-selected {
+  transform: translateY(-16px);
+}
+
+.vial.is-full {
+  border-color: #a7d7b8;
+}
+
+.vial.is-refused {
+  animation: vial-shake 0.3s;
+}
+
+@keyframes vial-shake {
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.liquid {
+  flex: 0 0 var(--unit);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--liquid) 80%, white), var(--liquid) 45%, color-mix(in srgb, var(--liquid) 85%, black));
+}
+
+.vial > .liquid:first-of-type {
+  border-radius: 0 0 16px 16px;
+}
+
+.liquid.is-fresh {
+  transform-origin: bottom;
+  animation: liquid-fill 0.35s ease-out;
+}
+
+@keyframes liquid-fill {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.vials.is-done .vial {
+  animation: vial-dance 0.6s ease-in-out 2;
+}
+
+@keyframes vial-dance {
+  40% {
+    transform: translateY(-10px) rotate(-4deg);
+  }
+  80% {
+    transform: translateY(0) rotate(3deg);
+  }
+}
+
+.potion-status {
+  min-height: 1.3em;
+  margin: 10px auto 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.potion-controls {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 12px 16px 24px;
+}
+
+.potion-stars {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #e0a32e;
+  letter-spacing: 3px;
+}
+
+.potion-result {
+  margin: 0;
+  color: var(--muted);
+}

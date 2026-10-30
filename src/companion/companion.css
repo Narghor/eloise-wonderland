@@ -1,0 +1,102 @@
+.companion {
+  min-height: 100dvh;
+  padding-bottom: 32px;
+}
+
+.companion-stage {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 4px 16px 16px;
+}
+
+.companion-stage .companion-portrait {
+  border-radius: 28px;
+}
+
+.companion-name {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.shop-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 16px 4px;
+  max-width: 720px;
+  margin: 0 auto;
+  scrollbar-width: none;
+}
+
+.shop-tab {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shop-tab.is-active {
+  background: var(--accent-strong);
+  color: white;
+}
+
+.shop-status {
+  min-height: 1.4em;
+  margin: 8px 16px 0;
+  text-align: center;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 16px;
+}
+
+.shop-card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.shop-card.is-worn {
+  box-shadow: var(--shadow), 0 0 0 3px var(--accent-strong);
+}
+
+.shop-card.is-locked .companion-portrait {
+  filter: saturate(0.55);
+}
+
+.shop-card-tag {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.shop-card.is-locked .shop-card-tag {
+  color: #b58900;
+}

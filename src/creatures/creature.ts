@@ -1,3 +1,4 @@
+import type { Difficulty } from '../difficulty';
 import { STEPS_4 } from './shape';
 
 export interface Creature {
@@ -8,33 +9,65 @@ export interface Creature {
   pixels: string[];
   /** Hex colours, in colouring order: the number shown to the player is index + 1. */
   palette: string[];
-  /** One string per row: '1' where the player has painted. */
+  /** One string per row: '0' unpainted, '1' painted right, 'a', 'b'... painted with the wrong colour 0, 1... */
   painted: string[];
   bornAt: string;
+  /** Cells painted wrong or touched outside the creature while colouring it. */
+  mistakes?: number;
+  /** 0-3, set once the creature is fully coloured. */
+  stars?: number;
+  /** Rare creatures: golden, or a rainbow body. */
+  rarity?: Rarity;
 }
 
 export const OUTSIDE = '.';
+const WRONG_BASE = 'a'.charCodeAt(0);
+
+/** The Picross size is its difficulty, for the grid and for colouring the creature it gives. */
+export function difficultyForSize(size: number): Difficulty {
+  if (size <= 5) return 0;
+  return size <= 10 ? 2 : 4;
+}
 
 // -----------------------------------------------
 // CREATION
 // -----------------------------------------------
 
-const Role = { Body: 0, Outline: 1, Belly: 2, Eyes: 3 } as const;
+const Role = { Body: 0, Outline: 1, Belly: 2, Eyes: 3, BodyMiddle: 4, BodyLow: 5 } as const;
 type Role = (typeof Role)[keyof typeof Role];
-const ROLE_ORDER: Role[] = [Role.Body, Role.Outline, Role.Belly, Role.Eyes];
+const ROLE_ORDER: Role[] = [Role.Body, Role.BodyMiddle, Role.BodyLow, Role.Outline, Role.Belly, Role.Eyes];
+
+export type Rarity = 'gold' | 'rainbow';
+export const RARITIES: readonly Rarity[] = ['gold', 'rainbow'];
+/** About one creature in eight is rare. */
+const RARE_CHANCE = 1 / 8;
 
 export function createCreature(shape: boolean[][]): Creature {
   const size = shape.length;
+  const rarity: Rarity | undefined = Math.random() < RARE_CHANCE ? RARITIES[Math.floor(Math.random() * RARITIES.length)] : undefined;
   const roles = assignRoles(shape);
+  if (rarity === 'rainbow') splitBodyInBands(roles);
 
   const hue = Math.floor(Math.random() * 360);
   const bellyHue = (hue + (Math.random() < 0.5 ? 40 : 180)) % 360;
-  const colorOf: Record<Role, string> = {
-    [Role.Body]: hslToHex(hue, 70, 72),
-    [Role.Outline]: hslToHex(hue, 45, 38),
-    [Role.Belly]: hslToHex(bellyHue, 75, 80),
-    [Role.Eyes]: '#3b2a3f',
-  };
+  const colorOf: Record<Role, string> =
+    rarity === 'gold'
+      ? {
+          [Role.Body]: '#f6cd4c',
+          [Role.BodyMiddle]: '#f6cd4c',
+          [Role.BodyLow]: '#f6cd4c',
+          [Role.Outline]: '#a8740f',
+          [Role.Belly]: '#fff3c4',
+          [Role.Eyes]: '#3b2a3f',
+        }
+      : {
+          [Role.Body]: rarity === 'rainbow' ? '#ff9ec7' : hslToHex(hue, 70, 72),
+          [Role.BodyMiddle]: '#9fe6c4',
+          [Role.BodyLow]: '#9cc9ff',
+          [Role.Outline]: rarity === 'rainbow' ? '#7a4f9e' : hslToHex(hue, 45, 38),
+          [Role.Belly]: rarity === 'rainbow' ? '#fff0a8' : hslToHex(bellyHue, 75, 80),
+          [Role.Eyes]: '#3b2a3f',
+        };
 
   const usedRoles = ROLE_ORDER.filter((role) => roles.some((row) => row.includes(role)));
   return {
@@ -45,7 +78,19 @@ export function createCreature(shape: boolean[][]): Creature {
     palette: usedRoles.map((role) => colorOf[role]),
     painted: roles.map((row) => '0'.repeat(row.length)),
     bornAt: new Date().toISOString(),
+    ...(rarity ? { rarity } : {}),
   };
+}
+
+/** Rainbow creatures: the body in three horizontal bands, each its own colour to paint. */
+function splitBodyInBands(roles: (Role | null)[][]): void {
+  const size = roles.length;
+  roles.forEach((row, r) => {
+    const band = Math.min(2, Math.floor((r / size) * 3));
+    row.forEach((role, c) => {
+      if (role === Role.Body && band > 0) row[c] = band === 1 ? Role.BodyMiddle : Role.BodyLow;
+    });
+  });
 }
 
 function assignRoles(shape: boolean[][]): (Role | null)[][] {
@@ -114,8 +159,21 @@ export function colorIndexAt(creature: Creature, row: number, col: number): numb
   return char === OUTSIDE ? -1 : Number(char);
 }
 
-export function isPaintedAt(creature: Creature, row: number, col: number): boolean {
-  return creature.painted[row][col] === '1';
+/** Palette index the player painted this pixel with, or -1 when unpainted. */
+export function paintedColorAt(creature: Creature, row: number, col: number): number {
+  const char = creature.painted[row][col];
+  if (char === '0') return -1;
+  return char === '1' ? colorIndexAt(creature, row, col) : char.charCodeAt(0) - WRONG_BASE;
+}
+
+/** The `painted` character for a pixel whose right colour is `right`, painted with `painted` (-1: none). */
+export function paintedChar(right: number, painted: number): string {
+  if (painted < 0) return '0';
+  return painted === right ? '1' : String.fromCharCode(WRONG_BASE + painted);
+}
+
+export function isPaintedChar(char: string, colorCount: number): boolean {
+  return char === '0' || char === '1' || (char >= 'a' && char.charCodeAt(0) - WRONG_BASE < colorCount);
 }
 
 export function isColored(creature: Creature): boolean {

@@ -1,5 +1,5 @@
 import { readGame, writeGame } from '../save';
-import { OUTSIDE, type Creature } from './creature';
+import { OUTSIDE, RARITIES, isPaintedChar, type Creature, type Rarity } from './creature';
 
 const GAME_ID = 'garden';
 
@@ -43,8 +43,12 @@ function isCreature(value: unknown): value is Creature {
     Array.isArray(rows) &&
     rows.length === size &&
     rows.every((row) => typeof row === 'string' && row.length === size && [...row].every(isChar));
+  const optionalCount = (value: unknown) => value === undefined || (Number.isInteger(value) && (value as number) >= 0);
   return (
     isRows(pixels, (char) => char === OUTSIDE || Number(char) < palette.length) &&
-    isRows(painted, (char) => char === '0' || char === '1')
+    isRows(painted, (char) => isPaintedChar(char, palette.length)) &&
+    optionalCount(candidate.mistakes) &&
+    optionalCount(candidate.stars) &&
+    (candidate.rarity === undefined || RARITIES.includes(candidate.rarity as Rarity))
   );
 }

@@ -1,11 +1,12 @@
 import './icing.css';
 import { el, topBar } from '../../dom';
+import { difficultyName, difficultyPicker } from '../../difficulty';
 import { navigate } from '../../navigation';
 import { newSeed } from '../../random';
-import { generateCookie } from './cookie';
+import { ICING_LEVELS, generateCookie } from './cookie';
 import { IcingGame } from './icingGame';
 import { paintCookie } from './icingPainter';
-import { loadIcing, saveIcing, type IcingSave, type ShowcaseCookie } from './icingSave';
+import { cookieNumber, loadIcing, saveIcing, type IcingSave, type ShowcaseCookie } from './icingSave';
 
 const PLAY_ROUTE = '#/glacage/jouer';
 
@@ -21,7 +22,13 @@ export function renderIcing(root: HTMLElement, params: string[]): () => void {
 }
 
 function startCookie(save: IcingSave): void {
-  save.current = { level: save.cookiesDone + 1, seed: newSeed(), strokes: [] };
+  save.current = {
+    number: save.cookiesDone + 1,
+    difficulty: save.difficulty,
+    level: ICING_LEVELS[save.difficulty],
+    seed: newSeed(),
+    strokes: [],
+  };
   saveIcing(save);
   navigate(PLAY_ROUTE);
 }
@@ -29,11 +36,16 @@ function startCookie(save: IcingSave): void {
 function renderMenu(root: HTMLElement, save: IcingSave): void {
   const menu = el('main', { class: 'icing-menu' });
   if (save.current) {
-    const level = save.current.level;
-    menu.append(menuCard('Reprendre mon biscuit', `Biscuit n°${level}`, () => (location.hash = PLAY_ROUTE)));
+    menu.append(menuCard('Reprendre mon biscuit', `Biscuit n°${cookieNumber(save.current)}`, () => (location.hash = PLAY_ROUTE)));
   }
   menu.append(
-    menuCard(`Biscuit n°${save.cookiesDone + 1}`, 'Suis les pointillés avec le glaçage', () => {
+    difficultyPicker(save.difficulty, (difficulty) => {
+      save.difficulty = difficulty;
+      saveIcing(save);
+      root.replaceChildren();
+      renderMenu(root, save);
+    }),
+    menuCard(`Biscuit n°${save.cookiesDone + 1}`, `${difficultyName(save.difficulty)} · suis les pointillés`, () => {
       if (!save.current || confirm('Abandonner le biscuit en cours ?')) startCookie(save);
     }),
     showcaseSection(save.showcase),
@@ -104,7 +116,7 @@ function cookieDialog(): { element: HTMLDialogElement; show(entry: ShowcaseCooki
     element,
     show(entry: ShowcaseCookie) {
       portrait.replaceChildren(cookieCanvas(entry, 240));
-      title.textContent = `Biscuit n°${entry.level}`;
+      title.textContent = `Biscuit n°${cookieNumber(entry)}`;
       details.textContent = `${starsText(entry.stars)} · décoré le ${new Date(entry.madeAt).toLocaleDateString('fr-FR')}`;
       element.showModal();
     },

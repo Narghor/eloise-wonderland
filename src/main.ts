@@ -7,6 +7,8 @@ import { renderSand } from './games/sand/sandScreen';
 import { renderGlass } from './games/stainedGlass/glassScreen';
 import { renderBubbles } from './games/bubbles/bubbleScreen';
 import { renderIcing } from './games/icing/icingScreen';
+import { renderPotions } from './games/potions/potionScreen';
+import { renderCompanion } from './companion/companionScreen';
 import { requestPersistentStorage } from './save';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
@@ -21,6 +23,8 @@ const routes: Record<string, Screen> = {
   vitrail: renderGlass,
   bulles: renderBubbles,
   glacage: renderIcing,
+  fioles: renderPotions,
+  compagnon: renderCompanion,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

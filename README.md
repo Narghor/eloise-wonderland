@@ -37,6 +37,7 @@ Le jeu marche ensuite hors ligne.
 | `src/games/sand/` | les bouteilles de sable : les formes de verre (`containers.ts`), le moteur (`jar.ts`), les modèles (`levels.ts`), la note (`score.ts`) |
 | `src/games/icing/` | le glaçage : biscuits et pointillés (`cookie.ts`), la note (`icingScore.ts`), le rendu (`icingPainter.ts`) |
 | `src/games/stainedGlass/` | les vitraux : découpage et voisins (`glassWindow.ts`, un vitrail = un numéro + un niveau), rendu (`glassPainter.ts`) |
+| `src/games/potions/` | les fioles : règles, solveur du nombre minimal de coups et niveaux (`potionBoard.ts`), écran (`potionScreen.ts`) |
 | `src/games/bubbles/` | les bulles mélangées : grille et mélanges (`bubbleBoard.ts`), tir et rendu (`bubbleGame.ts`) |
 | `src/help.ts` | le bouton « ? » et le tuto ouvert tout seul à la première partie ; le texte de chaque jeu est dans son `*Help.ts` |
 | `src/color.ts`, `src/random.ts`, `src/navigation.ts` | petits outils partagés : couleurs, hasard reproductible, navigation |

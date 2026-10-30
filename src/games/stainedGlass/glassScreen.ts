@@ -1,11 +1,12 @@
 import './glass.css';
 import { el, topBar } from '../../dom';
+import { difficultyName, difficultyPicker } from '../../difficulty';
 import { navigate } from '../../navigation';
 import { newSeed } from '../../random';
 import { GlassGame } from './glassGame';
 import { paintWindow } from './glassPainter';
-import { pieceCountFor, rasterize, WINDOW_ASPECT } from './glassWindow';
-import { loadGlass, saveGlass, type ChapelWindow, type GlassSave } from './glassSave';
+import { GLASS_LEVELS, pieceCountFor, rasterize, WINDOW_ASPECT, WINDOW_SHAPES } from './glassWindow';
+import { loadGlass, saveGlass, windowNumber, type ChapelWindow, type GlassSave } from './glassSave';
 
 const PLAY_ROUTE = '#/vitrail/jouer';
 
@@ -22,8 +23,11 @@ export function renderGlass(root: HTMLElement, params: string[]): () => void {
 }
 
 function startWindow(save: GlassSave): void {
-  const level = save.windowsDone + 1;
-  save.current = { level, seed: newSeed(), colors: new Array(pieceCountFor(level)).fill(-1) };
+  const number = save.windowsDone + 1;
+  const level = GLASS_LEVELS[save.difficulty];
+  // The very first window keeps the classic arch; after that, any shape.
+  const shape = number === 1 ? 'arch' : WINDOW_SHAPES[Math.floor(Math.random() * WINDOW_SHAPES.length)];
+  save.current = { number, level, shape, seed: newSeed(), colors: new Array(pieceCountFor(level)).fill(-1) };
   saveGlass(save);
   navigate(PLAY_ROUTE);
 }
@@ -31,11 +35,17 @@ function startWindow(save: GlassSave): void {
 function renderMenu(root: HTMLElement, save: GlassSave): void {
   const menu = el('main', { class: 'glass-menu' });
   if (save.current) {
-    const level = save.current.level;
-    menu.append(menuCard('Reprendre mon vitrail', `Vitrail n°${level}`, () => (location.hash = PLAY_ROUTE)));
+    menu.append(menuCard('Reprendre mon vitrail', `Vitrail n°${windowNumber(save.current)}`, () => (location.hash = PLAY_ROUTE)));
   }
+  const level = GLASS_LEVELS[save.difficulty];
   menu.append(
-    menuCard(`Vitrail n°${save.windowsDone + 1}`, `${pieceCountFor(save.windowsDone + 1)} morceaux de verre`, () => {
+    difficultyPicker(save.difficulty, (difficulty) => {
+      save.difficulty = difficulty;
+      saveGlass(save);
+      root.replaceChildren();
+      renderMenu(root, save);
+    }),
+    menuCard(`Vitrail n°${save.windowsDone + 1}`, `${difficultyName(save.difficulty)} · ${pieceCountFor(level)} morceaux de verre`, () => {
       if (!save.current || confirm('Abandonner le vitrail en cours ?')) startWindow(save);
     }),
     chapelSection(save.chapel),
@@ -78,7 +88,7 @@ function chapelSection(chapel: ChapelWindow[]): HTMLElement {
 function windowCanvas(entry: ChapelWindow, width: number): HTMLCanvasElement {
   const canvas = el('canvas', { class: 'glass-canvas is-lit' });
   const resolution = Math.round(width * Math.min(2, window.devicePixelRatio || 1));
-  paintWindow(canvas, rasterize(entry.seeds, resolution, resolution >= 200), entry.colors, entry.palette);
+  paintWindow(canvas, rasterize(entry.seeds, resolution, entry.shape, resolution >= 200), entry.colors, entry.palette);
   canvas.style.width = `${width}px`;
   canvas.style.height = `${Math.round(width * WINDOW_ASPECT)}px`;
   return canvas;
@@ -98,7 +108,7 @@ function windowDialog(): { element: HTMLDialogElement; show(entry: ChapelWindow)
     element,
     show(entry: ChapelWindow) {
       portrait.replaceChildren(windowCanvas(entry, 200));
-      title.textContent = `Vitrail n°${entry.level}`;
+      title.textContent = `Vitrail n°${windowNumber(entry)}`;
       details.textContent = `${entry.seeds.length} morceaux · fini le ${new Date(entry.madeAt).toLocaleDateString('fr-FR')}`;
       element.showModal();
     },

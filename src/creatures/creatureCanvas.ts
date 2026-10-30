@@ -1,4 +1,4 @@
-import { colorIndexAt, isPaintedAt, type Creature } from './creature';
+import { colorIndexAt, paintedColorAt, type Creature } from './creature';
 
 const UNPAINTED = '#e7d9e0';
 
@@ -15,7 +15,8 @@ export function creatureCanvas(creature: Creature, displaySize: number): HTMLCan
     for (let c = 0; c < creature.size; c++) {
       const index = colorIndexAt(creature, r, c);
       if (index < 0) continue;
-      context.fillStyle = isPaintedAt(creature, r, c) ? creature.palette[index] : UNPAINTED;
+      const painted = paintedColorAt(creature, r, c);
+      context.fillStyle = painted < 0 ? UNPAINTED : creature.palette[painted];
       context.fillRect(c * scale, r * scale, scale, scale);
     }
   }

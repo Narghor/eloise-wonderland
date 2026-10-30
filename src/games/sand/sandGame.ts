@@ -6,7 +6,10 @@ import { SandJar, cellsFromColors, spoutColumn } from './jar';
 import { JarPainter } from './jarPainter';
 import { GRAINS_PER_FRAME, STEPS_PER_FRAME } from './levels';
 import { similarity, starsFor } from './score';
-import { decodeColors, encodeColors, saveSand, type CurrentBottle, type SandSave } from './sandSave';
+import { bottleDifficulty, decodeColors, encodeColors, saveSand, type CurrentBottle, type SandSave } from './sandSave';
+import { difficultyName } from '../../difficulty';
+import { earnCoins } from '../../companion/companionSave';
+import { rewardBanner } from '../../companion/reward';
 
 const BACK_SAND: BackLink = { href: '#/sable', label: 'Sable' };
 const MAX_UNDO = 15;
@@ -67,7 +70,10 @@ export class SandGame {
       el('div', { class: 'button-row' }, this.undoButton, clearButton, finishButton),
     );
 
-    const title = bottle.level === null ? 'Création libre' : `Bouteille n°${bottle.level}`;
+    const title =
+      bottle.level === null
+        ? 'Création libre'
+        : `${bottle.theme ?? `Bouteille n°${bottle.level}`} · ${difficultyName(bottleDifficulty(bottle))}`;
     root.append(
       el('div', { class: 'sand-game' }, topBar(title, helpSlot(SAND_HELP), BACK_SAND), this.stage, this.status, this.controls),
     );
@@ -282,6 +288,7 @@ export class SandGame {
     });
     this.save.current = null;
     saveSand(this.save);
+    const coins = stars === null ? null : earnCoins(stars, bottleDifficulty(this.bottle));
 
     const next = el('button', { class: 'button', type: 'button' }, score === null ? 'Nouvelle création' : 'Bouteille suivante');
     next.addEventListener('click', () => (score === null ? this.actions.newFree(this.bottle.container) : this.actions.nextModel()));
@@ -295,6 +302,7 @@ export class SandGame {
             el('span', { class: 'sand-stars', text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
             ` Ressemblance : ${Math.round(score * 100)} %`,
           ),
+      coins === null ? '' : rewardBanner(coins),
       el('div', { class: 'button-row' }, next, el('a', { class: 'button button-secondary', href: '#/sable' }, 'Mon étagère')),
     );
   }

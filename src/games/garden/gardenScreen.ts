@@ -10,7 +10,11 @@ export function renderGarden(root: HTMLElement): () => void {
   const ordered = [...creatures].sort(
     (a, b) => Number(isColored(a)) - Number(isColored(b)) || b.bornAt.localeCompare(a.bornAt),
   );
-  const count = el('span', { class: 'garden-count', text: creatureCount(creatures.length) });
+  const rares = creatures.filter((creature) => creature.rarity).length;
+  const count = el('span', {
+    class: 'garden-count',
+    text: rares > 0 ? `${creatureCount(creatures.length)} · ${rares} ✨` : creatureCount(creatures.length),
+  });
   const page = el('div', { class: 'garden' }, topBar('Le Jardin', count));
   root.append(page);
 
@@ -37,7 +41,12 @@ export function renderGarden(root: HTMLElement): () => void {
       creatureCanvas(creature, 84),
       el('span', { class: 'garden-tile-name', text: creature.name }),
     );
+    if (creature.rarity) {
+      tile.classList.add(`is-${creature.rarity}`);
+      tile.append(el('span', { class: 'garden-tile-rare', text: '✨ Rare' }));
+    }
     if (!colored) tile.append(el('span', { class: 'garden-tile-tag', text: 'À colorier' }));
+    else if (creature.stars !== undefined) tile.append(el('span', { class: 'garden-tile-stars', text: starsText(creature.stars) }));
     tile.addEventListener('click', () => {
       if (colored) dialog.show(creature);
       else location.hash = `#/colorier/${creature.id}`;
@@ -46,6 +55,10 @@ export function renderGarden(root: HTMLElement): () => void {
   }
   page.append(grid, dialog.element);
   return () => dialog.element.close();
+}
+
+function starsText(stars: number): string {
+  return '★'.repeat(stars) + '☆'.repeat(3 - stars);
 }
 
 function creatureCount(count: number): string {
@@ -68,7 +81,8 @@ function creatureDialog(): { element: HTMLDialogElement; show(creature: Creature
     show(creature: Creature) {
       portrait.replaceChildren(creatureCanvas(creature, 200));
       name.textContent = creature.name;
-      born.textContent = `Apparue le ${new Date(creature.bornAt).toLocaleDateString('fr-FR')}`;
+      const date = `Apparue le ${new Date(creature.bornAt).toLocaleDateString('fr-FR')}`;
+      born.textContent = creature.stars === undefined ? date : `${starsText(creature.stars)} · ${date}`;
       element.showModal();
     },
   };

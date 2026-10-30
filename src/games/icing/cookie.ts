@@ -4,8 +4,12 @@
 // Everything lives in a unit square, the cookie centred on (0.5, 0.5).
 
 import { mulberry32, shuffled } from '../../random';
+import type { LevelTable } from '../../difficulty';
 
 export type Point = [number, number];
+
+/** 1 to 3 colours, then a wavy crown. Expert draws the cookies of Difficile, judged tighter (see icingScore). */
+export const ICING_LEVELS: LevelTable = [1, 2, 3, 5, 5];
 
 export interface Guide {
   /** Index in the cookie's palette. */
@@ -32,30 +36,65 @@ const OUTLINE_INSET = 0.86;
 const CROWN_FACTOR = 0.62;
 const POINTS_PER_SHAPE = 180;
 
-type ShapeKind = 'circle' | 'flower' | 'star' | 'heart';
-const SHAPES: ShapeKind[] = ['circle', 'flower', 'star', 'heart'];
+type ShapeKind = 'circle' | 'flower' | 'star' | 'heart' | 'clover' | 'hexagon' | 'egg' | 'tree';
+const SHAPES: ShapeKind[] = ['circle', 'flower', 'star', 'heart', 'clover', 'hexagon', 'egg', 'tree'];
+
+/** A fir tree with a trunk, as a polygon (y down), resampled into an even outline. */
+const TREE: Point[] = [
+  [0, -1], [0.45, -0.42], [0.24, -0.42], [0.68, 0.16], [0.4, 0.16], [0.9, 0.7], [0.2, 0.7], [0.2, 1],
+  [-0.2, 1], [-0.2, 0.7], [-0.9, 0.7], [-0.4, 0.16], [-0.68, 0.16], [-0.24, -0.42], [-0.45, -0.42],
+];
+
+function polygonOutline(corners: Point[], count: number): Point[] {
+  return sampleGuide({ color: 0, points: corners, closed: true }, perimeter(corners) / count).slice(0, count);
+}
+
+function perimeter(corners: Point[]): number {
+  return corners.reduce((sum, [x, y], i) => {
+    const [nx, ny] = corners[(i + 1) % corners.length];
+    return sum + Math.hypot(nx - x, ny - y);
+  }, 0);
+}
 
 // -----------------------------------------------
 // SHAPES
 // -----------------------------------------------
 
 /** Closed outline of a shape, scaled so its farthest point is `radius` from the centre. */
+/** Distance from the centre per angle, for the shapes that are a bumpy circle. */
+function radialShape(kind: ShapeKind, t: number): number {
+  switch (kind) {
+    case 'flower':
+      return 0.72 + 0.28 * Math.abs(Math.cos(2.5 * t));
+    case 'star':
+      return 0.6 + 0.4 * ((Math.cos(5 * t) + 1) / 2) ** 2.5;
+    case 'clover':
+      return 0.62 + 0.38 * Math.abs(Math.cos(2 * t)) ** 0.7;
+    case 'hexagon':
+      // Regular polygon: the apothem divided by the cosine of the angle to the nearest side's middle.
+      return Math.cos(Math.PI / 6) / Math.cos(((t % (Math.PI / 3)) + Math.PI / 3) % (Math.PI / 3) - Math.PI / 6);
+    default:
+      return 1;
+  }
+}
+
 function shapeOutline(kind: ShapeKind, radius: number, rotation: number): Point[] {
-  const raw: Point[] = [];
-  for (let i = 0; i < POINTS_PER_SHAPE; i++) {
+  const raw: Point[] =
+    kind === 'tree' ? polygonOutline(TREE, POINTS_PER_SHAPE) : [];
+  for (let i = 0; i < POINTS_PER_SHAPE && kind !== 'tree'; i++) {
     const t = (i / POINTS_PER_SHAPE) * Math.PI * 2;
     if (kind === 'heart') {
       // Classic heart curve, y flipped so the point is at the bottom.
       raw.push([16 * Math.sin(t) ** 3, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))]);
       continue;
     }
+    if (kind === 'egg') {
+      // Wider at the bottom (y grows downwards).
+      raw.push([0.76 * Math.cos(t) * (1 + 0.12 * Math.sin(t)), Math.sin(t)]);
+      continue;
+    }
     const angle = t + rotation;
-    const r =
-      kind === 'circle'
-        ? 1
-        : kind === 'flower'
-          ? 0.72 + 0.28 * Math.abs(Math.cos(2.5 * t))
-          : 0.6 + 0.4 * ((Math.cos(5 * t) + 1) / 2) ** 2.5;
+    const r = radialShape(kind, t);
     raw.push([Math.cos(angle) * r, Math.sin(angle) * r]);
   }
   // Centre on the shape's middle (the heart's curve is not centred on 0), then fit the radius.

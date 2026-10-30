@@ -4,8 +4,11 @@ import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { generateCookie, type Cookie, type Point } from './cookie';
 import { ICING_HELP } from './icingHelp';
 import { paintCookie } from './icingPainter';
-import { compactStroke, saveIcing, type CurrentCookie, type IcingSave } from './icingSave';
-import { scoreIcing, starsFor, type Stroke } from './icingScore';
+import { compactStroke, cookieDifficulty, cookieNumber, saveIcing, type CurrentCookie, type IcingSave } from './icingSave';
+import { scoreIcing, starsFor, toleranceFor, type Stroke } from './icingScore';
+import { difficultyName } from '../../difficulty';
+import { earnCoins } from '../../companion/companionSave';
+import { rewardBanner } from '../../companion/reward';
 
 const BACK_ICING: BackLink = { href: '#/glacage', label: 'Glaçage' };
 /** A new point is kept once the finger moved this far (cookie units). */
@@ -52,7 +55,7 @@ export class IcingGame {
       el(
         'div',
         { class: 'icing-game' },
-        topBar(`Biscuit n°${current.level}`, helpSlot(ICING_HELP), BACK_ICING),
+        topBar(`Biscuit n°${cookieNumber(current)} · ${difficultyName(cookieDifficulty(current))}`, helpSlot(ICING_HELP), BACK_ICING),
         el('div', { class: 'icing-stage' }, this.canvas),
         this.status,
         this.controls,
@@ -169,12 +172,14 @@ export class IcingGame {
       this.status.textContent = 'Pose un peu de glaçage d’abord !';
       return;
     }
-    const score = scoreIcing(this.cookie, this.current.strokes);
+    const difficulty = cookieDifficulty(this.current);
+    const score = scoreIcing(this.cookie, this.current.strokes, toleranceFor(difficulty));
     const stars = starsFor(score.total);
     this.finished = true;
-    this.save.cookiesDone = Math.max(this.save.cookiesDone, this.current.level);
+    this.save.cookiesDone = Math.max(this.save.cookiesDone, cookieNumber(this.current));
     this.save.showcase.push({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      number: cookieNumber(this.current),
       level: this.current.level,
       seed: this.current.seed,
       strokes: this.current.strokes,
@@ -183,6 +188,7 @@ export class IcingGame {
     });
     this.save.current = null;
     saveIcing(this.save);
+    const coins = earnCoins(stars, difficulty);
 
     // Sprinkles seeded by the cookie: the showcase throws exactly the same ones.
     this.repaint(this.current.seed);
@@ -197,6 +203,7 @@ export class IcingGame {
         el('span', { class: 'icing-stars', text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
         ` Précision : ${Math.round(score.total * 100)} %`,
       ),
+      rewardBanner(coins),
       el('div', { class: 'button-row' }, next, el('a', { class: 'button button-secondary', href: '#/glacage' }, 'Ma vitrine')),
     );
   }

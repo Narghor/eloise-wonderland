@@ -3,6 +3,8 @@
 // -----------------------------------------------
 // World unit = one bubble diameter. Even rows hold COLS bubbles, odd rows COLS - 1, shifted half a bubble.
 
+import type { LevelTable } from '../../difficulty';
+
 export const COLS = 11;
 export const MAX_ROWS = 14;
 export const ROW_HEIGHT = Math.sqrt(3) / 2;
@@ -139,6 +141,9 @@ export class BubbleBoard {
 // -----------------------------------------------
 // LEVELS
 // -----------------------------------------------
+
+/** 4 to 8 rows, 4 to 6 colours, the ceiling dropping every 9 to 5 shots. */
+export const BUBBLE_LEVELS: LevelTable = [1, 3, 5, 7, 9];
 
 /** Colours on the board for a level: primaries and orange first, the other mixes come later. */
 export function levelColors(level: number): BubbleColor[] {

@@ -1,5 +1,7 @@
 import { readGame, writeGame } from '../../save';
+import { difficultyFromLevel, isDifficulty, loadDifficulty, type Difficulty } from '../../difficulty';
 import { JAR_HEIGHT, JAR_WIDTH, isContainerId, type ContainerId } from './containers';
+import { SAND_LEVELS } from './levels';
 
 const GAME_ID = 'sand';
 const CELL_COUNT = JAR_WIDTH * JAR_HEIGHT;
@@ -7,7 +9,11 @@ const CELL_COUNT = JAR_WIDTH * JAR_HEIGHT;
 export interface CurrentBottle {
   /** Model number, or null for a free creation. */
   level: number | null;
+  /** Of a model; absent on older saves, where the model number was the generator level. */
+  difficulty?: Difficulty;
   container: ContainerId;
+  /** Name of the model's colour theme; absent in free mode and on older saves. */
+  theme?: string;
   palette: string[];
   /** Encoded colours of the model (see encodeColors), null in free mode. */
   target: string | null;
@@ -26,6 +32,8 @@ export interface ShelfBottle {
 }
 
 export interface SandSave {
+  /** For the next model. */
+  difficulty: Difficulty;
   modelsDone: number;
   current: CurrentBottle | null;
   shelf: ShelfBottle[];
@@ -34,8 +42,11 @@ export interface SandSave {
 export function loadSand(): SandSave {
   const raw = readGame(GAME_ID);
   const data = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const modelsDone = typeof data.modelsDone === 'number' ? data.modelsDone : 0;
   return {
-    modelsDone: typeof data.modelsDone === 'number' ? data.modelsDone : 0,
+    // Saves made before difficulties played model modelsDone + 1 at that level.
+    difficulty: loadDifficulty(data.difficulty, SAND_LEVELS, modelsDone + 1),
+    modelsDone,
     current: isCurrent(data.current) ? withContainer(data.current) : null,
     shelf: Array.isArray(data.shelf) ? data.shelf.filter(isShelfBottle).map(withContainer) : [],
   };
@@ -48,6 +59,11 @@ function withContainer<T extends { container: ContainerId }>(bottle: T): T {
 
 export function saveSand(save: SandSave): void {
   writeGame(GAME_ID, save);
+}
+
+export function bottleDifficulty(bottle: CurrentBottle): Difficulty {
+  if (isDifficulty(bottle.difficulty)) return bottle.difficulty;
+  return difficultyFromLevel(SAND_LEVELS, bottle.level ?? 1);
 }
 
 // -----------------------------------------------

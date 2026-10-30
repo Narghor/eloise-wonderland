@@ -1,8 +1,12 @@
 import { darken } from '../../color';
 import { el, topBar } from '../../dom';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
+import { difficultyButton, difficultyName } from '../../difficulty';
+import { UNGRADED_STARS, earnCoins } from '../../companion/companionSave';
+import { rewardBanner } from '../../companion/reward';
 import {
   BUBBLE_HEX,
+  BUBBLE_LEVELS,
   BubbleBoard,
   COLS,
   MAX_ROWS,
@@ -55,6 +59,8 @@ interface Faller {
 }
 
 export class BubbleGame {
+  /** Generator level of the chosen difficulty. */
+  private readonly level: number;
   private readonly board: BubbleBoard;
   private readonly canvas = el('canvas', { class: 'bubble-canvas' });
   private readonly context: CanvasRenderingContext2D;
@@ -81,7 +87,8 @@ export class BubbleGame {
     private readonly save: BubbleSave,
     private readonly actions: { replay(): void },
   ) {
-    this.board = generateLevel(save.level);
+    this.level = BUBBLE_LEVELS[save.difficulty];
+    this.board = generateLevel(this.level);
     this.shotsBeforeDrop = this.dropEvery();
     this.current = this.randomShotColor();
     this.next = this.randomShotColor();
@@ -91,13 +98,26 @@ export class BubbleGame {
     restart.addEventListener('click', () => {
       if (this.over || confirm('Recommencer ce niveau ?')) this.actions.replay();
     });
-    this.controls = el('div', { class: 'bubble-controls' }, this.dropMeter, el('div', { class: 'button-row' }, restart));
+    const zen = el('button', { class: 'button button-secondary', type: 'button' }, save.zen ? 'Mode normal' : 'Mode zen');
+    zen.addEventListener('click', () => {
+      if (!this.over && !confirm(save.zen ? 'Revenir au mode normal ? Le niveau recommence.' : 'Passer en mode zen ? Le niveau recommence.')) return;
+      this.save.zen = !this.save.zen;
+      saveBubbles(this.save);
+      this.actions.replay();
+    });
+    const difficulty = difficultyButton(save.difficulty, (chosen) => {
+      if (!this.over && !confirm('Changer de difficulté ? Le niveau recommence.')) return false;
+      this.save.difficulty = chosen;
+      saveBubbles(this.save);
+      this.actions.replay();
+    });
+    this.controls = el('div', { class: 'bubble-controls' }, this.dropMeter, el('div', { class: 'button-row' }, restart, zen, difficulty));
 
     root.append(
       el(
         'div',
         { class: 'bubble-game' },
-        topBar(`Bulles · niveau ${save.level}`, helpSlot(BUBBLES_HELP)),
+        topBar(`Bulles · ${difficultyName(save.difficulty)}${save.zen ? ' · zen' : ''}`, helpSlot(BUBBLES_HELP)),
         el('div', { class: 'bubble-stage' }, this.canvas),
         this.status,
         this.controls,
@@ -264,12 +284,14 @@ export class BubbleGame {
       for (const cell of this.board.floating()) this.removeFalling(cell);
     }
 
-    this.shotsBeforeDrop--;
-    if (this.shotsBeforeDrop === 0) {
-      this.ceilingY += ROW_HEIGHT;
-      this.shotsBeforeDrop = this.dropEvery();
+    if (!this.save.zen) {
+      this.shotsBeforeDrop--;
+      if (this.shotsBeforeDrop === 0) {
+        this.ceilingY += ROW_HEIGHT;
+        this.shotsBeforeDrop = this.dropEvery();
+      }
+      this.refreshDropMeter();
     }
-    this.refreshDropMeter();
 
     if (this.board.isEmpty()) this.win();
     else if (this.lowestBubbleY() > DANGER_Y) this.lose();
@@ -298,7 +320,7 @@ export class BubbleGame {
   }
 
   private dropEvery(): number {
-    return Math.max(5, 9 - Math.floor(this.save.level / 2));
+    return Math.max(5, 9 - Math.floor(this.level / 2));
   }
 
   private lowestBubbleY(): number {
@@ -349,13 +371,15 @@ export class BubbleGame {
   private win(): void {
     this.over = true;
     this.save.cleared++;
-    this.save.level++;
     saveBubbles(this.save);
+    // Zen mode has no ceiling to fear: it pays half.
+    const coins = earnCoins(this.save.zen ? UNGRADED_STARS / 2 : UNGRADED_STARS, this.save.difficulty);
     const next = el('button', { class: 'button', type: 'button' }, 'Niveau suivant');
     next.addEventListener('click', () => this.actions.replay());
     this.status.textContent = '';
     this.controls.replaceChildren(
       el('p', { class: 'bubble-result' }, el('strong', { text: 'Bravo !' }), ' Toutes les bulles ont éclaté.'),
+      rewardBanner(coins),
       el('div', { class: 'button-row' }, next),
     );
   }
@@ -372,6 +396,10 @@ export class BubbleGame {
   }
 
   private refreshDropMeter(): void {
+    if (this.save.zen) {
+      this.dropMeter.replaceChildren(el('span', { text: 'Mode zen : le plafond ne descend pas.' }));
+      return;
+    }
     const total = this.dropEvery();
     this.dropMeter.replaceChildren(
       el('span', { text: 'Le plafond descend dans ' }),
