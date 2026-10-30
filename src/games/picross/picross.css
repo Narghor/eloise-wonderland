@@ -1,0 +1,229 @@
+.picross {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------- */
+/* SIZE PICKER                                     */
+/* ----------------------------------------------- */
+
+.size-picker {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.size-picker h2 {
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.size-card {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  font: inherit;
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.size-card strong {
+  font-size: 1.15rem;
+}
+
+.size-card-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* ----------------------------------------------- */
+/* BOARD                                           */
+/* ----------------------------------------------- */
+
+.board-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px;
+}
+
+.board {
+  --cell: 28px;
+  display: grid;
+  grid-template-columns: auto repeat(var(--size), var(--cell));
+  grid-template-rows: auto repeat(var(--size), var(--cell));
+  font-size: max(10px, calc(var(--cell) * 0.48));
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.clue {
+  display: flex;
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.2s;
+}
+
+.clue.is-done {
+  opacity: 0.3;
+}
+
+.clue-col {
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 4px;
+  line-height: 1.15;
+}
+
+.clue-row {
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.35em;
+  padding-right: 6px;
+}
+
+.cell {
+  position: relative;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.cell.edge-top {
+  border-top: 2px solid var(--line-strong);
+}
+
+.cell.edge-left {
+  border-left: 2px solid var(--line-strong);
+}
+
+.cell.edge-right {
+  border-right: 2px solid var(--line-strong);
+}
+
+.cell.edge-bottom {
+  border-bottom: 2px solid var(--line-strong);
+}
+
+.cell.is-filled::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+
+.cell.is-crossed::after {
+  content: '\2715';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 0.85em;
+  font-weight: 700;
+}
+
+/* The finished drawing: lines fade, crosses vanish, filled cells join up in one colour. */
+.board.is-solved .cell {
+  border-color: transparent;
+  transition: border-color 0.6s, background 0.6s;
+}
+
+.board.is-solved .cell.is-crossed::after {
+  content: none;
+}
+
+.board.is-solved .cell.is-filled {
+  background: var(--reveal-color);
+}
+
+.board.is-solved .cell.is-filled::after {
+  content: none;
+}
+
+.board.is-solved .clue {
+  opacity: 0;
+}
+
+/* ----------------------------------------------- */
+/* CONTROLS                                        */
+/* ----------------------------------------------- */
+
+.controls {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 8px 16px 16px;
+}
+
+.tool-toggle {
+  display: flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+.tool-button {
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.tool-button.is-active {
+  background: var(--accent);
+  color: white;
+}
+
+.win-message {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.win-creature {
+  margin: -4px 0 0;
+  color: var(--muted);
+}
+
+.win-creature strong {
+  color: var(--accent-strong);
+}
+
+.hint-mouse {
+  display: none;
+  margin: 0 0 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hint-mouse {
+    display: block;
+  }
+}

@@ -1,0 +1,232 @@
+.sand,
+.sand-game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.jar-canvas {
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* ----------------------------------------------- */
+/* MENU AND SHELF                                  */
+/* ----------------------------------------------- */
+
+.sand-menu {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.menu-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-card.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.menu-card-icon {
+  width: 34px;
+  height: 56px;
+  border-radius: 6px 6px 12px 12px;
+  background: linear-gradient(#f7a6c1 0 30%, #ffe08a 30% 55%, #9fdfc8 55% 78%, #8fb8f0 78%);
+  box-shadow: inset 0 0 0 2px rgb(196 214 228);
+  flex-shrink: 0;
+}
+
+.menu-card-text {
+  display: grid;
+  gap: 2px;
+}
+
+.menu-card-text strong {
+  font-size: 1.1rem;
+}
+
+.menu-card-hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.shelf {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.shelf h2 {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.shelf-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: linear-gradient(transparent 0 calc(100% - 10px), #e8cdb5 calc(100% - 10px));
+}
+
+.shelf-tile {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.shelf-stars {
+  font-size: 0.8rem;
+  color: #e0a32e;
+  letter-spacing: 1px;
+}
+
+.bottle-portrait {
+  display: flex;
+  justify-content: center;
+}
+
+.bottle-details {
+  margin: 4px 0 16px;
+  color: var(--muted);
+}
+
+/* ----------------------------------------------- */
+/* GAME                                            */
+/* ----------------------------------------------- */
+
+.sand-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 18px 16px 8px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+}
+
+.spout {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* The funnel above the opening, coloured with the selected sand. */
+.spout::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: -18px;
+  width: 18px;
+  height: 14px;
+  background: var(--sand);
+  clip-path: polygon(0 0, 100% 0, 65% 100%, 35% 100%);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+/* The falling stream, only while pouring. */
+.spout::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: -4px;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--sand);
+  opacity: 0;
+}
+
+.spout.is-pouring::before {
+  opacity: 1;
+}
+
+.spout.is-pouring::after {
+  opacity: 1;
+}
+
+.sand-model {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: var(--shadow);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.sand-model .jar-canvas {
+  width: 52px;
+  height: 84px;
+}
+
+.sand-status {
+  min-height: 1.3em;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.sand-controls {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 8px 16px 20px;
+}
+
+.sand-swatch {
+  width: 40px;
+  height: 40px;
+}
+
+.sand-result {
+  margin: 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.sand-stars {
+  font-size: 1.6rem;
+  color: #e0a32e;
+  letter-spacing: 2px;
+  vertical-align: middle;
+}

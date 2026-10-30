@@ -1,0 +1,74 @@
+.garden {
+  min-height: 100dvh;
+}
+
+.garden-count {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.garden-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.garden-tile {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 12px 6px 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.garden-tile-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.garden-tile-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.creature-canvas {
+  image-rendering: pixelated;
+}
+
+.garden-empty {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  max-width: 420px;
+  margin: 24px auto;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.garden-empty .button {
+  margin-top: 12px;
+}
+
+.creature-born {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
