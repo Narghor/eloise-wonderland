@@ -2,7 +2,8 @@ import './companion.css';
 import { el, topBar } from '../dom';
 import { SLOTS, SLOT_NAMES, findItem, itemsOf, type Item, type Slot } from './catalog';
 import { companionPortrait } from './companionArt';
-import { loadCompanion, saveCompanion, type CompanionSave, type Look } from './companionSave';
+import { isOwned, loadCompanion, saveCompanion, type CompanionSave, type Look } from './companionSave';
+import { challengesDone } from '../daily/daily';
 
 const NAME_MAX_LENGTH = 16;
 
@@ -71,10 +72,12 @@ function shopCards(save: CompanionSave, slot: Slot, refresh: () => void, status:
     cards.push(none);
   }
 
+  const challenges = challengesDone();
   for (const item of itemsOf(slot)) {
-    const owned = save.owned.includes(item.id);
+    const owned = isOwned(save, item, challenges);
     const worn = currentId(save.look, slot) === item.id;
-    const tag = worn ? 'Porté' : owned ? 'À toi' : `${item.price} 🪙`;
+    const price = item.challenges === undefined ? `${item.price} 🪙` : `🏅 ${item.challenges} défis`;
+    const tag = worn ? 'Porté' : owned ? 'À toi' : price;
     const element = card(withItem(save.look, slot, item.id), item.name, tag);
     element.classList.toggle('is-worn', worn);
     element.classList.toggle('is-locked', !owned);
@@ -104,6 +107,10 @@ function card(look: Look, name: string, tag: string): HTMLButtonElement {
 }
 
 function buy(save: CompanionSave, item: Item, status: HTMLElement): boolean {
+  if (item.challenges !== undefined) {
+    status.textContent = `${item.name} ne s'achète pas : réussis ${item.challenges} défis du jour pour l'avoir (${challengesDone()} pour l'instant).`;
+    return false;
+  }
   if (save.coins < item.price) {
     const missing = item.price - save.coins;
     status.textContent = `Il te manque ${missing} pièce${missing > 1 ? 's' : ''} pour ${item.name.toLowerCase()}.`;

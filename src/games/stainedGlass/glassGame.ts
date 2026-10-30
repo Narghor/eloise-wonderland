@@ -2,8 +2,7 @@ import { el, topBar, type BackLink } from '../../dom';
 import { isDarkColor } from '../../color';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { difficultyFromLevel, difficultyName, type Difficulty } from '../../difficulty';
-import { UNGRADED_STARS, earnCoins } from '../../companion/companionSave';
-import { rewardBanner } from '../../companion/reward';
+import { levelReward } from '../../companion/reward';
 import { GLASS_HELP } from './glassHelp';
 import { paintWindow } from './glassPainter';
 import { GAME_WIDTH, GLASS_LEVELS, generateLayout, rasterize, type Layout, type Raster } from './glassWindow';
@@ -46,7 +45,11 @@ export class GlassGame {
       el(
         'div',
         { class: 'glass-game' },
-        topBar(`Vitrail n°${windowNumber(current)} · ${difficultyName(this.difficulty)}`, helpSlot(GLASS_HELP), BACK_GLASS),
+        topBar(
+          `Vitrail n°${windowNumber(current)} · ${current.challenge ? 'Défi du jour' : difficultyName(this.difficulty)}`,
+          helpSlot(GLASS_HELP),
+          BACK_GLASS,
+        ),
         el('div', { class: 'glass-stage' }, this.canvas),
         this.status,
         this.controls,
@@ -159,7 +162,7 @@ export class GlassGame {
     });
     this.save.current = null;
     saveGlass(this.save);
-    const coins = earnCoins(UNGRADED_STARS, this.difficulty);
+    const reward = levelReward(null, this.difficulty, this.current.challenge);
 
     this.canvas.classList.add('is-lit');
     const next = el('button', { class: 'button', type: 'button' }, 'Vitrail suivant');
@@ -167,7 +170,7 @@ export class GlassGame {
     this.status.textContent = '';
     this.controls.replaceChildren(
       el('p', { class: 'glass-result' }, el('strong', { text: 'Magnifique !' }), ' La lumière traverse ton vitrail.'),
-      rewardBanner(coins),
+      reward,
       el('div', { class: 'button-row' }, next, el('a', { class: 'button button-secondary', href: '#/vitrail' }, 'Ma chapelle')),
     );
   }

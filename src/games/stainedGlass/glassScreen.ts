@@ -1,6 +1,7 @@
 import './glass.css';
 import { el, topBar } from '../../dom';
 import { difficultyName, difficultyPicker } from '../../difficulty';
+import { CHALLENGE_DIFFICULTY } from '../../daily/daily';
 import { navigate } from '../../navigation';
 import { newSeed } from '../../random';
 import { GlassGame } from './glassGame';
@@ -22,14 +23,20 @@ export function renderGlass(root: HTMLElement, params: string[]): () => void {
   return () => {};
 }
 
-function startWindow(save: GlassSave): void {
+function startWindow(save: GlassSave, challenge?: string): void {
   const number = save.windowsDone + 1;
-  const level = GLASS_LEVELS[save.difficulty];
+  const level = GLASS_LEVELS[challenge ? CHALLENGE_DIFFICULTY : save.difficulty];
   // The very first window keeps the classic arch; after that, any shape.
   const shape = number === 1 ? 'arch' : WINDOW_SHAPES[Math.floor(Math.random() * WINDOW_SHAPES.length)];
-  save.current = { number, level, shape, seed: newSeed(), colors: new Array(pieceCountFor(level)).fill(-1) };
+  save.current = { number, level, shape, seed: newSeed(), colors: new Array(pieceCountFor(level)).fill(-1), challenge };
   saveGlass(save);
   navigate(PLAY_ROUTE);
+}
+
+export function startGlassChallenge(day: string): void {
+  const save = loadGlass();
+  if (save.current && !confirm('Le défi remplace ton vitrail en cours. On y va ?')) return;
+  startWindow(save, day);
 }
 
 function renderMenu(root: HTMLElement, save: GlassSave): void {

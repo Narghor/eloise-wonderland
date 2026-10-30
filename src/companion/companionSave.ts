@@ -1,6 +1,7 @@
 import { readGame, writeGame } from '../save';
 import type { Difficulty } from '../difficulty';
-import { STARTER_SPECIES, findItem, type Slot } from './catalog';
+import { challengesDone } from '../daily/daily';
+import { ITEMS, STARTER_SPECIES, findItem, type Item, type Slot } from './catalog';
 
 const GAME_ID = 'companion';
 const DEFAULT_NAME = 'Pompon';
@@ -25,12 +26,16 @@ export function loadCompanion(): CompanionSave {
   const data = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   const owned = new Set(Array.isArray(data.owned) ? data.owned.filter((id): id is string => typeof id === 'string' && !!findItem(id)) : []);
   owned.add(STARTER_SPECIES);
+  // What may be worn: bought, or unlocked by the challenges (those stay out of `owned`).
+  const wearable = new Set(owned);
+  const challenges = challengesDone();
+  for (const item of ITEMS) if (item.challenges !== undefined && challenges >= item.challenges) wearable.add(item.id);
   return {
     name: typeof data.name === 'string' && data.name.trim() !== '' ? data.name : DEFAULT_NAME,
     coins: isCount(data.coins) ? data.coins : 0,
     earned: isCount(data.earned) ? data.earned : 0,
     owned: [...owned],
-    look: loadLook(data.look, owned),
+    look: loadLook(data.look, wearable),
   };
 }
 
@@ -46,12 +51,21 @@ export function coinsFor(stars: number, difficulty: Difficulty): number {
 /** Adds the coins of a finished level and returns how many were given. */
 export function earnCoins(stars: number, difficulty: Difficulty): number {
   const coins = coinsFor(stars, difficulty);
-  if (coins === 0) return 0;
+  addCoins(coins);
+  return coins;
+}
+
+export function addCoins(coins: number): void {
+  if (coins === 0) return;
   const save = loadCompanion();
   save.coins += coins;
   save.earned += coins;
   saveCompanion(save);
-  return coins;
+}
+
+/** Bought, or unlocked by the daily challenges done. */
+export function isOwned(save: CompanionSave, item: Item, challenges = challengesDone()): boolean {
+  return save.owned.includes(item.id) || (item.challenges !== undefined && challenges >= item.challenges);
 }
 
 function isCount(value: unknown): value is number {

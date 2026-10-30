@@ -1,4 +1,5 @@
 import { readGame, writeGame } from '../../save';
+import { isDayKey } from '../../daily/daily';
 
 const GAME_ID = 'picross';
 
@@ -9,6 +10,8 @@ export interface InProgress {
   solution: boolean[][];
   marks: Mark[][];
   elapsedMs: number;
+  /** Day of the daily challenge this grid is. */
+  challenge?: string;
 }
 
 export interface PicrossSave {
@@ -50,6 +53,7 @@ function isInProgress(value: unknown): value is InProgress {
   return (
     size > 0 &&
     typeof candidate.elapsedMs === 'number' &&
+    (candidate.challenge === undefined || isDayKey(candidate.challenge)) &&
     isSquareGrid(candidate.solution, size, (cell) => typeof cell === 'boolean') &&
     isSquareGrid(candidate.marks, size, (cell) => cell === Mark.None || cell === Mark.Fill || cell === Mark.Cross)
   );

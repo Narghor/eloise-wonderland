@@ -1,5 +1,6 @@
 import { readGame, writeGame } from '../../save';
 import { loadDifficulty, type Difficulty } from '../../difficulty';
+import { isDayKey } from '../../daily/daily';
 import { CAPACITY, POTION_COLORS, POTION_LEVELS, type Vials } from './potionBoard';
 
 const GAME_ID = 'potions';
@@ -9,6 +10,8 @@ export interface CurrentPotions {
   vials: Vials;
   moves: number;
   par: number;
+  /** Day of the daily challenge this level is. */
+  challenge?: string;
 }
 
 export interface PotionSave {
@@ -50,6 +53,7 @@ function isCurrent(value: unknown): value is CurrentPotions {
     isVials(candidate.vials) &&
     candidate.initial.length === candidate.vials.length &&
     Number.isInteger(candidate.moves) &&
-    Number.isInteger(candidate.par)
+    Number.isInteger(candidate.par) &&
+    (candidate.challenge === undefined || isDayKey(candidate.challenge))
   );
 }

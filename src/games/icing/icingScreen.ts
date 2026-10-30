@@ -1,6 +1,7 @@
 import './icing.css';
 import { el, topBar } from '../../dom';
 import { difficultyName, difficultyPicker } from '../../difficulty';
+import { CHALLENGE_DIFFICULTY } from '../../daily/daily';
 import { navigate } from '../../navigation';
 import { newSeed } from '../../random';
 import { ICING_LEVELS, generateCookie } from './cookie';
@@ -21,13 +22,21 @@ export function renderIcing(root: HTMLElement, params: string[]): () => void {
   return () => {};
 }
 
-function startCookie(save: IcingSave): void {
+export function startIcingChallenge(day: string): void {
+  const save = loadIcing();
+  if (save.current && !confirm('Le défi remplace ton biscuit en cours. On y va ?')) return;
+  startCookie(save, day);
+}
+
+function startCookie(save: IcingSave, challenge?: string): void {
+  const difficulty = challenge ? CHALLENGE_DIFFICULTY : save.difficulty;
   save.current = {
     number: save.cookiesDone + 1,
-    difficulty: save.difficulty,
-    level: ICING_LEVELS[save.difficulty],
+    difficulty,
+    level: ICING_LEVELS[difficulty],
     seed: newSeed(),
     strokes: [],
+    challenge,
   };
   saveIcing(save);
   navigate(PLAY_ROUTE);

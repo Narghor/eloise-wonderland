@@ -2,6 +2,7 @@ import { readGame, writeGame } from '../../save';
 import { difficultyFromLevel, isDifficulty, loadDifficulty, type Difficulty } from '../../difficulty';
 import { JAR_HEIGHT, JAR_WIDTH, isContainerId, type ContainerId } from './containers';
 import { SAND_LEVELS } from './levels';
+import { isDayKey } from '../../daily/daily';
 
 const GAME_ID = 'sand';
 const CELL_COUNT = JAR_WIDTH * JAR_HEIGHT;
@@ -18,6 +19,8 @@ export interface CurrentBottle {
   /** Encoded colours of the model (see encodeColors), null in free mode. */
   target: string | null;
   cells: string;
+  /** Day of the daily challenge this model is. */
+  challenge?: string;
 }
 
 export interface ShelfBottle {
@@ -118,7 +121,8 @@ function isCurrent(value: unknown): value is CurrentBottle {
     (candidate.level === null || typeof candidate.level === 'number') &&
     isPalette(candidate.palette) &&
     fitsPalette(candidate.cells, candidate.palette) &&
-    (candidate.target === null || fitsPalette(candidate.target, candidate.palette))
+    (candidate.target === null || fitsPalette(candidate.target, candidate.palette)) &&
+    (candidate.challenge === undefined || isDayKey(candidate.challenge))
   );
 }
 

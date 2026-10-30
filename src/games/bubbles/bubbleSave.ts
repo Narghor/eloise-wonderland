@@ -1,5 +1,6 @@
 import { readGame, writeGame } from '../../save';
 import { loadDifficulty, type Difficulty } from '../../difficulty';
+import { isDayKey } from '../../daily/daily';
 import { BUBBLE_LEVELS } from './bubbleBoard';
 
 const GAME_ID = 'bubbles';
@@ -10,6 +11,8 @@ export interface BubbleSave {
   cleared: number;
   /** Zen mode: the ceiling never comes down. */
   zen: boolean;
+  /** Day of a daily challenge waiting to be won: the next levels are that challenge, without zen. */
+  challenge?: string;
 }
 
 export function loadBubbles(): BubbleSave {
@@ -20,6 +23,7 @@ export function loadBubbles(): BubbleSave {
     difficulty: loadDifficulty(data.difficulty, BUBBLE_LEVELS, data.level),
     cleared: Number.isInteger(data.cleared) ? (data.cleared as number) : 0,
     zen: data.zen === true,
+    challenge: isDayKey(data.challenge) ? data.challenge : undefined,
   };
 }
 

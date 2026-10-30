@@ -13,6 +13,9 @@ const FACE_COLORS: Record<string, string> = {
   n: '#5a3a48',
   e: '#2e2236',
   w: '#ffffff',
+  k: '#3b2a3f',
+  y: '#f6c45a',
+  p: '#ff9ec7',
 };
 
 /** The companion on a pixel canvas, scaled up by CSS (`image-rendering: pixelated`). */
@@ -38,9 +41,14 @@ export function companionPortrait(look: Look, size: number): HTMLElement {
 function drawCompanion(context: CanvasRenderingContext2D, look: Look): void {
   const species = speciesOf(look.species);
   const coat = findItem(look.color);
-  const body = coat?.slot === 'color' ? coat.color : species.color;
-  const colors: Record<string, string> = { ...FACE_COLORS, b: body, o: darken(body, 0.5), l: lighten(body, 0.55) };
-  paint(context, species.pixels, colors, 0, HEADROOM);
+  const bands = coat?.slot === 'color' ? (coat.bands ?? [coat.color]) : [species.color];
+  const top = species.pixels.findIndex((row) => /[^.]/.test(row));
+  const height = species.pixels.length - top;
+  species.pixels.forEach((row, y) => {
+    const body = bands[Math.max(0, Math.floor(((y - top) * bands.length) / height))];
+    const colors = { ...FACE_COLORS, b: body, o: darken(body, 0.5), l: lighten(body, 0.55) };
+    paint(context, [row], colors, 0, HEADROOM + y);
+  });
 
   const worn = (id: string | null) => {
     const item = findItem(id);

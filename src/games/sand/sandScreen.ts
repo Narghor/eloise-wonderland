@@ -1,6 +1,7 @@
 import './sand.css';
 import { el, topBar } from '../../dom';
 import { difficultyName, difficultyPicker } from '../../difficulty';
+import { CHALLENGE_DIFFICULTY } from '../../daily/daily';
 import { navigate } from '../../navigation';
 import { CONTAINERS, CONTAINER_IDS, JAR_HEIGHT, JAR_WIDTH, type ContainerId } from './containers';
 import { cellsFromColors } from './jar';
@@ -25,11 +26,18 @@ export function renderSand(root: HTMLElement, params: string[]): () => void {
   return () => {};
 }
 
-function startModel(save: SandSave): void {
+function startModel(save: SandSave, challenge?: string): void {
   const level = save.modelsDone + 1;
   const container = containerForModel(level);
-  const { theme, palette, target } = generateLevel(SAND_LEVELS[save.difficulty], CONTAINERS[container]);
-  start(save, { level, difficulty: save.difficulty, container, theme, palette, target: encodeColors(target), cells: emptyJar() });
+  const difficulty = challenge ? CHALLENGE_DIFFICULTY : save.difficulty;
+  const { theme, palette, target } = generateLevel(SAND_LEVELS[difficulty], CONTAINERS[container]);
+  start(save, { level, difficulty, container, theme, palette, target: encodeColors(target), cells: emptyJar(), challenge });
+}
+
+export function startSandChallenge(day: string): void {
+  const save = loadSand();
+  if (save.current && !confirm('Le défi remplace ta bouteille en cours. On y va ?')) return;
+  startModel(save, day);
 }
 
 function startFree(save: SandSave, container: ContainerId): void {

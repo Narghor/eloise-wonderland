@@ -5,6 +5,7 @@ import { creatureCanvas } from './creatures/creatureCanvas';
 import { loadGarden } from './creatures/garden';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
+import { CHALLENGE_GAME_NAMES, challengeGameOn, loadDaily, streak, todayKey } from './daily/daily';
 
 export function renderHome(root: HTMLElement): () => void {
   root.append(
@@ -17,6 +18,7 @@ export function renderHome(root: HTMLElement): () => void {
       'main',
       { class: 'home' },
       companionCard(),
+      dailyCard(),
       el(
         'a',
         { class: 'game-card', href: '#/picross' },
@@ -137,6 +139,25 @@ function companionCard(): HTMLElement {
       el('strong', { text: companion.name }),
       el('span', { class: 'coin-pill', text: `${companion.coins} 🪙` }),
       el('span', { text: 'Gagne des pièces en jouant pour l’habiller' }),
+    ),
+  );
+}
+
+function dailyCard(): HTMLElement {
+  const save = loadDaily();
+  const today = todayKey();
+  const stars = save.days[today];
+  const run = streak(save, today);
+  const status = stars === undefined ? `Aujourd'hui : ${CHALLENGE_GAME_NAMES[challengeGameOn(today)]}` : 'Réussi ! Reviens demain';
+  return el(
+    'a',
+    { class: `game-card daily-card${stars === undefined ? ' is-pending' : ''}`, href: '#/defi' },
+    el('span', { class: 'game-card-icon is-daily', 'aria-hidden': 'true', text: stars === undefined ? '★' : '✓' }),
+    el(
+      'span',
+      { class: 'game-card-text' },
+      el('strong', { text: 'Défi du jour' }),
+      el('span', { text: run > 1 ? `${status} · série de ${run} jours` : status }),
     ),
   );
 }

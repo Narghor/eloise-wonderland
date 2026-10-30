@@ -1,6 +1,7 @@
 import { readGame, writeGame } from '../../save';
 import { difficultyFromLevel, isDifficulty, type Difficulty } from '../../difficulty';
 import { ICING_LEVELS, type Point } from './cookie';
+import { isDayKey } from '../../daily/daily';
 import type { Stroke } from './icingScore';
 
 const GAME_ID = 'icing';
@@ -15,6 +16,8 @@ export interface CurrentCookie {
   /** Rebuilds the cookie with generateCookie(seed, level). */
   seed: number;
   strokes: Stroke[];
+  /** Day of the daily challenge this cookie is. */
+  challenge?: string;
 }
 
 export interface ShowcaseCookie {
@@ -95,7 +98,8 @@ function isCurrent(value: unknown): value is CurrentCookie {
     (candidate.number === undefined || Number.isInteger(candidate.number)) &&
     Number.isInteger(candidate.level) &&
     Number.isInteger(candidate.seed) &&
-    isStrokeList(candidate.strokes)
+    isStrokeList(candidate.strokes) &&
+    (candidate.challenge === undefined || isDayKey(candidate.challenge))
   );
 }
 

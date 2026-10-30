@@ -437,6 +437,22 @@ a {
     var(--accent-soft);
 }
 
+.game-card-icon.is-daily {
+  width: 69px;
+  height: 69px;
+  padding: 0;
+  place-items: center;
+  grid-template-columns: auto;
+  background: linear-gradient(135deg, #fff3c4, #ffd0e0);
+  color: #b58900;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.daily-card.is-pending {
+  box-shadow: var(--shadow), 0 0 0 2px #f2c94c;
+}
+
 .game-card-icon.is-creature {
   grid-template-columns: auto;
   place-items: center;

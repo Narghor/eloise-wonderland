@@ -2,11 +2,21 @@ import './potions.css';
 import { el, topBar } from '../../dom';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { difficultyButton, difficultyName } from '../../difficulty';
-import { earnCoins } from '../../companion/companionSave';
-import { rewardBanner } from '../../companion/reward';
+import { levelReward } from '../../companion/reward';
+import { CHALLENGE_DIFFICULTY } from '../../daily/daily';
+import { navigate } from '../../navigation';
 import { CAPACITY, POTION_COLORS, POTION_LEVELS, generateLevel, isSolved, pour, pourAmount, starsFor, type Vials } from './potionBoard';
 import { POTION_HELP } from './potionHelp';
 import { loadPotions, savePotions, type CurrentPotions, type PotionSave } from './potionSave';
+
+export function startPotionChallenge(day: string): void {
+  const save = loadPotions();
+  if (save.current && save.current.moves > 0 && !confirm('Le défi remplace ton niveau de Fioles en cours. On y va ?')) return;
+  const { vials, par } = generateLevel(POTION_LEVELS[CHALLENGE_DIFFICULTY]);
+  save.current = { initial: vials, vials, moves: 0, par, challenge: day };
+  savePotions(save);
+  navigate('#/fioles');
+}
 
 export function renderPotions(root: HTMLElement): () => void {
   const start = () => {
@@ -56,7 +66,7 @@ class PotionGame {
       el(
         'div',
         { class: 'potion-game' },
-        topBar(`Fioles · ${difficultyName(save.difficulty)}`, helpSlot(POTION_HELP, this.movesEl)),
+        topBar(`Fioles · ${current.challenge ? 'Défi du jour' : difficultyName(save.difficulty)}`, helpSlot(POTION_HELP, this.movesEl)),
         el('div', { class: 'vials-wrap' }, this.vialsEl),
         this.status,
         this.controls,
@@ -127,7 +137,8 @@ class PotionGame {
     this.save.done++;
     this.save.current = null;
     savePotions(this.save);
-    const coins = earnCoins(stars, this.save.difficulty);
+    const challenge = this.current.challenge;
+    const reward = levelReward(stars, challenge ? CHALLENGE_DIFFICULTY : this.save.difficulty, challenge);
 
     this.vialsEl.classList.add('is-done');
     const next = el('button', { class: 'button', type: 'button' }, 'Niveau suivant');
@@ -136,7 +147,7 @@ class PotionGame {
     this.controls.replaceChildren(
       el('p', { class: 'potion-stars', text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
       el('p', { class: 'potion-result' }, `Trié en ${this.current.moves} coups (objectif ${this.current.par}).`),
-      rewardBanner(coins),
+      reward,
       el('div', { class: 'button-row' }, next),
     );
   }

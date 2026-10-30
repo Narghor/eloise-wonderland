@@ -8,8 +8,7 @@ import { GRAINS_PER_FRAME, STEPS_PER_FRAME } from './levels';
 import { similarity, starsFor } from './score';
 import { bottleDifficulty, decodeColors, encodeColors, saveSand, type CurrentBottle, type SandSave } from './sandSave';
 import { difficultyName } from '../../difficulty';
-import { earnCoins } from '../../companion/companionSave';
-import { rewardBanner } from '../../companion/reward';
+import { levelReward } from '../../companion/reward';
 
 const BACK_SAND: BackLink = { href: '#/sable', label: 'Sable' };
 const MAX_UNDO = 15;
@@ -73,7 +72,7 @@ export class SandGame {
     const title =
       bottle.level === null
         ? 'Création libre'
-        : `${bottle.theme ?? `Bouteille n°${bottle.level}`} · ${difficultyName(bottleDifficulty(bottle))}`;
+        : `${bottle.theme ?? `Bouteille n°${bottle.level}`} · ${bottle.challenge ? 'Défi du jour' : difficultyName(bottleDifficulty(bottle))}`;
     root.append(
       el('div', { class: 'sand-game' }, topBar(title, helpSlot(SAND_HELP), BACK_SAND), this.stage, this.status, this.controls),
     );
@@ -288,7 +287,7 @@ export class SandGame {
     });
     this.save.current = null;
     saveSand(this.save);
-    const coins = stars === null ? null : earnCoins(stars, bottleDifficulty(this.bottle));
+    const reward = stars === null ? '' : levelReward(stars, bottleDifficulty(this.bottle), this.bottle.challenge);
 
     const next = el('button', { class: 'button', type: 'button' }, score === null ? 'Nouvelle création' : 'Bouteille suivante');
     next.addEventListener('click', () => (score === null ? this.actions.newFree(this.bottle.container) : this.actions.nextModel()));
@@ -302,7 +301,7 @@ export class SandGame {
             el('span', { class: 'sand-stars', text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
             ` Ressemblance : ${Math.round(score * 100)} %`,
           ),
-      coins === null ? '' : rewardBanner(coins),
+      reward,
       el('div', { class: 'button-row' }, next, el('a', { class: 'button button-secondary', href: '#/sable' }, 'Mon étagère')),
     );
   }

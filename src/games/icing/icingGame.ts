@@ -7,8 +7,7 @@ import { paintCookie } from './icingPainter';
 import { compactStroke, cookieDifficulty, cookieNumber, saveIcing, type CurrentCookie, type IcingSave } from './icingSave';
 import { scoreIcing, starsFor, toleranceFor, type Stroke } from './icingScore';
 import { difficultyName } from '../../difficulty';
-import { earnCoins } from '../../companion/companionSave';
-import { rewardBanner } from '../../companion/reward';
+import { levelReward } from '../../companion/reward';
 
 const BACK_ICING: BackLink = { href: '#/glacage', label: 'Glaçage' };
 /** A new point is kept once the finger moved this far (cookie units). */
@@ -55,7 +54,11 @@ export class IcingGame {
       el(
         'div',
         { class: 'icing-game' },
-        topBar(`Biscuit n°${cookieNumber(current)} · ${difficultyName(cookieDifficulty(current))}`, helpSlot(ICING_HELP), BACK_ICING),
+        topBar(
+          `Biscuit n°${cookieNumber(current)} · ${current.challenge ? 'Défi du jour' : difficultyName(cookieDifficulty(current))}`,
+          helpSlot(ICING_HELP),
+          BACK_ICING,
+        ),
         el('div', { class: 'icing-stage' }, this.canvas),
         this.status,
         this.controls,
@@ -188,7 +191,7 @@ export class IcingGame {
     });
     this.save.current = null;
     saveIcing(this.save);
-    const coins = earnCoins(stars, difficulty);
+    const reward = levelReward(stars, difficulty, this.current.challenge);
 
     // Sprinkles seeded by the cookie: the showcase throws exactly the same ones.
     this.repaint(this.current.seed);
@@ -203,7 +206,7 @@ export class IcingGame {
         el('span', { class: 'icing-stars', text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
         ` Précision : ${Math.round(score.total * 100)} %`,
       ),
-      rewardBanner(coins),
+      reward,
       el('div', { class: 'button-row' }, next, el('a', { class: 'button button-secondary', href: '#/glacage' }, 'Ma vitrine')),
     );
   }

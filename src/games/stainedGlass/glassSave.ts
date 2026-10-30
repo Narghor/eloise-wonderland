@@ -1,5 +1,6 @@
 import { readGame, writeGame } from '../../save';
 import { loadDifficulty, type Difficulty } from '../../difficulty';
+import { isDayKey } from '../../daily/daily';
 import { GLASS_LEVELS, isWindowShape, type Point, type WindowShape } from './glassWindow';
 
 const GAME_ID = 'stainedGlass';
@@ -14,6 +15,8 @@ export interface CurrentWindow {
   seed: number;
   /** Palette index per piece, -1 when still uncoloured. */
   colors: number[];
+  /** Day of the daily challenge this window is. */
+  challenge?: string;
 }
 
 /** A finished window keeps its seeds: the gallery redraws it without regenerating it. */
@@ -76,7 +79,8 @@ function isCurrent(value: unknown): value is CurrentWindow {
     isOptionalNumber(candidate.number) &&
     Number.isInteger(candidate.level) &&
     Number.isInteger(candidate.seed) &&
-    isColorList(candidate.colors, 10)
+    isColorList(candidate.colors, 10) &&
+    (candidate.challenge === undefined || isDayKey(candidate.challenge))
   );
 }
 

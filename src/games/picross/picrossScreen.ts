@@ -4,8 +4,8 @@ import { createCreature, difficultyForSize } from '../../creatures/creature';
 import { addCreature } from '../../creatures/garden';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { difficultyName } from '../../difficulty';
-import { UNGRADED_STARS, earnCoins } from '../../companion/companionSave';
-import { rewardBanner } from '../../companion/reward';
+import { levelReward } from '../../companion/reward';
+import { navigate } from '../../navigation';
 import { PICROSS_HELP } from './picrossHelp';
 import { generatePuzzle, puzzleFrom, type Puzzle } from './generator';
 import { clueOf, sameClue } from './lines';
@@ -16,6 +16,19 @@ const SIZES = [
   { size: 10, label: 'Moyen' },
   { size: 15, label: 'Grand' },
 ];
+
+/** The challenge grid is the medium one. */
+const CHALLENGE_SIZE = 10;
+
+export function startPicrossChallenge(day: string): void {
+  const save = loadPicross();
+  if (save.current && save.current.marks.some((row) => row.some((mark) => mark !== Mark.None))) {
+    if (!confirm('Le défi remplace ta grille de Picross en cours. On y va ?')) return;
+  }
+  save.current = { solution: generatePuzzle(CHALLENGE_SIZE).solution, marks: emptyMarks(CHALLENGE_SIZE), elapsedMs: 0, challenge: day };
+  savePicross(save);
+  navigate('#/picross');
+}
 
 export function renderPicross(root: HTMLElement): () => void {
   const save = loadPicross();
@@ -139,7 +152,10 @@ class PicrossGame {
       el(
         'div',
         { class: 'picross' },
-        topBar(`Picross ${this.size}×${this.size} · ${difficultyName(difficultyForSize(this.size))}`, helpSlot(PICROSS_HELP, this.timerEl)),
+        topBar(
+          `Picross ${this.size}×${this.size} · ${state.challenge ? 'Défi du jour' : difficultyName(difficultyForSize(this.size))}`,
+          helpSlot(PICROSS_HELP, this.timerEl),
+        ),
         el('div', { class: 'board-wrap' }, this.board),
         this.controls,
         el('p', { class: 'hint-mouse', text: 'Clic droit : poser une croix.' }),
@@ -387,7 +403,7 @@ class PicrossGame {
     addCreature(creature);
     this.save.current = null;
     savePicross(this.save);
-    const coins = earnCoins(UNGRADED_STARS, difficultyForSize(this.size));
+    const reward = levelReward(null, difficultyForSize(this.size), this.state.challenge);
 
     this.board.style.setProperty('--reveal-color', creature.palette[0]);
     this.board.classList.add('is-solved');
@@ -405,7 +421,7 @@ class PicrossGame {
         creature.rarity ? '✨ Une bête RARE est apparue : ' : 'Une petite bête est apparue : ',
         el('strong', { text: creature.name }),
       ),
-      rewardBanner(coins),
+      reward,
       el('div', { class: 'button-row' }, color, again, otherSize),
     );
   }

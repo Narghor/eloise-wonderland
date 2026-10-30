@@ -2,8 +2,9 @@ import { darken } from '../../color';
 import { el, topBar } from '../../dom';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { difficultyButton, difficultyName } from '../../difficulty';
-import { UNGRADED_STARS, earnCoins } from '../../companion/companionSave';
-import { rewardBanner } from '../../companion/reward';
+import { UNGRADED_STARS } from '../../companion/companionSave';
+import { levelReward } from '../../companion/reward';
+import { CHALLENGE_DIFFICULTY } from '../../daily/daily';
 import {
   BUBBLE_HEX,
   BUBBLE_LEVELS,
@@ -61,6 +62,7 @@ interface Faller {
 export class BubbleGame {
   /** Generator level of the chosen difficulty. */
   private readonly level: number;
+  private readonly zen: boolean;
   private readonly board: BubbleBoard;
   private readonly canvas = el('canvas', { class: 'bubble-canvas' });
   private readonly context: CanvasRenderingContext2D;
@@ -87,7 +89,8 @@ export class BubbleGame {
     private readonly save: BubbleSave,
     private readonly actions: { replay(): void },
   ) {
-    this.level = BUBBLE_LEVELS[save.difficulty];
+    this.zen = save.zen && !save.challenge;
+    this.level = BUBBLE_LEVELS[save.challenge ? CHALLENGE_DIFFICULTY : save.difficulty];
     this.board = generateLevel(this.level);
     this.shotsBeforeDrop = this.dropEvery();
     this.current = this.randomShotColor();
@@ -111,13 +114,16 @@ export class BubbleGame {
       saveBubbles(this.save);
       this.actions.replay();
     });
-    this.controls = el('div', { class: 'bubble-controls' }, this.dropMeter, el('div', { class: 'button-row' }, restart, zen, difficulty));
+    // A challenge is played as it is: no zen, no other difficulty.
+    const buttons = save.challenge ? [restart] : [restart, zen, difficulty];
+    this.controls = el('div', { class: 'bubble-controls' }, this.dropMeter, el('div', { class: 'button-row' }, ...buttons));
 
+    const mode = save.challenge ? 'Défi du jour' : `${difficultyName(save.difficulty)}${this.zen ? ' · zen' : ''}`;
     root.append(
       el(
         'div',
         { class: 'bubble-game' },
-        topBar(`Bulles · ${difficultyName(save.difficulty)}${save.zen ? ' · zen' : ''}`, helpSlot(BUBBLES_HELP)),
+        topBar(`Bulles · ${mode}`, helpSlot(BUBBLES_HELP)),
         el('div', { class: 'bubble-stage' }, this.canvas),
         this.status,
         this.controls,
@@ -284,7 +290,7 @@ export class BubbleGame {
       for (const cell of this.board.floating()) this.removeFalling(cell);
     }
 
-    if (!this.save.zen) {
+    if (!this.zen) {
       this.shotsBeforeDrop--;
       if (this.shotsBeforeDrop === 0) {
         this.ceilingY += ROW_HEIGHT;
@@ -371,15 +377,19 @@ export class BubbleGame {
   private win(): void {
     this.over = true;
     this.save.cleared++;
+    const challenge = this.save.challenge;
+    this.save.challenge = undefined;
     saveBubbles(this.save);
     // Zen mode has no ceiling to fear: it pays half.
-    const coins = earnCoins(this.save.zen ? UNGRADED_STARS / 2 : UNGRADED_STARS, this.save.difficulty);
+    const reward = challenge
+      ? levelReward(null, CHALLENGE_DIFFICULTY, challenge)
+      : levelReward(this.zen ? UNGRADED_STARS / 2 : null, this.save.difficulty);
     const next = el('button', { class: 'button', type: 'button' }, 'Niveau suivant');
     next.addEventListener('click', () => this.actions.replay());
     this.status.textContent = '';
     this.controls.replaceChildren(
       el('p', { class: 'bubble-result' }, el('strong', { text: 'Bravo !' }), ' Toutes les bulles ont éclaté.'),
-      rewardBanner(coins),
+      reward,
       el('div', { class: 'button-row' }, next),
     );
   }
@@ -396,7 +406,7 @@ export class BubbleGame {
   }
 
   private refreshDropMeter(): void {
-    if (this.save.zen) {
+    if (this.zen) {
       this.dropMeter.replaceChildren(el('span', { text: 'Mode zen : le plafond ne descend pas.' }));
       return;
     }

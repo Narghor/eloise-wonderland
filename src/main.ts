@@ -9,6 +9,7 @@ import { renderBubbles } from './games/bubbles/bubbleScreen';
 import { renderIcing } from './games/icing/icingScreen';
 import { renderPotions } from './games/potions/potionScreen';
 import { renderCompanion } from './companion/companionScreen';
+import { renderDaily } from './daily/dailyScreen';
 import { requestPersistentStorage } from './save';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
@@ -25,6 +26,7 @@ const routes: Record<string, Screen> = {
   glacage: renderIcing,
   fioles: renderPotions,
   compagnon: renderCompanion,
+  defi: renderDaily,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;
