@@ -23,26 +23,6 @@
   padding: 8px 16px 32px;
 }
 
-.menu-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
-  border: none;
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font: inherit;
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.menu-card.is-loading {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
 .menu-card-icon {
   width: 34px;
   height: 56px;
@@ -52,18 +32,51 @@
   flex-shrink: 0;
 }
 
-.menu-card-text {
+.free-creation {
   display: grid;
-  gap: 2px;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
-.menu-card-text strong {
+.free-creation h2 {
   font-size: 1.1rem;
 }
 
-.menu-card-hint {
+.free-creation p {
+  margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.container-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.container-choice {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .container-choice:hover {
+    background: var(--accent-soft);
+  }
 }
 
 .shelf {
@@ -196,6 +209,26 @@
 .sand-model .jar-canvas {
   width: 52px;
   height: 84px;
+}
+
+/* Room enough beside the jar: the model sits next to it, big enough to read the layers. */
+@media (min-width: 700px) {
+  .sand-stage {
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .sand-model {
+    position: static;
+    order: 1;
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+
+  .sand-model .jar-canvas {
+    width: 160px;
+    height: 259px;
+  }
 }
 
 .sand-status {

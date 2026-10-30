@@ -1,5 +1,8 @@
 import { el, topBar, type BackLink } from '../../dom';
-import { JAR_WIDTH, SandJar, cellsFromColors, spoutColumn } from './jar';
+import { helpSlot, openHelpOnFirstVisit } from '../../help';
+import { SAND_HELP } from './sandHelp';
+import { CONTAINERS, JAR_WIDTH, type Container, type ContainerId } from './containers';
+import { SandJar, cellsFromColors, spoutColumn } from './jar';
 import { JarPainter } from './jarPainter';
 import { GRAINS_PER_FRAME, STEPS_PER_FRAME } from './levels';
 import { similarity, starsFor } from './score';
@@ -12,10 +15,12 @@ const MIN_FILL_TO_FINISH = 0.05;
 
 export interface SandGameActions {
   nextModel(): void;
-  newFree(): void;
+  /** Another free creation, in the same container. */
+  newFree(container: ContainerId): void;
 }
 
 export class SandGame {
+  private readonly container: Container;
   private readonly jar: SandJar;
   private readonly painter: JarPainter;
   private readonly target: Uint8Array | null;
@@ -28,7 +33,7 @@ export class SandGame {
   private readonly undoStack: Uint8Array[] = [];
   private selected = 0;
   private pouringPointer: number | null = null;
-  private spoutX = JAR_WIDTH / 2;
+  private spoutX: number;
   private settling = false;
   private frameId = 0;
   private saveTimer = 0;
@@ -40,9 +45,11 @@ export class SandGame {
     private readonly bottle: CurrentBottle,
     private readonly actions: SandGameActions,
   ) {
-    this.jar = new SandJar(cellsFromColors(decodeColors(bottle.cells)!));
+    this.container = CONTAINERS[bottle.container];
+    this.jar = new SandJar(this.container, cellsFromColors(decodeColors(bottle.cells)!));
     this.target = bottle.target === null ? null : decodeColors(bottle.target);
-    this.painter = new JarPainter(bottle.palette);
+    this.painter = new JarPainter(bottle.palette, this.container);
+    this.spoutX = (this.container.pourMinX + this.container.pourMaxX) / 2;
 
     this.stage = el('div', { class: 'sand-stage' }, this.spout, this.painter.canvas);
     if (this.target) this.stage.append(this.modelThumbnail(this.target));
@@ -62,7 +69,7 @@ export class SandGame {
 
     const title = bottle.level === null ? 'Création libre' : `Bouteille n°${bottle.level}`;
     root.append(
-      el('div', { class: 'sand-game' }, topBar(title, undefined, BACK_SAND), this.stage, this.status, this.controls),
+      el('div', { class: 'sand-game' }, topBar(title, helpSlot(SAND_HELP), BACK_SAND), this.stage, this.status, this.controls),
     );
 
     this.status.textContent = 'Maintiens le doigt sur la bouteille et glisse pour verser.';
@@ -80,6 +87,7 @@ export class SandGame {
     window.addEventListener('resize', this.fitStage);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.frameId = requestAnimationFrame(this.frame);
+    openHelpOnFirstVisit(SAND_HELP);
   }
 
   dispose(): void {
@@ -107,7 +115,7 @@ export class SandGame {
   }
 
   private modelThumbnail(target: Uint8Array): HTMLElement {
-    const painter = new JarPainter(this.bottle.palette);
+    const painter = new JarPainter(this.bottle.palette, this.container);
     painter.paint(cellsFromColors(target));
     return el('div', { class: 'sand-model' }, painter.canvas, el('span', { text: 'Modèle' }));
   }
@@ -151,7 +159,7 @@ export class SandGame {
 
   private moveSpout(clientX: number): void {
     const canvasRect = this.painter.canvas.getBoundingClientRect();
-    this.spoutX = spoutColumn((clientX - canvasRect.left) / canvasRect.width);
+    this.spoutX = spoutColumn(this.container, (clientX - canvasRect.left) / canvasRect.width);
     this.placeSpout();
   }
 
@@ -266,6 +274,7 @@ export class SandGame {
     this.save.shelf.push({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
       level: this.bottle.level,
+      container: this.bottle.container,
       palette: this.bottle.palette,
       cells: encodeColors(colors),
       stars,
@@ -275,7 +284,7 @@ export class SandGame {
     saveSand(this.save);
 
     const next = el('button', { class: 'button', type: 'button' }, score === null ? 'Nouvelle création' : 'Bouteille suivante');
-    next.addEventListener('click', () => (score === null ? this.actions.newFree() : this.actions.nextModel()));
+    next.addEventListener('click', () => (score === null ? this.actions.newFree(this.bottle.container) : this.actions.nextModel()));
     this.status.textContent = '';
     this.controls.replaceChildren(
       score === null || stars === null

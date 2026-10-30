@@ -1,5 +1,5 @@
 import { readGame, writeGame } from '../../save';
-import { JAR_HEIGHT, JAR_WIDTH } from './jar';
+import { JAR_HEIGHT, JAR_WIDTH, isContainerId, type ContainerId } from './containers';
 
 const GAME_ID = 'sand';
 const CELL_COUNT = JAR_WIDTH * JAR_HEIGHT;
@@ -7,6 +7,7 @@ const CELL_COUNT = JAR_WIDTH * JAR_HEIGHT;
 export interface CurrentBottle {
   /** Model number, or null for a free creation. */
   level: number | null;
+  container: ContainerId;
   palette: string[];
   /** Encoded colours of the model (see encodeColors), null in free mode. */
   target: string | null;
@@ -16,6 +17,7 @@ export interface CurrentBottle {
 export interface ShelfBottle {
   id: string;
   level: number | null;
+  container: ContainerId;
   palette: string[];
   cells: string;
   /** 0-3, null for a free creation. */
@@ -34,9 +36,14 @@ export function loadSand(): SandSave {
   const data = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   return {
     modelsDone: typeof data.modelsDone === 'number' ? data.modelsDone : 0,
-    current: isCurrent(data.current) ? data.current : null,
-    shelf: Array.isArray(data.shelf) ? data.shelf.filter(isShelfBottle) : [],
+    current: isCurrent(data.current) ? withContainer(data.current) : null,
+    shelf: Array.isArray(data.shelf) ? data.shelf.filter(isShelfBottle).map(withContainer) : [],
   };
+}
+
+/** Bottles saved before containers existed were all jars. */
+function withContainer<T extends { container: ContainerId }>(bottle: T): T {
+  return isContainerId(bottle.container) ? bottle : { ...bottle, container: 'jar' };
 }
 
 export function saveSand(save: SandSave): void {

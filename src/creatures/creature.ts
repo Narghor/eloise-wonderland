@@ -123,12 +123,3 @@ export function isColored(creature: Creature): boolean {
     [...row].every((char, c) => char === OUTSIDE || creature.painted[r][c] === '1'),
   );
 }
-
-/** True when white text reads better than dark text on this colour. */
-export function isDarkColor(hex: string): boolean {
-  const value = parseInt(hex.slice(1), 16);
-  const red = (value >> 16) & 255;
-  const green = (value >> 8) & 255;
-  const blue = value & 255;
-  return 0.299 * red + 0.587 * green + 0.114 * blue < 140;
-}

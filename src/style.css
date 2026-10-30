@@ -20,7 +20,6 @@
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
   min-height: 100dvh;
@@ -59,6 +58,13 @@ a {
   color: var(--accent-strong);
 }
 
+.button:focus-visible,
+.swatch:focus-visible,
+.help-button:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
 /* Touch screens keep :hover stuck after a tap: hover effects are for real mice only. */
 @media (hover: hover) {
   .button:hover {
@@ -89,7 +95,7 @@ a {
 }
 
 /* ----------------------------------------------- */
-/* PALETTE (colouring, sand)                       */
+/* PALETTE (colouring, sand, stained glass)        */
 /* ----------------------------------------------- */
 
 .palette {
@@ -132,7 +138,45 @@ a {
 }
 
 /* ----------------------------------------------- */
-/* DETAIL DIALOG (garden, shelf)                   */
+/* MENU CARDS (game menus)                         */
+/* ----------------------------------------------- */
+
+.menu-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-card.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.menu-card-text {
+  display: grid;
+  gap: 2px;
+}
+
+.menu-card-text strong {
+  font-size: 1.1rem;
+}
+
+.menu-card-hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ----------------------------------------------- */
+/* DETAIL DIALOG (garden, shelf, chapel)           */
 /* ----------------------------------------------- */
 
 .detail-dialog {
@@ -150,6 +194,101 @@ a {
 .detail-dialog h2 {
   margin-top: 12px;
   color: var(--accent-strong);
+}
+
+/* ----------------------------------------------- */
+/* HOW TO PLAY                                     */
+/* ----------------------------------------------- */
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.help-button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.help-dialog {
+  max-width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.help-dialog h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.help-dialog .button {
+  display: block;
+  margin: 0 auto;
+}
+
+.help-steps {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 20px;
+  padding-left: 20px;
+  line-height: 1.4;
+}
+
+.help-steps li::marker {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.help-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.help-line-clue {
+  min-width: 34px;
+  margin-right: 6px;
+  text-align: right;
+  font-weight: 800;
+}
+
+.help-cell {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.help-cell.is-filled {
+  background: var(--ink);
+}
+
+.help-cell.is-unknown {
+  background: repeating-linear-gradient(45deg, var(--surface) 0 4px, var(--accent-soft) 4px 8px);
+}
+
+.help-cell.is-crossed::after {
+  content: '\2715';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
 /* ----------------------------------------------- */
@@ -247,6 +386,36 @@ a {
 
 .game-card-icon.is-garden span.is-on {
   background: #4f9d69;
+}
+
+.game-card-icon.is-icing {
+  width: 69px;
+  height: 69px;
+  padding: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 11px, #ff8fb1 11px 15px, transparent 15px),
+    radial-gradient(circle at 46% 44%, #f3cf9b 0 8px, #d89c5c 22px, transparent 23px),
+    var(--accent-soft);
+}
+
+.game-card-icon.is-bubbles {
+  width: 69px;
+  height: 69px;
+  padding: 0;
+  background:
+    radial-gradient(circle at 30% 38%, #ff5d73 0 10px, transparent 11px),
+    radial-gradient(circle at 70% 38%, #ffd23f 0 10px, transparent 11px),
+    radial-gradient(circle at 50% 70%, #ff9f43 0 10px, transparent 11px),
+    var(--accent-soft);
+}
+
+.game-card-icon.is-glass {
+  width: 69px;
+  height: 69px;
+  padding: 0;
+  background:
+    conic-gradient(from 45deg at 50% 60%, #c8324b 0 25%, #2f5fb3 0 50%, #f2b33d 0 75%, #2e9d6a 0) center / 32px 46px no-repeat,
+    var(--accent-soft);
 }
 
 .game-card-icon.is-sand {

@@ -1,4 +1,6 @@
-import { JAR_HEIGHT, JAR_WIDTH, MaskCell, SHADES, jarMask } from './jar';
+import { hexToRgb, type Rgb } from '../../color';
+import { JAR_HEIGHT, JAR_WIDTH, MaskCell, type Container } from './containers';
+import { SHADES } from './jar';
 
 const GLASS = [196, 214, 228, 255];
 const GLASS_INSIDE = [236, 244, 250, 150];
@@ -11,7 +13,10 @@ export class JarPainter {
   /** RGBA per grain code (index 0 unused). */
   private readonly grainColors: number[][];
 
-  constructor(palette: string[]) {
+  constructor(
+    palette: string[],
+    private readonly container: Container,
+  ) {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'jar-canvas';
     this.canvas.width = JAR_WIDTH;
@@ -33,7 +38,7 @@ export class JarPainter {
   paint(cells: Uint8Array): void {
     const data = this.image.data;
     for (let i = 0; i < cells.length; i++) {
-      const mask = jarMask[i];
+      const mask = this.container.mask[i];
       const rgba =
         mask === MaskCell.Outside ? null : mask === MaskCell.Glass ? GLASS : cells[i] === 0 ? GLASS_INSIDE : this.grainColors[cells[i]];
       const offset = i * 4;
@@ -46,11 +51,6 @@ export class JarPainter {
   }
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-  const value = parseInt(hex.slice(1), 16);
-  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
-}
-
-function mix(rgb: [number, number, number], other: number[], amount: number): number[] {
+function mix(rgb: Rgb, other: number[], amount: number): number[] {
   return rgb.map((channel, i) => Math.round(channel + (other[i] - channel) * amount));
 }

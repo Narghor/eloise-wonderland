@@ -1,74 +1,15 @@
 // -----------------------------------------------
-// THE JAR AND ITS SAND
+// THE SAND IN A CONTAINER
 // -----------------------------------------------
-// A grid of cells: the mask says where the glass and the inside are, the cells hold the grains.
+// A grid of cells: the container's mask says where the glass and the inside are, the cells hold the grains.
 // A grain code packs its colour and a shade: 0 = empty, else 1 + color * SHADES + shade.
 
-export const JAR_WIDTH = 84;
-export const JAR_HEIGHT = 136;
+import { JAR_HEIGHT, JAR_WIDTH, MaskCell, type Container } from './containers';
+
 export const SHADES = 3;
-
-const OUTSIDE = 0;
-const INSIDE = 1;
-const GLASS = 2;
-export const MaskCell = { Outside: OUTSIDE, Inside: INSIDE, Glass: GLASS } as const;
-
-const BODY_HALF_WIDTH = JAR_WIDTH / 2 - 3;
-const LIP_HALF_WIDTH = BODY_HALF_WIDTH - 2;
-const LIP_HEIGHT = 4;
-const BOTTOM_RADIUS = 14;
-const FLOOR_Y = JAR_HEIGHT - 3;
-const GLASS_THICKNESS = 2;
-
-const CENTER_X = (JAR_WIDTH - 1) / 2;
-/** Leftmost and rightmost columns a spout can pour into. */
-export const POUR_MIN_X = Math.ceil(CENTER_X - LIP_HALF_WIDTH);
-export const POUR_MAX_X = Math.floor(CENTER_X + LIP_HALF_WIDTH);
 
 const POUR_ROWS = 3;
 const POUR_SPREAD = 2;
-
-export const jarMask = buildMask();
-export const INSIDE_COUNT = jarMask.reduce((count, cell) => count + (cell === INSIDE ? 1 : 0), 0);
-
-function innerHalfWidth(y: number): number {
-  if (y > FLOOR_Y) return -1;
-  if (y < LIP_HEIGHT) return LIP_HALF_WIDTH;
-  const curveStart = FLOOR_Y - BOTTOM_RADIUS;
-  if (y <= curveStart) return BODY_HALF_WIDTH;
-  const dy = y - curveStart;
-  return BODY_HALF_WIDTH - BOTTOM_RADIUS + Math.sqrt(BOTTOM_RADIUS * BOTTOM_RADIUS - dy * dy);
-}
-
-function buildMask(): Uint8Array {
-  const mask = new Uint8Array(JAR_WIDTH * JAR_HEIGHT);
-  for (let y = 0; y < JAR_HEIGHT; y++) {
-    const half = innerHalfWidth(y);
-    for (let x = 0; x < JAR_WIDTH; x++) {
-      if (Math.abs(x - CENTER_X) <= half) mask[y * JAR_WIDTH + x] = INSIDE;
-    }
-  }
-  // Glass: every outside cell close enough to the inside. The top stays open.
-  for (let y = 0; y < JAR_HEIGHT; y++) {
-    for (let x = 0; x < JAR_WIDTH; x++) {
-      if (mask[y * JAR_WIDTH + x] === INSIDE) continue;
-      if (nearInside(mask, x, y)) mask[y * JAR_WIDTH + x] = GLASS;
-    }
-  }
-  return mask;
-}
-
-function nearInside(mask: Uint8Array, x: number, y: number): boolean {
-  for (let dy = -GLASS_THICKNESS; dy <= GLASS_THICKNESS; dy++) {
-    for (let dx = -GLASS_THICKNESS; dx <= GLASS_THICKNESS; dx++) {
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx < 0 || nx >= JAR_WIDTH || ny < 0 || ny >= JAR_HEIGHT) continue;
-      if (mask[ny * JAR_WIDTH + nx] === INSIDE) return true;
-    }
-  }
-  return false;
-}
 
 export function grainCode(color: number, shade: number): number {
   return 1 + color * SHADES + shade;
@@ -83,7 +24,10 @@ export class SandJar {
   readonly cells: Uint8Array;
   private tick = 0;
 
-  constructor(cells?: Uint8Array) {
+  constructor(
+    readonly container: Container,
+    cells?: Uint8Array,
+  ) {
     this.cells = cells ?? new Uint8Array(JAR_WIDTH * JAR_HEIGHT);
   }
 
@@ -95,7 +39,7 @@ export class SandJar {
       const y = Math.floor(Math.random() * POUR_ROWS);
       if (x < 0 || x >= JAR_WIDTH) continue;
       const index = y * JAR_WIDTH + x;
-      if (jarMask[index] !== INSIDE || this.cells[index] !== 0) continue;
+      if (!this.isFree(index)) continue;
       this.cells[index] = grainCode(color, Math.floor(Math.random() * SHADES));
       poured++;
     }
@@ -146,7 +90,7 @@ export class SandJar {
   fillRatio(): number {
     let grains = 0;
     for (const cell of this.cells) if (cell !== 0) grains++;
-    return grains / INSIDE_COUNT;
+    return grains / this.container.insideCount;
   }
 
   /** Colour per cell: 0 empty, else colour index + 1. What saves and scores compare. */
@@ -155,7 +99,7 @@ export class SandJar {
   }
 
   private isFree(index: number): boolean {
-    return jarMask[index] === INSIDE && this.cells[index] === 0;
+    return this.container.mask[index] === MaskCell.Inside && this.cells[index] === 0;
   }
 }
 
@@ -170,7 +114,7 @@ export function cellsFromColors(colors: Uint8Array): Uint8Array {
   });
 }
 
-/** Grid column under a horizontal fraction of the jar's width, clamped to the opening. */
-export function spoutColumn(fraction: number): number {
-  return Math.min(POUR_MAX_X, Math.max(POUR_MIN_X, fraction * JAR_WIDTH));
+/** Grid column under a horizontal fraction of the grid's width, clamped to the container's opening. */
+export function spoutColumn(container: Container, fraction: number): number {
+  return Math.min(container.pourMaxX, Math.max(container.pourMinX, fraction * JAR_WIDTH));
 }

@@ -1,4 +1,6 @@
-import { INSIDE_COUNT, POUR_MAX_X, POUR_MIN_X, SandJar } from './jar';
+import { shuffled } from '../../random';
+import { CONTAINER_IDS, type Container, type ContainerId } from './containers';
+import { SandJar } from './jar';
 
 export const SAND_COLORS = [
   '#f7a6c1', // pink
@@ -39,7 +41,12 @@ const PATTERNS: Pattern[] = [
 
 const TARGET_FILL = 0.9;
 
-export function generateLevel(levelNumber: number): Level {
+/** Models go round every container, starting with the plain jar. */
+export function containerForLevel(levelNumber: number): ContainerId {
+  return CONTAINER_IDS[(levelNumber - 1) % CONTAINER_IDS.length];
+}
+
+export function generateLevel(levelNumber: number, container: Container): Level {
   const colorCount = Math.min(3 + Math.floor((levelNumber - 1) / 3), 5);
   const layerCount = Math.min(3 + Math.floor((levelNumber - 1) / 2), 8);
   const palette = shuffled(SAND_COLORS).slice(0, colorCount);
@@ -56,16 +63,16 @@ export function generateLevel(levelNumber: number): Level {
     });
   }
 
-  const jar = new SandJar();
+  const jar = new SandJar(container);
   const totalWeight = layers.reduce((sum, layer) => sum + layer.weight, 0);
-  const totalGrains = INSIDE_COUNT * TARGET_FILL;
+  const totalGrains = container.insideCount * TARGET_FILL;
   for (const layer of layers) {
     const amount = (totalGrains * layer.weight) / totalWeight;
     let poured = 0;
     let blocked = 0;
     while (poured < amount && blocked < BLOCKED_FRAMES) {
       const fraction = layer.pattern(poured / amount, layer.phase);
-      const column = POUR_MIN_X + fraction * (POUR_MAX_X - POUR_MIN_X);
+      const column = container.pourMinX + fraction * (container.pourMaxX - container.pourMinX);
       const fitted = jar.pour(column, layer.color, Math.min(GENERATOR_GRAINS_PER_FRAME, Math.ceil(amount - poured)));
       poured += fitted;
       blocked = fitted === 0 ? blocked + 1 : 0;
@@ -74,13 +81,4 @@ export function generateLevel(levelNumber: number): Level {
   }
   jar.settle();
   return { palette, target: jar.colors() };
-}
-
-function shuffled<T>(list: readonly T[]): T[] {
-  const copy = [...list];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
 }

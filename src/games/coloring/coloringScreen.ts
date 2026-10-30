@@ -1,7 +1,10 @@
 import './coloring.css';
 import { BACK_GARDEN, el, topBar } from '../../dom';
-import { colorIndexAt, isDarkColor, isPaintedAt, type Creature } from '../../creatures/creature';
+import { isDarkColor } from '../../color';
+import { colorIndexAt, isPaintedAt, type Creature } from '../../creatures/creature';
 import { findCreature, updateCreature } from '../../creatures/garden';
+import { helpSlot, openHelpOnFirstVisit } from '../../help';
+import { COLORING_HELP } from './coloringHelp';
 
 export function renderColoring(root: HTMLElement, params: string[]): () => void {
   const creature = findCreature(params[0] ?? '');
@@ -56,7 +59,7 @@ class ColoringGame {
       el(
         'div',
         { class: 'coloring' },
-        topBar(creature.name, this.progressEl, BACK_GARDEN),
+        topBar(creature.name, helpSlot(COLORING_HELP, this.progressEl), BACK_GARDEN),
         el('div', { class: 'coloring-board-wrap' }, this.board),
         this.footer,
       ),
@@ -74,6 +77,7 @@ class ColoringGame {
     this.board.addEventListener('lostpointercapture', this.endStroke);
     this.board.addEventListener('contextmenu', (event) => event.preventDefault());
     window.addEventListener('resize', this.fitBoard);
+    openHelpOnFirstVisit(COLORING_HELP);
   }
 
   dispose(): void {

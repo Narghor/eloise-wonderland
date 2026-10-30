@@ -1,4 +1,4 @@
-import { JAR_HEIGHT, JAR_WIDTH } from './jar';
+import { JAR_HEIGHT, JAR_WIDTH } from './containers';
 
 /** A layer boundary a few grains off still counts: nobody pours to the grain. */
 const VERTICAL_TOLERANCE = 3;

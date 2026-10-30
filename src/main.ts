@@ -4,6 +4,9 @@ import { renderPicross } from './games/picross/picrossScreen';
 import { renderColoring } from './games/coloring/coloringScreen';
 import { renderGarden } from './games/garden/gardenScreen';
 import { renderSand } from './games/sand/sandScreen';
+import { renderGlass } from './games/stainedGlass/glassScreen';
+import { renderBubbles } from './games/bubbles/bubbleScreen';
+import { renderIcing } from './games/icing/icingScreen';
 import { requestPersistentStorage } from './save';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
@@ -15,6 +18,9 @@ const routes: Record<string, Screen> = {
   jardin: renderGarden,
   colorier: renderColoring,
   sable: renderSand,
+  vitrail: renderGlass,
+  bulles: renderBubbles,
+  glacage: renderIcing,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

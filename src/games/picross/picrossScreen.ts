@@ -2,6 +2,8 @@ import './picross.css';
 import { el, topBar } from '../../dom';
 import { createCreature } from '../../creatures/creature';
 import { addCreature } from '../../creatures/garden';
+import { helpSlot, openHelpOnFirstVisit } from '../../help';
+import { PICROSS_HELP } from './picrossHelp';
 import { generatePuzzle, puzzleFrom, type Puzzle } from './generator';
 import { clueOf, sameClue } from './lines';
 import { Mark, emptyMarks, loadPicross, savePicross, type InProgress, type PicrossSave } from './picrossSave';
@@ -134,7 +136,7 @@ class PicrossGame {
       el(
         'div',
         { class: 'picross' },
-        topBar(`Picross ${this.size}×${this.size}`, this.timerEl),
+        topBar(`Picross ${this.size}×${this.size}`, helpSlot(PICROSS_HELP, this.timerEl)),
         el('div', { class: 'board-wrap' }, this.board),
         this.controls,
         el('p', { class: 'hint-mouse', text: 'Clic droit : poser une croix.' }),
@@ -155,6 +157,7 @@ class PicrossGame {
     window.addEventListener('resize', this.fitBoard);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.resumeTimer();
+    openHelpOnFirstVisit(PICROSS_HELP);
   }
 
   dispose(): void {

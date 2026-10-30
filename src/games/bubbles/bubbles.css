@@ -1,0 +1,84 @@
+.bubble-game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.bubble-stage {
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px 4px;
+}
+
+.bubble-canvas {
+  display: block;
+  border-radius: 18px;
+  background: linear-gradient(#ffffff, #fdf1f6);
+  box-shadow: var(--shadow);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+}
+
+.bubble-status {
+  min-height: 1.3em;
+  max-width: 460px;
+  margin: 6px auto 0;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.bubble-controls {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 8px 16px 20px;
+}
+
+.drop-meter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.drop-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.drop-dot.is-left {
+  background: var(--accent);
+}
+
+.bubble-result {
+  margin: 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.bubble-result strong {
+  color: var(--accent-strong);
+}
+
+/* Help: the colour mixes. */
+.help-mix {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.help-bubble {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: inset -3px -3px 0 rgb(0 0 0 / 0.15);
+}

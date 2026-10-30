@@ -37,6 +37,39 @@ export function renderHome(root: HTMLElement): () => void {
           el('span', { text: 'Verser le sable en couches pour reproduire le modèle' }),
         ),
       ),
+      el(
+        'a',
+        { class: 'game-card', href: '#/vitrail' },
+        el('span', { class: 'game-card-icon is-glass', 'aria-hidden': 'true' }),
+        el(
+          'span',
+          { class: 'game-card-text' },
+          el('strong', { text: 'Vitraux' }),
+          el('span', { text: 'Colorier le verre sans que deux voisins se ressemblent' }),
+        ),
+      ),
+      el(
+        'a',
+        { class: 'game-card', href: '#/bulles' },
+        el('span', { class: 'game-card-icon is-bubbles', 'aria-hidden': 'true' }),
+        el(
+          'span',
+          { class: 'game-card-text' },
+          el('strong', { text: 'Bulles mélangées' }),
+          el('span', { text: 'Mélanger les couleurs pour faire éclater les bulles' }),
+        ),
+      ),
+      el(
+        'a',
+        { class: 'game-card', href: '#/glacage' },
+        el('span', { class: 'game-card-icon is-icing', 'aria-hidden': 'true' }),
+        el(
+          'span',
+          { class: 'game-card-text' },
+          el('strong', { text: 'Glaçage' }),
+          el('span', { text: 'Décorer des biscuits en suivant les pointillés' }),
+        ),
+      ),
       savePanel(),
     ),
   );
