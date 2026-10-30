@@ -17,9 +17,30 @@ const STREAK_BONUS = 50;
 /** Games without a star grade: finishing the challenge is a perfect score. */
 export const UNGRADED_CHALLENGE_STARS = 3;
 
-export type ChallengeGame = 'picross' | 'sand' | 'glass' | 'bubbles' | 'icing' | 'potions';
+export type ChallengeGame =
+  | 'picross'
+  | 'sand'
+  | 'glass'
+  | 'bubbles'
+  | 'icing'
+  | 'potions'
+  | 'bracelets'
+  | 'embroidery'
+  | 'mosaic'
+  | 'bouquet';
 
-const ROTATION: readonly ChallengeGame[] = ['picross', 'sand', 'glass', 'bubbles', 'icing', 'potions'];
+const ROTATION: readonly ChallengeGame[] = [
+  'picross',
+  'bracelets',
+  'sand',
+  'embroidery',
+  'glass',
+  'bouquet',
+  'bubbles',
+  'mosaic',
+  'icing',
+  'potions',
+];
 
 export const CHALLENGE_GAME_NAMES: Record<ChallengeGame, string> = {
   picross: 'Picross',
@@ -28,6 +49,10 @@ export const CHALLENGE_GAME_NAMES: Record<ChallengeGame, string> = {
   bubbles: 'Bulles mélangées',
   icing: 'Glaçage',
   potions: 'Fioles',
+  bracelets: 'Bracelets brésiliens',
+  embroidery: 'Broderie',
+  mosaic: 'Mosaïque',
+  bouquet: 'Bouquets',
 };
 
 export interface DailySave {

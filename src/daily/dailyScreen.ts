@@ -9,6 +9,10 @@ import { startIcingChallenge } from '../games/icing/icingScreen';
 import { startPicrossChallenge } from '../games/picross/picrossScreen';
 import { startPotionChallenge } from '../games/potions/potionScreen';
 import { startSandChallenge } from '../games/sand/sandScreen';
+import { startBraceletChallenge } from '../games/bracelets/braceletScreen';
+import { startEmbroideryChallenge } from '../games/embroidery/embroideryScreen';
+import { startMosaicChallenge } from '../games/mosaic/mosaicScreen';
+import { startBouquetChallenge } from '../games/bouquet/bouquetScreen';
 import {
   CHALLENGE_GAME_NAMES,
   challengeGameOn,
@@ -27,6 +31,10 @@ const START: Record<ChallengeGame, (day: string) => void> = {
   bubbles: startBubbleChallenge,
   icing: startIcingChallenge,
   potions: startPotionChallenge,
+  bracelets: startBraceletChallenge,
+  embroidery: startEmbroideryChallenge,
+  mosaic: startMosaicChallenge,
+  bouquet: startBouquetChallenge,
 };
 
 const WEEKDAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];

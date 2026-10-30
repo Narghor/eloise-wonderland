@@ -204,6 +204,7 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
 }
 
 .help-button {
@@ -435,6 +436,48 @@ a {
   background:
     linear-gradient(#f7a6c1 0 30%, #ffe08a 30% 55%, #9fdfc8 55% 78%, #8fb8f0 78%) center / 30px 46px no-repeat,
     var(--accent-soft);
+}
+
+.game-card-icon.is-bracelets,
+.game-card-icon.is-embroidery,
+.game-card-icon.is-mosaic,
+.game-card-icon.is-bouquet {
+  width: 69px;
+  height: 69px;
+  padding: 0;
+}
+
+.game-card-icon.is-bracelets {
+  background:
+    repeating-linear-gradient(45deg, transparent 0 9px, rgb(255 255 255 / 0.3) 9px 11px),
+    repeating-linear-gradient(-45deg, #e8547a 0 10px, #f5d547 10px 20px, #3fa7c9 20px 30px, #5fbf6e 30px 40px);
+}
+
+.game-card-icon.is-embroidery {
+  border: 5px solid #c99a5b;
+  border-radius: 50%;
+  background:
+    linear-gradient(45deg, transparent 44%, #e0607e 44% 56%, transparent 56%) 0 0 / 20px 20px,
+    linear-gradient(-45deg, transparent 44%, #c8455f 44% 56%, transparent 56%) 0 0 / 20px 20px,
+    #fbf6ec;
+}
+
+.game-card-icon.is-mosaic {
+  border: 3px solid #6b5d52;
+  background:
+    linear-gradient(90deg, transparent 31%, #6b5d52 31% 35%, transparent 35% 65%, #6b5d52 65% 69%, transparent 69%),
+    linear-gradient(0deg, transparent 31%, #6b5d52 31% 35%, transparent 35% 65%, #6b5d52 65% 69%, transparent 69%),
+    conic-gradient(from 45deg, #e8607a 0 25%, #f4d27a 0 50%, #2f7fb8 0 75%, #3d9970 0);
+}
+
+.game-card-icon.is-bouquet {
+  background:
+    radial-gradient(circle at 50% 30%, #f5c518 0 6px, transparent 7px),
+    radial-gradient(circle at 50% 30%, #fbfaf3 0 14px, transparent 15px),
+    radial-gradient(circle at 26% 44%, #e0393e 0 10px, transparent 11px),
+    radial-gradient(circle at 74% 44%, #8e5cc4 0 10px, transparent 11px),
+    linear-gradient(to top, #96cde6 0 22%, transparent 22%) 50% 100% / 34% 100% no-repeat,
+    #e8f6ec;
 }
 
 .game-card-icon.is-daily {

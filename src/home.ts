@@ -86,6 +86,10 @@ export function renderHome(root: HTMLElement): () => void {
           el('span', { text: 'Trier les couleurs, une seule par fiole' }),
         ),
       ),
+      gameCard('#/bracelets', 'is-bracelets', 'Bracelets brésiliens', 'Nouer les fils pour reproduire le motif'),
+      gameCard('#/broderie', 'is-embroidery', 'Broderie', 'Broder au point de croix, proprement, même à l’envers'),
+      gameCard('#/mosaique', 'is-mosaic', 'Mosaïque', 'Poser les tesselles sans dépasser ni se tromper de couleur'),
+      gameCard('#/bouquet', 'is-bouquet', 'Bouquets', 'Composer le bouquet que la cliente a commandé'),
       savePanel(),
     ),
   );
@@ -124,6 +128,15 @@ function gardenCard(): HTMLElement {
     { class: 'game-card', href: '#/jardin' },
     icon,
     el('span', { class: 'game-card-text' }, el('strong', { text: 'Le Jardin' }), el('span', { text: summary })),
+  );
+}
+
+function gameCard(href: string, iconClass: string, title: string, text: string): HTMLElement {
+  return el(
+    'a',
+    { class: 'game-card', href },
+    el('span', { class: `game-card-icon ${iconClass}`, 'aria-hidden': 'true' }),
+    el('span', { class: 'game-card-text' }, el('strong', { text: title }), el('span', { text })),
   );
 }
 

@@ -153,11 +153,17 @@ export function solve(start: Vials, maxNodes = 400000): number | null {
 // LEVELS
 // -----------------------------------------------
 
-/** 3, 4, 6, 8 then 9 colours. */
-export const POTION_LEVELS: LevelTable = [1, 3, 7, 11, 13];
+/** 3, 4, 6, 8 then 9 colours; Expert also takes one empty vial away. */
+export const POTION_LEVELS: LevelTable = [1, 3, 7, 11, 15];
+const ONE_EMPTY_VIAL_FROM = 15;
 
 export function colorCountFor(level: number): number {
   return Math.min(3 + Math.floor((level - 1) / 2), LETTERS.length);
+}
+
+/** With a single spare vial, a random pour almost always dead-ends: about 5 % of naive games end sorted, against 25 %. */
+function emptyVialsFor(level: number): number {
+  return level >= ONE_EMPTY_VIAL_FROM ? 1 : EMPTY_VIALS;
 }
 
 export interface PotionLevel {
@@ -176,7 +182,7 @@ export function generateLevel(level: number): PotionLevel {
     }
     const vials: Vials = [];
     for (let v = 0; v < colors; v++) vials.push(units.slice(v * CAPACITY, (v + 1) * CAPACITY).join(''));
-    for (let v = 0; v < EMPTY_VIALS; v++) vials.push('');
+    for (let v = 0; v < emptyVialsFor(level); v++) vials.push('');
     // A vial sorted from the start is a gift: draw again.
     if (vials.some((vial) => vial.length === CAPACITY && topRun(vial) === CAPACITY)) continue;
     // The true minimum: measured at 1-40 ms even with 9 colours.

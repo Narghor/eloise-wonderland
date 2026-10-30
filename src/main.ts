@@ -10,6 +10,10 @@ import { renderIcing } from './games/icing/icingScreen';
 import { renderPotions } from './games/potions/potionScreen';
 import { renderCompanion } from './companion/companionScreen';
 import { renderDaily } from './daily/dailyScreen';
+import { renderBracelets } from './games/bracelets/braceletScreen';
+import { renderEmbroidery } from './games/embroidery/embroideryScreen';
+import { renderMosaic } from './games/mosaic/mosaicScreen';
+import { renderBouquet } from './games/bouquet/bouquetScreen';
 import { requestPersistentStorage } from './save';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
@@ -27,6 +31,10 @@ const routes: Record<string, Screen> = {
   fioles: renderPotions,
   compagnon: renderCompanion,
   defi: renderDaily,
+  bracelets: renderBracelets,
+  broderie: renderEmbroidery,
+  mosaique: renderMosaic,
+  bouquet: renderBouquet,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

@@ -1,0 +1,218 @@
+.bracelets,
+.bracelet-game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.bracelet-canvas {
+  display: block;
+}
+
+.bracelet-icon {
+  width: 40px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 3px solid #2b2433;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 7px, rgb(255 255 255 / 0.25) 7px 9px),
+    repeating-linear-gradient(-45deg, #e8547a 0 8px, #f5d547 8px 16px, #3fa7c9 16px 24px);
+}
+
+/* ----------------------------------------------- */
+/* MENU AND BOX                                    */
+/* ----------------------------------------------- */
+
+.bracelet-menu {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.bracelet-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.bracelet-box h2 {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.bracelet-box-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.bracelet-box-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 10px;
+  justify-items: center;
+}
+
+.bracelet-box-tile {
+  padding: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.7);
+  cursor: pointer;
+}
+
+.bracelet-portrait {
+  display: flex;
+  justify-content: center;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.bracelet-details {
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+/* ----------------------------------------------- */
+/* PLAYING                                         */
+/* ----------------------------------------------- */
+
+.bracelet-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.bracelet-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+}
+
+.bracelet-column figcaption {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.bracelet-counter {
+  margin: 8px 0 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.bracelet-controls {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 24px;
+}
+
+.bracelet-knots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.bracelet-knot-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 8px 4px;
+  border: 2px solid #2b2433;
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.bracelet-knot-button:active {
+  transform: scale(0.96);
+}
+
+.bracelet-knot-arrow {
+  font-size: 1.5rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* The colour this knot would show. */
+.bracelet-knot-swatch {
+  width: 24px;
+  height: 24px;
+  transform: rotate(45deg);
+  border: 2px solid #2b2433;
+  border-radius: 3px;
+  background: var(--knot-color, transparent);
+}
+
+.bracelet-knot-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.bracelet-result {
+  margin: 0;
+  text-align: center;
+}
+
+.bracelet-result strong {
+  color: #e0a21b;
+  font-size: 1.3rem;
+}
+
+/* ----------------------------------------------- */
+/* HELP DIAGRAMS                                   */
+/* ----------------------------------------------- */
+
+.bracelet-help-knot {
+  display: inline-grid;
+  grid-template-columns: auto 12px 12px;
+  grid-template-rows: 12px 16px 12px;
+  align-items: center;
+  justify-items: center;
+  gap: 2px 4px;
+  margin: 6px 12px 0 0;
+  vertical-align: middle;
+}
+
+.bracelet-help-arrow {
+  grid-row: 1 / 4;
+  font-size: 1.1rem;
+  margin-right: 4px;
+}
+
+.bracelet-help-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.bracelet-help-diamond {
+  grid-column: 2 / 4;
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+}
+
+.bracelet-help-knot .is-pink {
+  background: #e8547a;
+}
+
+.bracelet-help-knot .is-blue {
+  background: #3fa7c9;
+}
