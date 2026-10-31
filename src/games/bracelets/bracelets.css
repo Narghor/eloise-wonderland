@@ -144,24 +144,28 @@
   transform: scale(0.96);
 }
 
-.bracelet-knot-arrow {
-  font-size: 1.5rem;
-  line-height: 1;
-  white-space: nowrap;
+/* On a button the diagram is drawn bigger, with the real colours of the strings. */
+.bracelet-knot-picture .bracelet-help-knot {
+  grid-template-columns: 16px 16px;
+  grid-template-rows: 16px 24px 16px;
+  gap: 4px 8px;
+  margin: 0;
 }
 
-/* The colour this knot would show. */
-.bracelet-knot-swatch {
-  width: 24px;
-  height: 24px;
-  transform: rotate(45deg);
-  border: 2px solid #2b2433;
-  border-radius: 3px;
-  background: var(--knot-color, transparent);
+.bracelet-knot-picture .bracelet-help-dot {
+  width: 14px;
+  height: 14px;
+}
+
+.bracelet-knot-picture .bracelet-help-diamond {
+  width: 18px;
+  height: 18px;
 }
 
 .bracelet-knot-hint {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
   color: var(--muted);
 }
 
@@ -181,38 +185,34 @@
 
 .bracelet-help-knot {
   display: inline-grid;
-  grid-template-columns: auto 12px 12px;
+  grid-template-columns: 12px 12px;
   grid-template-rows: 12px 16px 12px;
   align-items: center;
   justify-items: center;
-  gap: 2px 4px;
-  margin: 6px 12px 0 0;
+  gap: 2px 6px;
   vertical-align: middle;
-}
-
-.bracelet-help-arrow {
-  grid-row: 1 / 4;
-  font-size: 1.1rem;
-  margin-right: 4px;
 }
 
 .bracelet-help-dot {
   width: 10px;
   height: 10px;
+  border: 1.5px solid #2b2433;
   border-radius: 50%;
 }
 
 .bracelet-help-diamond {
-  grid-column: 2 / 4;
+  grid-column: 1 / 3;
   width: 12px;
   height: 12px;
+  border: 1.5px solid #2b2433;
   transform: rotate(45deg);
 }
 
-.bracelet-help-knot .is-pink {
-  background: #e8547a;
-}
-
-.bracelet-help-knot .is-blue {
-  background: #3fa7c9;
+.bracelet-help-example {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 10px 0 0;
+  vertical-align: top;
 }

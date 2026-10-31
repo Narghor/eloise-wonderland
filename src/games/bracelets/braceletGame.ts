@@ -2,19 +2,12 @@ import { el, topBar, type BackLink } from '../../dom';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { difficultyName } from '../../difficulty';
 import { levelReward } from '../../companion/reward';
-import { BRACELET_HELP } from './braceletHelp';
+import { BRACELET_HELP, KNOT_WORDS, knotDiagram } from './braceletHelp';
 import { drawBracelet } from './braceletDraw';
-import { KNOTS, knotCount, knotPlaces, showsLeft, starsFor, swaps, weave, type Knot } from './braceletLogic';
+import { KNOTS, knotCount, knotPlaces, starsFor, weave, type Knot } from './braceletLogic';
 import { saveBracelets, type BraceletSave, type CurrentBracelet } from './braceletSave';
 
 const BACK_BRACELETS: BackLink = { href: '#/bracelets', label: 'Bracelets' };
-
-const KNOT_LOOKS: Record<Knot, { arrow: string; hint: string }> = {
-  FF: { arrow: '↘', hint: 'croisés' },
-  BB: { arrow: '↙', hint: 'croisés' },
-  FB: { arrow: '↘↙', hint: 'restent' },
-  BF: { arrow: '↙↘', hint: 'restent' },
-};
 
 export interface BraceletGameActions {
   nextBracelet(): void;
@@ -27,7 +20,7 @@ export class BraceletGame {
   private readonly workCanvas = el('canvas', { class: 'bracelet-canvas' });
   private readonly counter = el('p', { class: 'bracelet-counter', role: 'status' });
   private readonly controls: HTMLElement;
-  private readonly knotButtons = new Map<Knot, { button: HTMLButtonElement; swatch: HTMLElement }>();
+  private readonly knotButtons = new Map<Knot, { button: HTMLButtonElement; picture: HTMLElement }>();
   private readonly undoButton = el('button', { class: 'button button-secondary', type: 'button' }, 'Annuler');
 
   constructor(
@@ -41,17 +34,15 @@ export class BraceletGame {
 
     const knots = el('div', { class: 'bracelet-knots', role: 'group', 'aria-label': 'Nœuds' });
     for (const knot of KNOTS) {
-      const look = KNOT_LOOKS[knot];
-      const swatch = el('span', { class: 'bracelet-knot-swatch' });
+      const picture = el('span', { class: 'bracelet-knot-picture' });
       const button = el(
         'button',
-        { class: 'bracelet-knot-button', type: 'button', 'aria-label': `Nœud ${look.arrow}, fils ${look.hint}` },
-        el('span', { class: 'bracelet-knot-arrow', text: look.arrow }),
-        swatch,
-        el('span', { class: 'bracelet-knot-hint', text: look.hint }),
+        { class: 'bracelet-knot-button', type: 'button', 'aria-label': `Nœud : ${KNOT_WORDS[knot]}` },
+        picture,
+        el('span', { class: 'bracelet-knot-hint', text: KNOT_WORDS[knot] }),
       );
       button.addEventListener('click', () => this.tie(knot));
-      this.knotButtons.set(knot, { button, swatch });
+      this.knotButtons.set(knot, { button, picture });
       knots.append(button);
     }
     this.undoButton.addEventListener('click', () => this.undo());
@@ -123,9 +114,8 @@ export class BraceletGame {
     if (knots.length >= this.total) return;
     const { left } = knotPlaces(this.current)[knots.length];
     const strings = weave(this.current, knots).strings;
-    for (const [knot, { swatch }] of this.knotButtons) {
-      swatch.style.setProperty('--knot-color', palette[showsLeft(knot) ? strings[left] : strings[left + 1]]);
-      swatch.classList.toggle('is-crossing', swaps(knot));
+    for (const [knot, { picture }] of this.knotButtons) {
+      picture.replaceChildren(knotDiagram(knot, palette[strings[left]], palette[strings[left + 1]]));
     }
   };
 
