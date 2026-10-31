@@ -43,7 +43,7 @@ export class PastryGame {
     this.controls = el('div', { class: 'pastry-controls' }, kinds, el('div', { class: 'button-row' }, this.undoButton));
 
     const clues = current.clues.length
-      ? el('ul', { class: 'pastry-clues' }, ...current.clues.map((clue) => el('li', { text: clueText(clue, this.total) })))
+      ? el('ul', { class: 'pastry-clues' }, ...current.clues.map((clue) => el('li', { text: clueText(clue, current.layers, current.hidden) })))
       : el('span');
 
     root.append(

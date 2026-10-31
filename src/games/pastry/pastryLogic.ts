@@ -102,16 +102,20 @@ export function holds(clue: Clue, cake: readonly KindId[]): boolean {
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-export function clueText(clue: Clue, layers: number): string {
+/** Counts only talk about the hidden layers: what the model shows needs no clue. */
+export function clueText(clue: Clue, layers: readonly KindId[], hidden: readonly boolean[]): string {
   switch (clue.type) {
     case 'count': {
       const { many, none, one } = words(clue.target);
-      if (clue.count === 0) return `Il n’y a pas de ${none}.`;
-      if (clue.count === 1) return `Il y a exactement ${one}.`;
-      return `Il y a exactement ${clue.count} ${many}.`;
+      const shown = layers.filter((kind, i) => !hidden[i] && matches(kind, clue.target)).length;
+      const count = clue.count - shown;
+      const where = hidden.every(Boolean) ? 'Dans le gâteau' : 'Parmi les « ? »';
+      if (count === 0) return `${where}, il n’y a pas de ${none}.`;
+      if (count === 1) return `${where}, il y a exactement ${one}.`;
+      return `${where}, il y a exactement ${count} ${many}.`;
     }
     case 'at': {
-      const where = clue.index === 0 ? 'Tout en bas' : clue.index === layers - 1 ? 'Tout en haut' : `Couche n°${clue.index + 1} en partant du bas`;
+      const where = clue.index === 0 ? 'Tout en bas' : clue.index === layers.length - 1 ? 'Tout en haut' : `Couche n°${clue.index + 1} en partant du bas`;
       return `${where} : ${words(clue.target).one}.`;
     }
     case 'under':
@@ -211,16 +215,18 @@ function trueClues(cake: readonly KindId[], pool: readonly KindId[], hidden: rea
   for (const target of [...targets, ...glazes]) {
     clues.push({ type: 'count', target, count: cake.filter((kind) => matches(kind, target)).length });
   }
+  // Positions only at the ends: "the 4th layer" makes the player count thin layers on a picture.
   cake.forEach((kind, index) => {
-    if (!hidden[index]) return;
+    if (!hidden[index] || (index !== 0 && index !== cake.length - 1)) return;
     clues.push({ type: 'at', index, target: kind });
     if (KINDS[kind].family === 'sponge' || KINDS[kind].family === 'cream') clues.push({ type: 'at', index, target: KINDS[kind].family as Target });
   });
   for (const lower of targets) {
     for (const upper of targets) {
       if (lower === upper) continue;
-      const clue: Clue = { type: 'under', lower, upper };
-      if (holds(clue, cake)) clues.push(clue);
+      // Only when every matching pair is hidden: a pair the model shows reads as a wasted clue.
+      const pairs = cake.flatMap((kind, i) => (i + 1 < cake.length && matches(kind, lower) && matches(cake[i + 1], upper) ? [i] : []));
+      if (pairs.length > 0 && pairs.every((i) => hidden[i] && hidden[i + 1])) clues.push({ type: 'under', lower, upper });
     }
   }
   targets.forEach((a, i) => {
