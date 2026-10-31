@@ -368,12 +368,37 @@
 }
 
 .veg-seed-info {
-  margin: 0;
-  padding: 8px 12px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: rgb(255 255 255 / 0.75);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   line-height: 1.3;
+}
+
+.veg-card-title {
+  font-size: 1.05rem;
+  margin-bottom: 2px;
+}
+
+.veg-card-row {
+  display: grid;
+  grid-template-columns: 1.4em 5.2em 1fr;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.veg-card-label {
+  color: var(--muted);
+}
+
+.veg-card-row.is-friend .veg-card-value {
+  color: #2f8a4c;
+}
+
+.veg-card-row.is-enemy .veg-card-value {
+  color: #c0392b;
 }
 
 .veg-result {

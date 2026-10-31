@@ -35,19 +35,28 @@ export function stars(count: number): string {
   return '★'.repeat(count) + '☆'.repeat(3 - count);
 }
 
-export function kindLine(kind: KindId): string {
+/** The selected seed's card: one line per need, friends and enemies named in full. */
+export function kindCard(kind: KindId): HTMLElement[] {
   const info = KINDS[kind];
-  const names = (list: KindId[]) => list.map((other) => KINDS[other].emoji).join(' ');
-  const parts = [
-    `mûre en ${info.grow} nuits`,
-    info.thirst === 1 ? 'à arroser chaque jour' : `eau pour ${info.thirst} nuits`,
-    LIGHT_WORDS[info.light],
-    `vaut ${info.value}${info.regrow ? ', repousse' : ''}`,
+  const names = (list: KindId[]) => list.map((other) => `${KINDS[other].emoji} ${KINDS[other].label}`).join(', ');
+  const row = (icon: string, label: string, value: string, tone = '') =>
+    el(
+      'div',
+      { class: `veg-card-row ${tone}` },
+      el('span', { class: 'veg-card-icon', text: icon }),
+      el('span', { class: 'veg-card-label', text: label }),
+      el('span', { class: 'veg-card-value', text: value }),
+    );
+  const rows = [
+    row('⏳', 'Pousse', `${info.grow} nuits`),
+    row('💧', 'Eau', info.thirst === 1 ? 'chaque jour' : `tous les ${info.thirst} jours`),
+    row(info.light === 'shade' ? '🌳' : '☀️', 'Lumière', LIGHT_WORDS[info.light]),
+    row('🧺', 'Récolte', `${info.value}${info.regrow ? ', puis repousse' : ''}`),
+    row('💚', 'Aime', info.likes.length ? names(info.likes) : 'personne en particulier', 'is-friend'),
+    row('💢', 'Déteste', info.dislikes.length ? names(info.dislikes) : 'personne', 'is-enemy'),
   ];
-  if (info.likes.length) parts.push(`aime ${names(info.likes)}`);
-  if (info.dislikes.length) parts.push(`déteste ${names(info.dislikes)}`);
-  if (info.tender) parts.push('frileuse');
-  return parts.join(' · ');
+  if (info.tender) rows.push(row('❄️', 'Gel', 'meurt s’il gèle', 'is-enemy'));
+  return [el('strong', { class: 'veg-card-title', text: `${info.emoji} ${info.label}` }), ...rows];
 }
 
 export class VegetableGame {
@@ -58,7 +67,7 @@ export class VegetableGame {
   private readonly cellButtons: HTMLButtonElement[] = [];
   private readonly message = el('p', { class: 'veg-message', role: 'status' });
   private readonly packet = el('div', { class: 'veg-packet', role: 'group', 'aria-label': 'Sachet de graines' });
-  private readonly seedInfo = el('p', { class: 'veg-seed-info' });
+  private readonly seedInfo = el('div', { class: 'veg-seed-info' });
   private readonly controls: HTMLElement;
   private readonly nextButton = el('button', { class: 'button', type: 'button' }, 'Journée suivante');
   private readonly restartButton = el('button', { class: 'button button-secondary', type: 'button' }, 'Recommencer la journée');
@@ -233,7 +242,7 @@ export class VegetableGame {
       }),
     );
     const kind = garden.kinds[this.selected];
-    this.seedInfo.textContent = `${KINDS[kind].emoji} ${KINDS[kind].label} : ${kindLine(kind)}`;
+    this.seedInfo.replaceChildren(...kindCard(kind));
     this.nextButton.textContent = last ? 'Finir la saison' : 'Journée suivante';
   }
 
