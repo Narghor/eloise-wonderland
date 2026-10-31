@@ -90,6 +90,9 @@ export function renderHome(root: HTMLElement): () => void {
       gameCard('#/broderie', 'is-embroidery', 'Broderie', 'Broder au point de croix, proprement, même à l’envers'),
       gameCard('#/mosaique', 'is-mosaic', 'Mosaïque', 'Poser les tesselles sans dépasser ni se tromper de couleur'),
       gameCard('#/bouquet', 'is-bouquet', 'Bouquets', 'Composer le bouquet que la cliente a commandé'),
+      gameCard('#/perles', 'is-beads', 'Perles à repasser', 'Refaire le motif avec juste les perles qu’il faut'),
+      gameCard('#/rangement', 'is-box', 'Boîte à trésors', 'Tout ranger dans la boîte sans laisser de trou'),
+      gameCard('#/patisserie', 'is-pastry', 'Pâtisserie', 'Monter le gâteau couche par couche, parfois à l’aveugle'),
       savePanel(),
     ),
   );

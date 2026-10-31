@@ -1,0 +1,197 @@
+.pastry,
+.pastry-game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.pastry-canvas {
+  display: block;
+}
+
+.pastry-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 10px 10px 6px 6px;
+  border: 3px solid #2b2433;
+  background: linear-gradient(#ff8fb1 0 22%, #f1cf7e 22% 46%, #c42848 46% 54%, #fff3d6 54% 66%, #7a4a2e 66% 100%);
+}
+
+/* ----------------------------------------------- */
+/* MENU AND SHOWCASE                               */
+/* ----------------------------------------------- */
+
+.pastry-menu {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.pastry-showcase {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.pastry-showcase h2 {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.pastry-showcase-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.pastry-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+  justify-items: center;
+  align-items: end;
+}
+
+.pastry-showcase-tile {
+  padding: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.7);
+  cursor: pointer;
+}
+
+.pastry-portrait {
+  display: flex;
+  justify-content: center;
+}
+
+.pastry-details {
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+/* ----------------------------------------------- */
+/* PLAYING                                         */
+/* ----------------------------------------------- */
+
+.pastry-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px;
+  align-items: end;
+}
+
+.pastry-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+}
+
+.pastry-column figcaption {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pastry-clues {
+  display: grid;
+  gap: 4px;
+  width: calc(100% - 32px);
+  max-width: 528px;
+  margin: 8px auto 0;
+  padding: 10px 12px 10px 28px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.75);
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.pastry-counter {
+  margin: 8px 0 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.pastry-controls {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 24px;
+}
+
+.pastry-kinds {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.pastry-kind-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 8px 4px;
+  border: 2px solid #2b2433;
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.pastry-kind-button:active {
+  transform: scale(0.96);
+}
+
+.pastry-kind-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pastry-swatch {
+  display: inline-block;
+  width: 36px;
+  height: 18px;
+  border: 1.5px solid #2b2433;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.pastry-swatch.is-cream,
+.pastry-swatch.is-glaze {
+  height: 10px;
+}
+
+.pastry-swatch.is-jam {
+  height: 6px;
+}
+
+.pastry-swatch.is-fruit {
+  background-image: radial-gradient(circle, #e8364f 0 4px, transparent 5px);
+  background-size: 12px 12px;
+}
+
+.pastry-result {
+  margin: 0;
+  text-align: center;
+}
+
+.pastry-result strong {
+  color: #e0a21b;
+  font-size: 1.3rem;
+}

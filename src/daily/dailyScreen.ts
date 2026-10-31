@@ -13,6 +13,9 @@ import { startBraceletChallenge } from '../games/bracelets/braceletScreen';
 import { startEmbroideryChallenge } from '../games/embroidery/embroideryScreen';
 import { startMosaicChallenge } from '../games/mosaic/mosaicScreen';
 import { startBouquetChallenge } from '../games/bouquet/bouquetScreen';
+import { startBeadsChallenge } from '../games/beads/beadScreen';
+import { startBoxChallenge } from '../games/box/boxScreen';
+import { startPastryChallenge } from '../games/pastry/pastryScreen';
 import {
   CHALLENGE_GAME_NAMES,
   challengeGameOn,
@@ -35,6 +38,9 @@ const START: Record<ChallengeGame, (day: string) => void> = {
   embroidery: startEmbroideryChallenge,
   mosaic: startMosaicChallenge,
   bouquet: startBouquetChallenge,
+  beads: startBeadsChallenge,
+  box: startBoxChallenge,
+  pastry: startPastryChallenge,
 };
 
 const WEEKDAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
