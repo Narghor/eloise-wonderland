@@ -16,6 +16,8 @@ import { startBouquetChallenge } from '../games/bouquet/bouquetScreen';
 import { startBeadsChallenge } from '../games/beads/beadScreen';
 import { startBoxChallenge } from '../games/box/boxScreen';
 import { startPastryChallenge } from '../games/pastry/pastryScreen';
+import { startVegetablesChallenge } from '../games/vegetables/vegetablesScreen';
+import { startTeaChallenge } from '../games/tea/teaScreen';
 import {
   CHALLENGE_GAME_NAMES,
   challengeGameOn,
@@ -41,6 +43,8 @@ const START: Record<ChallengeGame, (day: string) => void> = {
   beads: startBeadsChallenge,
   box: startBoxChallenge,
   pastry: startPastryChallenge,
+  vegetables: startVegetablesChallenge,
+  tea: startTeaChallenge,
 };
 
 const WEEKDAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];

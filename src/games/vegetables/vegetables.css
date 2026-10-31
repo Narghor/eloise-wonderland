@@ -1,0 +1,393 @@
+.veg,
+.veg-game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.veg-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border: 3px solid #2b2433;
+  border-radius: 12px;
+  background: linear-gradient(#bfe6a0 0 40%, #8a5a3a 40% 100%);
+  font-size: 1.6rem;
+}
+
+/* ----------------------------------------------- */
+/* MENU AND CELLAR                                 */
+/* ----------------------------------------------- */
+
+.veg-menu {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.veg-cellar {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.veg-cellar h2 {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.veg-cellar-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.veg-cellar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.veg-crate {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: repeating-linear-gradient(#d9a066 0 10px, #c48a52 10px 12px);
+  box-shadow: inset 0 0 0 2px #8a5a3a;
+  font: inherit;
+  color: #3b2a1f;
+  cursor: pointer;
+}
+
+.veg-crate-crops {
+  font-size: 1.5rem;
+  letter-spacing: -4px;
+}
+
+.veg-crate-score {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.veg-crate-stars {
+  color: #e0a21b;
+  font-size: 0.8rem;
+}
+
+.veg-dialog-crops {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.veg-dialog-crop span {
+  font-size: 1.8rem;
+  margin-right: 2px;
+}
+
+.veg-details {
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+/* ----------------------------------------------- */
+/* PLAYING                                         */
+/* ----------------------------------------------- */
+
+.veg-board {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.veg-status {
+  margin: 0;
+  text-align: center;
+}
+
+.veg-goal {
+  display: grid;
+  gap: 2px;
+}
+
+.veg-goal-bar {
+  position: relative;
+  height: 12px;
+  margin: 12px 10px 0;
+  border-radius: 6px;
+  background: var(--line);
+}
+
+.veg-goal-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #8cc56b, #4f9a3a);
+  transition: width 0.3s;
+}
+
+.veg-goal-mark {
+  position: absolute;
+  top: -14px;
+  transform: translateX(-50%);
+  color: var(--line-strong);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.veg-goal-mark.is-reached {
+  color: #e0a21b;
+}
+
+.veg-goal-text {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.veg-forecast {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.95rem;
+}
+
+.veg-forecast li {
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.veg-forecast li.is-past {
+  opacity: 0.3;
+}
+
+.veg-forecast li.is-today {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.veg-plot-frame {
+  position: relative;
+  padding: 10px;
+  border-radius: 18px;
+  background: #7fb85a;
+  box-shadow: inset 0 0 0 3px #5d9440;
+}
+
+.veg-tree {
+  position: absolute;
+  z-index: 1;
+  font-size: 2.4rem;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 2px rgb(0 0 0 / 0.25));
+}
+
+.veg-plot-frame:has(.is-tree-0) .veg-tree { top: -18px; left: -12px; }
+.veg-plot-frame:has(.is-tree-1) .veg-tree { top: -18px; right: -12px; }
+.veg-plot-frame:has(.is-tree-2) .veg-tree { bottom: -14px; left: -12px; }
+.veg-plot-frame:has(.is-tree-3) .veg-tree { bottom: -14px; right: -12px; }
+
+.veg-plot {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  gap: 5px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.veg-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.07) 0 3px, transparent 3px 9px),
+    #9b6a43;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.veg-cell.is-shade {
+  background:
+    radial-gradient(circle at 30% 30%, rgb(20 40 20 / 0.25) 0 30%, transparent 31%),
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.07) 0 3px, transparent 3px 9px),
+    #6e4a30;
+}
+
+.veg-cell:active {
+  transform: scale(0.95);
+}
+
+.veg-sprite {
+  font-size: calc(min(9vw, 40px) * var(--grow, 1));
+  line-height: 1;
+  transition: font-size 0.3s;
+}
+
+.veg-cell.is-ripe {
+  box-shadow: inset 0 0 0 3px #ffd54a, 0 0 10px #ffd54a;
+  animation: veg-shine 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes veg-shine {
+  to {
+    box-shadow: inset 0 0 0 3px #fff1a8, 0 0 4px #ffd54a;
+  }
+}
+
+.veg-cell.is-thirsty .veg-drops {
+  color: #fff;
+  background: #3f8fd9;
+}
+
+.veg-cell.is-wilted .veg-sprite {
+  filter: grayscale(0.7);
+  transform: rotate(18deg);
+}
+
+.veg-cell.is-wilted .veg-drops {
+  color: #fff;
+  background: #d9534f;
+}
+
+.veg-cell.is-dead {
+  background: #6b5a4c;
+}
+
+.veg-drops {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.veg-days {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  padding: 0 3px;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.8);
+  color: #3b2a1f;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.veg-badge {
+  position: absolute;
+  top: 1px;
+  font-size: 0.65rem;
+}
+
+.veg-badge.is-friend {
+  left: 3px;
+}
+
+.veg-badge.is-enemy {
+  left: 16px;
+}
+
+.veg-message {
+  min-height: 1.3em;
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.veg-controls {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 24px;
+}
+
+.veg-packet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.veg-seed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 2px;
+  border: 2px solid #2b2433;
+  border-radius: 12px;
+  background: #fffaf0;
+  font: inherit;
+  font-size: 0.7rem;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.veg-seed.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent-strong);
+}
+
+.veg-seed:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.veg-seed-emoji {
+  font-size: 1.5rem;
+}
+
+.veg-seed-info {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.75);
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.veg-result {
+  margin: 0;
+  text-align: center;
+}
+
+.veg-result strong {
+  color: #e0a21b;
+  font-size: 1.3rem;
+}
+
+.veg-crops {
+  margin: 0;
+  text-align: center;
+  font-size: 1.2rem;
+}

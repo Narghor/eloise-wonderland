@@ -93,6 +93,8 @@ export function renderHome(root: HTMLElement): () => void {
       gameCard('#/perles', 'is-beads', 'Perles à repasser', 'Refaire le motif avec juste les perles qu’il faut'),
       gameCard('#/rangement', 'is-box', 'Boîte à trésors', 'Tout ranger dans la boîte sans laisser de trou'),
       gameCard('#/patisserie', 'is-pastry', 'Pâtisserie', 'Monter le gâteau couche par couche, parfois à l’aveugle'),
+      gameCard('#/potager', 'is-vegetables', 'Potager', 'Planter, arroser, récolter avant la fin de la saison'),
+      gameCard('#/salon', 'is-tea', 'Salon de thé', 'Servir les clientes avant qu’elles perdent patience'),
       savePanel(),
     ),
   );

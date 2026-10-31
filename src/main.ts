@@ -17,6 +17,8 @@ import { renderBouquet } from './games/bouquet/bouquetScreen';
 import { renderBeads } from './games/beads/beadScreen';
 import { renderBox } from './games/box/boxScreen';
 import { renderPastry } from './games/pastry/pastryScreen';
+import { renderVegetables } from './games/vegetables/vegetablesScreen';
+import { renderTea } from './games/tea/teaScreen';
 import { requestPersistentStorage } from './save';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
@@ -41,6 +43,8 @@ const routes: Record<string, Screen> = {
   perles: renderBeads,
   rangement: renderBox,
   patisserie: renderPastry,
+  potager: renderVegetables,
+  salon: renderTea,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;
