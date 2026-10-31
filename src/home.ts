@@ -5,6 +5,7 @@ import { creatureCanvas } from './creatures/creatureCanvas';
 import { loadGarden } from './creatures/garden';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
+import { loadCasino } from './games/casino/chips';
 import { CHALLENGE_GAME_NAMES, challengeGameOn, loadDaily, streak, todayKey } from './daily/daily';
 
 export function renderHome(root: HTMLElement): () => void {
@@ -95,6 +96,7 @@ export function renderHome(root: HTMLElement): () => void {
       gameCard('#/patisserie', 'is-pastry', 'Pâtisserie', 'Monter le gâteau couche par couche, parfois à l’aveugle'),
       gameCard('#/potager', 'is-vegetables', 'Potager', 'Planter, arroser, récolter avant la fin de la saison'),
       gameCard('#/salon', 'is-tea', 'Salon de thé', 'Servir les clientes avant qu’elles perdent patience'),
+      casinoCard(),
       savePanel(),
     ),
   );
@@ -142,6 +144,15 @@ function gameCard(href: string, iconClass: string, title: string, text: string):
     { class: 'game-card', href },
     el('span', { class: `game-card-icon ${iconClass}`, 'aria-hidden': 'true' }),
     el('span', { class: 'game-card-text' }, el('strong', { text: title }), el('span', { text })),
+  );
+}
+
+function casinoCard(): HTMLElement {
+  return el(
+    'a',
+    { class: 'game-card casino-card', href: '#/casino' },
+    el('span', { class: 'game-card-icon is-casino', 'aria-hidden': 'true', text: '🎰' }),
+    el('span', { class: 'game-card-text' }, el('strong', { text: 'Casino' }), el('span', { text: `${loadCasino().chips} jetons à jouer` })),
   );
 }
 

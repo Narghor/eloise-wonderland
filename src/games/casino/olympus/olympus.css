@@ -1,0 +1,109 @@
+.oly-screen {
+  position: relative;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+
+.oly-balance { font-weight: 700; color: var(--accent-strong); white-space: nowrap; }
+.oly-title { font-weight: 800; color: #1e4a8a; letter-spacing: 0.04em; }
+
+.oly-machine {
+  background: linear-gradient(#1e3c72, #0f1e3d);
+  border: 3px solid #d4af37;
+  border-radius: var(--radius);
+  padding: 10px;
+  box-shadow: var(--shadow);
+  transition: background 0.4s;
+}
+.oly-in-feature .oly-machine { background: linear-gradient(#4b2a8a, #160b33); }
+.oly-flash .oly-machine { animation: oly-strike 0.5s ease-out; }
+
+.oly-feature-bar { display: flex; justify-content: space-between; gap: 6px; color: #fff3c4; font-size: 0.95em; }
+.oly-feature-bar:not(:empty) { margin-bottom: 8px; }
+.oly-mult b { font-size: 1.3em; color: #ffd54f; }
+
+.oly-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+
+.oly-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4efe1;
+  color: #1e3c72;
+  font-weight: 800;
+  border-radius: 10px;
+  font-size: clamp(18px, 7vw, 30px);
+  min-width: 0;
+  overflow: hidden;
+}
+.oly-rolling { filter: blur(1px); opacity: 0.75; }
+.oly-landed { animation: oly-land 0.2s ease-out; }
+.oly-win { background: #fff3b0; outline: 2px solid #d4af37; }
+.oly-wild { background: radial-gradient(circle, #fff9c4, #ffd54f 55%, #f57f17); }
+.oly-scatter { box-shadow: 0 0 10px 3px #ffd54f; animation: oly-glow 0.8s ease-in-out infinite alternate; }
+.oly-tension { box-shadow: 0 0 12px 4px #64b5f6; animation: oly-shake 0.15s linear infinite; }
+.oly-tension-text { color: #1565c0; animation: oly-pop 0.5s ease-out; }
+
+.oly-message { min-height: 1.4em; font-weight: 700; }
+.oly-big { font-size: 1.15em; color: var(--accent-strong); animation: oly-pop 0.5s ease-out; }
+
+.oly-bet { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.oly-bet-step { width: 44px; padding: 10px 0; }
+.oly-bet-value { font-weight: 700; }
+.oly-small { font-size: 0.85em; color: var(--muted); }
+.oly-spin { min-width: 140px; }
+
+.oly-celebrate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgb(15 30 61 / 0.9);
+  color: #ffd54f;
+  border-radius: var(--radius);
+  font-weight: 700;
+  z-index: 5;
+  animation: oly-flash 0.25s ease-in-out 6 alternate;
+}
+.oly-celebrate-bolt { font-size: 4rem; animation: oly-pop 0.6s ease-out; }
+.oly-celebrate-text { font-size: 2rem; animation: oly-pop 0.6s ease-out; }
+
+.oly-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+}
+.oly-rules {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.oly-rules table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.oly-rules td, .oly-rules th { padding: 3px; text-align: center; border-bottom: 1px solid var(--line); }
+
+@keyframes oly-land { from { transform: translateY(-20%); } to { transform: none; } }
+@keyframes oly-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes oly-flash { from { background: rgb(15 30 61 / 0.9); } to { background: rgb(255 248 200 / 0.95); } }
+@keyframes oly-strike { 0% { box-shadow: 0 0 0 0 #fff; } 30% { box-shadow: 0 0 30px 10px #fff59d; } 100% { box-shadow: var(--shadow); } }
+@keyframes oly-glow { from { box-shadow: 0 0 6px 2px #ffd54f; } to { box-shadow: 0 0 16px 6px #ffb300; } }
+@keyframes oly-shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }

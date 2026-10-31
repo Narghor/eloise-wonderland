@@ -1,0 +1,43 @@
+.bj { max-width: 520px; margin: 0 auto; padding: 0 16px 24px; box-sizing: border-box; overflow-x: hidden; }
+.bj-balance { font-weight: 700; color: var(--accent-strong); white-space: nowrap; }
+.bj-table {
+  background: #1f6b4a; border-radius: var(--radius); padding: 16px 12px; color: #f4fff8;
+  display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow);
+}
+.bj-zone { border-radius: 12px; padding: 8px; }
+.bj-active { outline: 2px solid #ffd76a; }
+.bj-label { font-size: 0.95rem; margin: 0 0 6px; font-weight: 600; }
+.bj-hands { display: flex; flex-wrap: wrap; gap: 8px; }
+.bj-hands > .bj-zone { flex: 1 1 140px; min-width: 0; }
+.bj-cards { display: flex; flex-wrap: wrap; gap: 4px; min-height: 84px; }
+.bj-card {
+  width: 54px; height: 78px; border-radius: 8px; background: #fff; color: #222;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); font-weight: 700; line-height: 1;
+}
+.bj-card + .bj-card { margin-left: -14px; }
+.bj-red { color: #c62839; }
+.bj-rank { font-size: 1.3rem; }
+.bj-suit { font-size: 1.5rem; }
+.bj-back { background: repeating-linear-gradient(45deg, var(--accent-strong) 0 6px, var(--accent) 6px 12px); border: 3px solid #fff; box-sizing: border-box; }
+.bj-new { animation: bj-deal 0.35s ease-out both; }
+@keyframes bj-deal { from { transform: translate(40px, -40px) rotate(8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bj-new { animation: none; } }
+.bj-result { margin: 6px 0 0; font-weight: 700; }
+.bj-win, .bj-blackjack { color: #ffd76a; }
+.bj-lose { color: #ffb3b3; }
+.bj-shuffle { margin: 0; text-align: center; font-style: italic; color: #ffd76a; }
+.bj-hint, .bj-pending, .bj-rules { margin: 0; text-align: center; }
+.bj-pending { font-size: 1.4rem; font-weight: 700; }
+.bj-rules { font-size: 0.8rem; opacity: 0.8; }
+.bj-chips { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.bj-chip {
+  width: 60px; height: 60px; border-radius: 50%; font: inherit; font-weight: 700; color: #fff; cursor: pointer;
+  border: 4px dashed rgb(255 255 255 / 0.8);
+}
+.bj-chip:disabled { opacity: 0.4; cursor: default; }
+.bj-chip:focus-visible { outline: 3px solid #ffd76a; outline-offset: 2px; }
+.bj-chip-10 { background: #3d6fd1; }
+.bj-chip-25 { background: #2e9b57; }
+.bj-chip-50 { background: #d1453d; }
+.bj-chip-100 { background: #222; }

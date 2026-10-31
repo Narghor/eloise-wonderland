@@ -1,0 +1,90 @@
+.casino {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.game-card-icon.is-casino {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #2b1840, #5a2a5e);
+  font-size: 1.6rem;
+}
+
+.casino-lobby {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.casino-bank {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2b1840, #5a2a5e);
+  color: #ffe9a8;
+}
+
+.casino-balance {
+  font-size: 1.8rem;
+}
+
+.casino-record,
+.casino-status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #f3d6ff;
+}
+
+.casino-tables {
+  display: grid;
+  gap: 10px;
+}
+
+.casino-tables a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.casino-table-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border: 3px solid #2b2433;
+  border-radius: 12px;
+  background: #3a7a4a;
+  font-size: 1.6rem;
+}
+
+.casino-cashier {
+  display: grid;
+  gap: 8px;
+}
+
+.casino-cashier h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.casino-cashier p {
+  margin: 0;
+}
+
+.casino-packs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.casino-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+}

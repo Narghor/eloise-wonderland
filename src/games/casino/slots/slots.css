@@ -1,0 +1,110 @@
+.slots-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.slots-balance {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.slots-jackpot {
+  text-align: center;
+  font-weight: 800;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.slots-reels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 6px;
+  box-shadow: var(--shadow);
+}
+
+.slots-reel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slots-cell {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: clamp(1.4rem, 8vw, 2.4rem);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.slots-blur {
+  filter: blur(2px);
+  transform: translateY(2px);
+}
+
+.slots-win {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  animation: slots-pulse 0.6s ease-in-out 3;
+}
+
+@keyframes slots-pulse {
+  50% { transform: scale(1.1); }
+}
+
+.slots-message {
+  text-align: center;
+  min-height: 1.5em;
+  margin: 0;
+  font-weight: 700;
+}
+
+.slots-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.slots-bet {
+  min-width: 7em;
+  text-align: center;
+  font-weight: 700;
+}
+
+.slots-step {
+  min-width: 44px;
+}
+
+.slots-paytable table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.slots-paytable td,
+.slots-paytable th {
+  padding: 4px;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.slots-pay-glyph {
+  font-size: 1.4rem;
+}
+
+.slots-paytable p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
