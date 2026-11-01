@@ -14,10 +14,12 @@ export const STEPS_4 = [
 
 const MAX_DRAWS = 10000;
 
-export function creatureShape(size: number): Grid {
+/** `mirrored` false draws a lopsided creature (no left/right symmetry to lean on). */
+export function creatureShape(size: number, mirrored = true): Grid {
   let shape: Grid = [];
   for (let draw = 0; draw < MAX_DRAWS; draw++) {
-    shape = mirroredNoise(size, size <= 5 ? 0.6 : 0.5 + Math.random() * 0.1);
+    const density = size <= 5 ? 0.6 : 0.5 + Math.random() * 0.1;
+    shape = mirrored ? mirroredNoise(size, density) : noise(size, density);
     // A 5x5 grid has no room for smoothing: it would erase the whole shape.
     if (size > 5) shape = smooth(smooth(shape));
     shape = withoutSpecks(shape, Math.max(2, Math.floor(size / 3)));
@@ -32,6 +34,10 @@ function mirroredNoise(size: number, density: number): Grid {
     const left = Array.from({ length: half }, () => Math.random() < density);
     return [...left, ...left.slice(0, size - half).reverse()];
   });
+}
+
+function noise(size: number, density: number): Grid {
+  return Array.from({ length: size }, () => Array.from({ length: size }, () => Math.random() < density));
 }
 
 /** Majority vote over the 3x3 neighbourhood: noise becomes rounded blobs. */

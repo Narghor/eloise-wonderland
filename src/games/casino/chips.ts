@@ -112,10 +112,10 @@ export function feedJackpot(machineId: string, amount: number): void {
   saveCasino(save);
 }
 
-/** Pays the whole pool to the player, resets it, and returns the amount won. */
-export function winJackpot(machineId: string): number {
+/** Pays the whole pool (at least `minimum`) to the player, resets it, and returns the amount won. */
+export function winJackpot(machineId: string, minimum = 0): number {
   const save = loadCasino();
-  const won = Math.floor(save.jackpots[machineId] ?? JACKPOT_SEED);
+  const won = Math.floor(Math.max(minimum, save.jackpots[machineId] ?? JACKPOT_SEED));
   save.jackpots[machineId] = JACKPOT_SEED;
   save.chips += won;
   saveCasino(save);

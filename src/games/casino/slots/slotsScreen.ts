@@ -7,7 +7,7 @@ import {
   type WinLinesHandle, type WinPath,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
-import { BET_LEVELS, DIAMOND, JACKPOT_SHARE, MACHINE_ID, PAYLINES, REELS, ROWS, STRIPS, SYMBOLS, WILD, spin, type SlotsForce, type SpinResult } from './slotsLogic';
+import { BET_LEVELS, DIAMOND, JACKPOT_MIN_X, JACKPOT_SHARE, jackpotFor, MACHINE_ID, PAYLINES, REELS, ROWS, STRIPS, SYMBOLS, WILD, spin, type SlotsForce, type SpinResult } from './slotsLogic';
 
 const SPIN_MS = 1400;
 const REEL_GAP_MS = 260;
@@ -76,7 +76,7 @@ export function renderSlots(root: HTMLElement): () => void {
   function refresh(): void {
     const stake = BET_LEVELS[betIndex];
     balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
-    pool.textContent = `💎 JACKPOT ${Math.floor(jackpot(MACHINE_ID)).toLocaleString('fr-FR')} 💎`;
+    pool.textContent = `💎 JACKPOT ${jackpotFor(jackpot(MACHINE_ID), stake).toLocaleString('fr-FR')} 💎`;
     betLabel.textContent = `Mise : ${stake}`;
     minus.disabled = spinning || betIndex === 0;
     plus.disabled = spinning || betIndex === BET_LEVELS.length - 1;
@@ -136,7 +136,7 @@ export function renderSlots(root: HTMLElement): () => void {
       lights.setMode('big');
       playBonusTrigger();
       shake(machine, 3);
-      const won = winJackpot(MACHINE_ID);
+      const won = winJackpot(MACHINE_ID, stake * JACKPOT_MIN_X);
       message.textContent = `💎 JACKPOT : ${won.toLocaleString('fr-FR')} jetons ! 💎`;
       message.className = 'slots-message slots-message-big';
       refresh();
@@ -224,6 +224,6 @@ function paytable(stake: number): HTMLElement[] {
     paylineDiagrams(PAYLINES, ROWS),
     el('h3', { class: 'slots-paytable-title', text: `Gains par ligne (mise ${stake})` }),
     payoutTable(entries, stake),
-    rulesBlock('💎 Jackpot progressif', '💎💎💎💎💎 sur la ligne du milieu = tout le jackpot !', 'Plus ta mise est haute, plus tu as de chances de le décrocher.'),
+    rulesBlock('💎 Jackpot progressif', '💎💎💎💎💎 sur la ligne du milieu = tout le jackpot !', `Il vaut au moins ${JACKPOT_MIN_X} fois ta mise. Plus ta mise est haute, plus tu as de chances de le décrocher.`),
   ];
 }

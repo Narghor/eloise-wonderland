@@ -1,10 +1,10 @@
 // -----------------------------------------------
 // OLYMPUS SLOT ("Le Regard de Medusa") - pure maths, no DOM
 // -----------------------------------------------
-// 6x5, 20 lines, high volatility. The base game is dry; in the free spins every
-// reel may land as a full stack of Medusa (any reel) or of lightning wilds
-// (reels 2-6), so the screen floods with Medusa. Scatters retrigger without limit
-// (only a safety cap on the total).
+// 6x5, 20 lines, high volatility. Medusa is the top symbol AND the wild. The base
+// game is dry; in the free spins every reel may land as a full stack of Medusa, so
+// the screen floods with her. Scatters retrigger without limit (only a safety cap
+// on the total).
 
 export const COLS = 6;
 export const ROWS = 5;
@@ -30,28 +30,28 @@ export const SYMBOLS: SymbolDef[] = [
   { glyph: '🛡️', weight: 14, pays: [0.75, 1.75, 4, 12] },
   { glyph: '🦉', weight: 11, pays: [1, 2.5, 6, 18] },
   { glyph: '🔱', weight: 9, pays: [1.25, 3.5, 10, 25] },
-  { glyph: '🐍', weight: 6, pays: [1.75, 5, 15, 40] },
-  { glyph: '⚡', weight: 0, pays: [0, 0, 0, 0] },
+  { glyph: '🐍', weight: 4, pays: [1.75, 5, 15, 40] },
   { glyph: '🏛️', weight: 0, pays: [0, 0, 0, 0] },
 ];
+/** Medusa pays her own lines and stands in for every symbol but the temple. */
 export const MEDUSA = 8;
-export const WILD = 9;
-export const SCATTER = 10;
+export const SCATTER = 9;
 const PAYING = 9;
 
-/** Reels (0-based) where the wild can land; never reel 1, so a line's symbol is its first cell. */
-export const WILD_REELS = [1, 2, 3, 4, 5];
-/** Base game: chance per cell on a wild reel to show a single wild. */
-export const BASE_WILD_CHANCE = 0.075;
+/** Base game: extra chance per cell, off the first reel, to show Medusa. */
+export const BASE_EXTRA_MEDUSA_CHANCE = 0.034;
 /** Chance per cell to show a temple. */
 export const BASE_SCATTER_CHANCE = 0.0112;
-export const FREE_SCATTER_CHANCE = 0.0075;
-/** Free spins: chance per reel to be a full stack of Medusa (any reel) or of wilds (wild reels). */
-export const FREE_MEDUSA_STACK = 0.3;
-export const FREE_WILD_STACK = 0.1;
+export const FREE_SCATTER_CHANCE = 0.03;
+/** Free spins: chance per reel to be a full stack of Medusa. */
+export const FREE_MEDUSA_STACK = 0.31;
 
 export const FREE_SPINS_BY_SCATTERS: Record<number, number> = { 3: 10, 4: 25, 5: 100 };
 export const MIN_SCATTERS = 3;
+/** Spins added in the free spins by 3+ temples, however many (the 4 and 5 rows are for the base game). */
+export const FREE_RETRIGGER_SPINS = 10;
+/** A feature always pays at least this many times the bet (topped up at the end). */
+export const FREE_SPINS_MIN_X = 10;
 /** Safety cap on the spins of one feature, retriggers included. */
 export const MAX_FREE_SPINS = 500;
 
@@ -83,8 +83,8 @@ const REEL_TILT: number[][] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
-/** Free spins: the loose cells are even (no reel tilt) and richer in Medusa. */
-const FREE_TILT = [1, 1, 1, 1, 1, 1, 1, 1, 2.5];
+/** Free spins: the loose cells are even (no reel tilt) and never Medusa: she only comes as full stacks. */
+const FREE_TILT = [1, 1, 1, 1, 1, 1, 1, 1, 0];
 const REEL_WEIGHTS = REEL_TILT.map((tilt) => SYMBOLS.slice(0, PAYING).map((s, i) => s.weight * tilt[i]));
 const FREE_WEIGHTS = SYMBOLS.slice(0, PAYING).map((s, i) => s.weight * FREE_TILT[i]);
 
@@ -99,7 +99,7 @@ function drawPaying(rng: Rng, weights: number[]): number {
 
 function drawCell(rng: Rng, col: number, free: boolean): number {
   if (rng() < (free ? FREE_SCATTER_CHANCE : BASE_SCATTER_CHANCE)) return SCATTER;
-  if (!free && WILD_REELS.includes(col) && rng() < BASE_WILD_CHANCE) return WILD;
+  if (!free && col > 0 && rng() < BASE_EXTRA_MEDUSA_CHANCE) return MEDUSA;
   return drawPaying(rng, free ? FREE_WEIGHTS : REEL_WEIGHTS[col]);
 }
 
@@ -113,10 +113,6 @@ export function spinGrid(rng: Rng, free: boolean, force?: OlympusForce): Grid { 
       const roll = force === 'flood' ? 0 : rng(); // TEST-BUTTONS
       if (roll < FREE_MEDUSA_STACK) {
         grid.push(Array(ROWS).fill(MEDUSA));
-        continue;
-      }
-      if (WILD_REELS.includes(c) && roll < FREE_MEDUSA_STACK + FREE_WILD_STACK) {
-        grid.push(Array(ROWS).fill(WILD));
         continue;
       }
     }
@@ -135,32 +131,31 @@ export function scatterCount(grid: Grid): number {
   return n;
 }
 
-/** Reels fully covered by one symbol (the stacks of the free spins). */
-export function stackedReels(grid: Grid): number[] {
+/** Reels fully covered by Medusa (the stacks of the free spins). */
+export function medusaReels(grid: Grid): number[] {
   const reels: number[] = [];
   grid.forEach((column, c) => {
-    if (column.every((s) => s === column[0]) && (column[0] === WILD || column[0] === MEDUSA)) reels.push(c);
+    if (column.every((s) => s === MEDUSA)) reels.push(c);
   });
   return reels;
-}
-
-/** Reels fully covered by Medusa. */
-export function medusaReels(grid: Grid): number[] {
-  return stackedReels(grid).filter((c) => grid[c][0] === MEDUSA);
 }
 
 export function lineWins(grid: Grid): LineWin[] {
   const wins: LineWin[] = [];
   LINES.forEach((rows, line) => {
-    const symbol = grid[0][rows[0]];
-    if (symbol >= PAYING) return;
-    let count = 1;
-    while (count < COLS) {
-      const s = grid[count][rows[count]];
-      if (s !== symbol && s !== WILD) break;
-      count++;
+    const cells = rows.map((row, col) => grid[col][row]);
+    // Leading Medusas pay as Medusa; the line also pays the first other symbol they stand in for. The better one wins.
+    let medusaRun = 0;
+    while (medusaRun < COLS && cells[medusaRun] === MEDUSA) medusaRun++;
+    const symbol = cells[medusaRun];
+    let count = medusaRun;
+    if (medusaRun < COLS && symbol !== SCATTER) {
+      while (count < COLS && (cells[count] === symbol || cells[count] === MEDUSA)) count++;
     }
-    if (count >= 3) wins.push({ line, symbol, count, mult: SYMBOLS[symbol].pays[count - 3] });
+    const own = medusaRun >= 3 ? SYMBOLS[MEDUSA].pays[medusaRun - 3] : 0;
+    const other = count >= 3 && count > medusaRun && symbol !== SCATTER ? SYMBOLS[symbol].pays[count - 3] : 0;
+    if (own === 0 && other === 0) return;
+    wins.push(own >= other ? { line, symbol: MEDUSA, count: medusaRun, mult: own } : { line, symbol, count, mult: other });
   });
   return wins;
 }
@@ -189,8 +184,10 @@ export interface FreeSpin {
 
 export interface FreeSpinsResult {
   spins: FreeSpin[];
-  /** Total in multiples of the bet. */
+  /** Total in multiples of the bet, the top-up included. */
   mult: number;
+  /** Added at the end to reach FREE_SPINS_MIN_X (0 when the spins paid enough). */
+  topUp: number;
   /** True when the safety cap cut retriggers. */
   capped: boolean;
 }
@@ -206,7 +203,7 @@ export function playFreeSpins(rng: Rng, startSpins: number, boostSpins = 0): Fre
     const grid = spinGrid(rng, true, spins.length < boostSpins ? 'flood' : undefined); // TEST-BUTTONS
     const wins = lineWins(grid);
     const mult = winMult(wins);
-    let added = freeSpinsFor(scatterCount(grid));
+    let added = scatterCount(grid) >= MIN_SCATTERS ? FREE_RETRIGGER_SPINS : 0;
     if (awarded + added > MAX_FREE_SPINS) {
       capped = capped || added > 0;
       added = MAX_FREE_SPINS - awarded;
@@ -216,7 +213,8 @@ export function playFreeSpins(rng: Rng, startSpins: number, boostSpins = 0): Fre
     total += mult;
     spins.push({ grid, wins, mult, added, spinsLeft: left });
   }
-  return { spins, mult: total, capped };
+  const topUp = Math.max(0, FREE_SPINS_MIN_X - total);
+  return { spins, mult: total + topUp, topUp, capped };
 }
 
 /** Chips for a multiple of the bet. */

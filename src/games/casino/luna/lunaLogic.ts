@@ -5,13 +5,17 @@
 // the Book is wild AND scatter; 3+ books = 10 free spins with one special
 // symbol that expands to full reels and pays on every line.
 // Free spins add sticky books ("reactions"): a book landing in the feature stays
-// on its cell as a wild until the end of the round.
+// on its cell as a wild until the next retrigger (which clears them) or the end of the round.
 
 export const REELS = 5;
 export const ROWS = 3;
 export const BETS = [10, 20, 50, 100, 200, 500, 1000];
 export const FREE_SPINS = 10;
 export const MIN_BOOKS = 3;
+/** New books needed on one free spin to add FREE_SPINS more. */
+export const RETRIGGER_BOOKS = 2;
+/** Spins added by a retrigger. */
+export const RETRIGGER_SPINS = 8;
 export const GAMBLE_MAX_STEPS = 5;
 /** A gamble never brings more than this multiple of the stake. */
 export const GAMBLE_CAP_X = 100;
@@ -222,10 +226,12 @@ export function playFreeSpins(rng: Rng, forcedSpecial?: number): FreeSpinsResult
     drawn.forEach((col, reel) => col.forEach((s, row) => { if (s === BOOK) sticky.add(`${reel},${row}`); }));
     const wins = lineWins(drawn);
     const expand = expandWin(drawn, special);
-    const added = fresh >= MIN_BOOKS ? FREE_SPINS : 0;
+    const added = fresh >= RETRIGGER_BOOKS ? RETRIGGER_SPINS : 0;
     left += added;
     const mult = wins.reduce((s, w) => s + w.mult, 0) + (expand?.mult ?? 0);
     spins.push({ grid: drawn, sticky: [...sticky], wins, expand, added, spinsLeft: left, mult });
+    // A retrigger opens a new chapter: the sticky books are cleared, or long rounds would end covered in wilds.
+    if (added > 0) sticky.clear();
   }
   return { special, spins, mult: spins.reduce((s, x) => s + x.mult, 0) };
 }

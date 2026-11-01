@@ -9,7 +9,7 @@ import {
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import { LUNA_DEFS, OPEN_BOOK, SYMBOL_ART } from './lunaArt';
 import {
-  BETS, BOOK, BOOK_PAYS, FREE_SPINS, GAMBLE_CAP_X, GAMBLE_MAX_STEPS, LUNA, MIN_BOOKS, PAYLINES, REELS, ROWS, SYMBOLS,
+  BETS, BOOK, BOOK_PAYS, FREE_SPINS, GAMBLE_CAP_X, GAMBLE_MAX_STEPS, LUNA, MIN_BOOKS, PAYLINES, RETRIGGER_BOOKS, RETRIGGER_SPINS, REELS, ROWS, SYMBOLS,
   baseSpin, canGamble, chipsFor, playFreeSpins, type FreeSpinsResult, type Grid, type LineWin, type LunaForce,
 } from './lunaLogic';
 
@@ -289,7 +289,7 @@ export function renderLuna(root: HTMLElement): () => void {
       el('div', { class: 'luna-fs-box' }, el('span', { text: 'Symbole' }), specialBox),
       el('div', { class: 'luna-fs-box' }, el('span', { text: 'Gain' }), totalValue),
     );
-    let sticky = new Set<string>(last ? last.sticky : []);
+    let sticky = new Set<string>(last && last.added === 0 ? last.sticky : []);
     paintSticky(sticky);
 
     for (let i = pending.next; i < feature.spins.length; i++) {
@@ -318,8 +318,11 @@ export function renderLuna(root: HTMLElement): () => void {
       }
       if (step.added > 0) {
         playBonusTrigger();
-        setMessage(`+${step.added} tours gratuits !`, 'luna-big');
-        await wait(1300);
+        setMessage(`+${step.added} tours gratuits ! Nouveau chapitre : les livres collés s’envolent.`, 'luna-big');
+        await wait(1600);
+        // The logic clears the sticky books on a retrigger.
+        sticky = new Set();
+        paintSticky(sticky);
       } else if (won > 0 && !step.expand) {
         setMessage(`+${won} jetons`, 'luna-win-text');
       } else if (won === 0) {
@@ -590,8 +593,8 @@ function paytable(stake: number): HTMLElement[] {
       `📖 ${MIN_BOOKS} livres n’importe où sur l’écran = ${FREE_SPINS} tours gratuits. Seul le livre déclenche les tours gratuits : 3 Eloise ne le font pas, elles paient juste une grosse ligne.`,
       'Au début des tours, le livre s’ouvre et tire au hasard un symbole spécial (Eloise, hibou, lettre…).',
       'Pendant les tours, si le symbole spécial tombe sur assez de rouleaux (2 pour 👸 🦉 🔮 🧪, 3 pour les lettres), il remplit ces rouleaux de haut en bas et paie sur les 10 lignes, même si les rouleaux ne se touchent pas.',
-      'Un livre qui tombe pendant les tours reste collé à sa place jusqu’à la fin et sert de joker.',
-      `${MIN_BOOKS} nouveaux livres pendant les tours = +${FREE_SPINS} tours.`,
+      'Un livre qui tombe pendant les tours reste collé à sa place jusqu’à la fin du chapitre et sert de joker.',
+      `${RETRIGGER_BOOKS} nouveaux livres sur un même tour = +${RETRIGGER_SPINS} tours, et un nouveau chapitre : les livres collés s’envolent. Ça peut arriver plusieurs fois !`,
     ),
     el('div', { class: 'fx-paylines' },
       shapeDiagram(REELS, ROWS, books, '📖 3 livres, n’importe où'),

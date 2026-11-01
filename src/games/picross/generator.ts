@@ -9,6 +9,8 @@ export interface Puzzle {
 }
 
 const MAX_ATTEMPTS = 2000;
+/** Share of symmetric grids: a mirror halves the thinking, so half the grids have none. */
+const SYMMETRIC_CHANCE = 0.5;
 
 export function puzzleFrom(solution: boolean[][]): Puzzle {
   const size = solution.length;
@@ -25,10 +27,11 @@ export function puzzleFrom(solution: boolean[][]): Puzzle {
  * The last draw is kept if none is: the win is checked on the clues, so it stays winnable.
  */
 export function generatePuzzle(size: number): Puzzle {
-  let puzzle = puzzleFrom(creatureShape(size));
+  const mirrored = Math.random() < SYMMETRIC_CHANCE;
+  let puzzle = puzzleFrom(creatureShape(size, mirrored));
   for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
     if (isSolvableByLines(puzzle.rowClues, puzzle.colClues)) break;
-    puzzle = puzzleFrom(creatureShape(size));
+    puzzle = puzzleFrom(creatureShape(size, mirrored));
   }
   return puzzle;
 }

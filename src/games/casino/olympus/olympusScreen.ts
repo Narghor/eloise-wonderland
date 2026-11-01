@@ -11,13 +11,13 @@ import {
   BETS,
   COLS,
   FREE_SPINS_BY_SCATTERS,
+  FREE_SPINS_MIN_X,
+  FREE_RETRIGGER_SPINS,
   LINES,
   MIN_SCATTERS,
   ROWS,
   SCATTER,
   SYMBOLS,
-  WILD,
-  WILD_REELS,
   MEDUSA,
   chipsFor,
   freeSpinsFor,
@@ -25,7 +25,6 @@ import {
   playFreeSpins,
   scatterCount,
   spinGrid,
-  stackedReels,
   winMult,
   medusaReels,
   type FreeSpinsResult,
@@ -233,7 +232,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     timers.add(roll);
     const stopLoop = playSpinLoop();
     let scattersShown = 0;
-    const stacks = stackedReels(result);
+    const stacks = medusaReels(result);
     let struck = false;
     for (let c = 0; c < COLS; c++) {
       // Anticipation: two temples are up, every remaining reel slows down.
@@ -251,13 +250,12 @@ export function renderOlympus(root: HTMLElement): () => void {
       for (let r = 0; r < ROWS; r++) {
         const symbol = result[c][r];
         const v = cellAt(c, r);
-        v.className = `oly-cell oly-landed${symbol === SCATTER ? ' oly-scatter' : ''}${symbol === WILD ? ' oly-wild' : ''}${symbol === MEDUSA ? ' oly-medusa' : ''}`;
+        v.className = `oly-cell oly-landed${symbol === SCATTER ? ' oly-scatter' : ''}${symbol === MEDUSA ? ' oly-medusa' : ''}`;
         paintCell(v, symbol);
       }
       if (stacked) {
-        const medusa = result[c][0] === MEDUSA;
-        reels[c].className = `oly-reel oly-reel-full ${medusa ? 'oly-reel-medusa' : 'oly-reel-wild'}`;
-        reels[c].lastElementChild!.innerHTML = medusa ? `<span>🐍</span>${MEDUSA_HEAD}<span>MEDUSA</span>` : 'FOUDRE';
+        reels[c].className = 'oly-reel oly-reel-full oly-reel-medusa';
+        reels[c].lastElementChild!.innerHTML = `<span>🐍</span>${MEDUSA_HEAD}<span>MEDUSA</span>`;
       }
       if (stacked && !struck) {
         struck = true;
@@ -340,8 +338,16 @@ export function renderOlympus(root: HTMLElement): () => void {
     }
 
     clearLines();
-    savePending(null);
     const totalChips = chipsFor(feature.mult, stake);
+    // Sessions saved before the floor existed have no topUp field.
+    if ((feature.topUp ?? 0) > 0 && totalChips > total) {
+      setMessage(`Minimum garanti : +${totalChips - total} jetons`, 'oly-big');
+      const from = total;
+      countUp(totalValue, totalChips - total, 800, (n) => `${from + n}`);
+      await wait(1600);
+      if (disposed) return;
+    }
+    savePending(null);
     refresh();
     setMessage(`Tours gratuits : ${totalChips} jetons`, 'oly-win-text');
     await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'MEDUSA PAIE !' : 'TOURS GRATUITS');
@@ -477,10 +483,9 @@ function artify(root: HTMLElement): void {
 }
 
 function paytable(stake: number): HTMLElement[] {
-  const entries = SYMBOLS.slice(0, WILD)
+  const entries = SYMBOLS.slice(0, SCATTER)
     .map((s, i) => ({ glyph: s.glyph, name: SYMBOL_NAMES[i], counts: [3, 4, 5, 6], multipliers: s.pays }))
     .reverse();
-  const reels = WILD_REELS.map((c) => c + 1).join(', ');
   const fullReels: [number, number][] = [0, 1, 2, 3, 4].flatMap((r): [number, number][] => [[0, r], [1, r], [2, r], [4, r]]);
   const temples: [number, number][] = [[0, 3], [2, 0], [5, 1]];
   return [
@@ -491,18 +496,19 @@ function paytable(stake: number): HTMLElement[] {
       'Plusieurs lignes peuvent gagner en même temps : les gains s’additionnent.',
       'Le jeu normal est souvent sec : c’est dans les tours gratuits que tout s’enchaîne.',
     ),
-    el('h3', { class: 'oly-paytable-title', text: 'La foudre ⚡, Medusa 🐍 et le temple 🏛️' }),
+    el('h3', { class: 'oly-paytable-title', text: 'Medusa 🐍 et le temple 🏛️' }),
     el('div', { class: 'fx-paylines' },
       shapeDiagram(COLS, ROWS, temples, '🏛️ 3 n’importe où'),
       shapeDiagram(COLS, ROWS, fullReels, '🐍 colonnes de Medusa (tours gratuits)'),
     ),
     rulesBlock(
       'Tours gratuits',
-      `La foudre ⚡ remplace tous les symboles sauf le temple. Elle tombe sur les rouleaux ${reels}.`,
+      'Medusa 🐍 remplace tous les symboles sauf le temple : son regard change tout en pierre. Elle paie aussi ses propres lignes, les plus grosses.',
       `${MIN_SCATTERS} temples ou plus, n’importe où : ${FREE_SPINS_BY_SCATTERS[3]} tours pour 3, ${FREE_SPINS_BY_SCATTERS[4]} pour 4, ${FREE_SPINS_BY_SCATTERS[5]} pour 5.`,
-      'Pendant les tours gratuits, Medusa 🐍 tombe en colonnes entières, souvent plusieurs à la fois, et peut remplir tout l’écran. La foudre ⚡ peut aussi couvrir une colonne.',
+      'Pendant les tours gratuits, Medusa 🐍 tombe en colonnes entières, souvent plusieurs à la fois, et peut remplir tout l’écran.',
       'Plus il y a de colonnes de Medusa collées depuis la gauche, plus les lignes paient : 6 colonnes = les 20 lignes à 6 Medusa.',
-      'Les temples redonnent des tours pendant les tours gratuits (même barème), sans limite.',
+      `Pendant les tours gratuits, les temples tombent bien plus souvent : 3 temples = +${FREE_RETRIGGER_SPINS} tours, sans limite. Un bonus sur quatre repart, parfois plusieurs fois !`,
+      `Les tours gratuits paient toujours au moins ${FREE_SPINS_MIN_X} fois ta mise.`,
     ),
     el('h3', { class: 'oly-paytable-title', text: `Les ${LINES.length} lignes` }),
     paylineDiagrams(LINES, ROWS),

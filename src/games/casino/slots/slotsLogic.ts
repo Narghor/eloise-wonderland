@@ -3,7 +3,7 @@
 // -----------------------------------------------
 // 5 reels x 3 rows, 10 fixed paylines, weighted reel strips.
 // Tuned for fun: ~37% of spins win, base RTP ~94%; the progressive jackpot
-// adds 1% (the fed share) plus ~0.05% (the seed), ~95% in total.
+// adds 1% (the fed share) plus the floor below: up to +3% at the 1000 bet, ~98% in total.
 
 export const MACHINE_ID = 'slots-classic';
 export const REELS = 5;
@@ -15,6 +15,13 @@ export const JACKPOT_SHARE = 0.01;
 export const JACKPOT_ODDS_PER_CHIP = 1 / 10_000_000;
 /** Ceiling of the per-spin jackpot chance (reached at the 1000 bet). */
 export const JACKPOT_ODDS_CAP = 1 / 10_000;
+/** The jackpot pays at least this many times the bet, so it still matters at a high bet. */
+export const JACKPOT_MIN_X = 300;
+
+/** What the jackpot pays at this bet: the pool, or the floor if higher. */
+export function jackpotFor(pool: number, bet: number): number {
+  return Math.floor(Math.max(pool, bet * JACKPOT_MIN_X));
+}
 
 export interface SymbolInfo {
   id: number;
