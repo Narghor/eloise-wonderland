@@ -8,6 +8,7 @@ import { renderBonusSlot } from './bonus/bonusScreen';
 import { renderOlympus } from './olympus/olympusScreen';
 import { renderLuna } from './luna/lunaScreen';
 import { ELOISE_ICON } from './luna/lunaArt';
+import { MEDUSA_ICON } from './olympus/olympusArt';
 import { renderBlackjack } from './blackjack/blackjackScreen';
 import { renderRoulette } from './roulette/rouletteScreen';
 
@@ -15,7 +16,7 @@ import { renderRoulette } from './roulette/rouletteScreen';
 const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: string; iconSvg?: string; title: string; hint: string }> = {
   sous: { render: renderSlots, icon: '🍒', title: 'Machine à sous', hint: '5 rouleaux, jackpot progressif' },
   porte: { render: renderBonusSlot, icon: '🚪', title: 'Machine à porte', hint: 'Décroche le bonus, plus la mise est haute, mieux il paie' },
-  olympe: { render: renderOlympus, icon: '⚡', title: 'Foudre de l’Olympe', hint: 'Presque rien sans les temples, tout avec les tours gratuits' },
+  olympe: { render: renderOlympus, icon: '🐍', iconSvg: MEDUSA_ICON, title: 'Le Regard de Medusa', hint: 'Presque rien sans les temples, tout avec les tours gratuits' },
   eloise: { render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book', hint: '3 livres = 10 tours gratuits avec un symbole qui remplit les rouleaux' },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
   roulette: { render: renderRoulette, icon: '🎡', title: 'Roulette', hint: 'Européenne, un seul zéro' },

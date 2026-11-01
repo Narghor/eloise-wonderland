@@ -3,7 +3,7 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, feedJackpot, jackpot, pay, winJackpot } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
-  playCoinTick, playLose, playReelStop, playSmallWin, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
+  playCoinTick, playLose, playReelStop, playSmallWin, playSuspense, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
   type WinLinesHandle, type WinPath,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -245,11 +245,9 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         message.textContent = 'Encore une porte…';
         message.className = 'bonus-message bonus-tension-text';
         shake(machine, 1);
-        const id = window.setInterval(playCoinTick, 160);
-        timers.add(id);
+        const stopSuspense = playSuspense(TENSION_MS);
         await wait(TENSION_MS);
-        window.clearInterval(id);
-        timers.delete(id);
+        stopSuspense();
         machine.classList.remove('bonus-machine-tense');
       } else {
         await wait(c === 0 ? REEL_MS : REEL_STAGGER);

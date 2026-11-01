@@ -1,9 +1,9 @@
 // -----------------------------------------------
-// OLYMPUS SLOT ("Foudre de l'Olympe") - pure maths, no DOM
+// OLYMPUS SLOT ("Le Regard de Medusa") - pure maths, no DOM
 // -----------------------------------------------
 // 6x5, 20 lines, high volatility. The base game is dry; in the free spins every
-// reel may land as a full stack of Zeus (any reel) or of lightning wilds
-// (reels 2-6), so the screen floods with Zeus. Scatters retrigger without limit
+// reel may land as a full stack of Medusa (any reel) or of lightning wilds
+// (reels 2-6), so the screen floods with Medusa. Scatters retrigger without limit
 // (only a safety cap on the total).
 
 export const COLS = 6;
@@ -30,11 +30,11 @@ export const SYMBOLS: SymbolDef[] = [
   { glyph: '🛡️', weight: 14, pays: [0.75, 1.75, 4, 12] },
   { glyph: '🦉', weight: 11, pays: [1, 2.5, 6, 18] },
   { glyph: '🔱', weight: 9, pays: [1.25, 3.5, 10, 25] },
-  { glyph: '🧔', weight: 6, pays: [1.75, 5, 15, 40] },
+  { glyph: '🐍', weight: 6, pays: [1.75, 5, 15, 40] },
   { glyph: '⚡', weight: 0, pays: [0, 0, 0, 0] },
   { glyph: '🏛️', weight: 0, pays: [0, 0, 0, 0] },
 ];
-export const ZEUS = 8;
+export const MEDUSA = 8;
 export const WILD = 9;
 export const SCATTER = 10;
 const PAYING = 9;
@@ -46,8 +46,8 @@ export const BASE_WILD_CHANCE = 0.075;
 /** Chance per cell to show a temple. */
 export const BASE_SCATTER_CHANCE = 0.0112;
 export const FREE_SCATTER_CHANCE = 0.0075;
-/** Free spins: chance per reel to be a full stack of Zeus (any reel) or of wilds (wild reels). */
-export const FREE_ZEUS_STACK = 0.3;
+/** Free spins: chance per reel to be a full stack of Medusa (any reel) or of wilds (wild reels). */
+export const FREE_MEDUSA_STACK = 0.3;
 export const FREE_WILD_STACK = 0.1;
 
 export const FREE_SPINS_BY_SCATTERS: Record<number, number> = { 3: 10, 4: 25, 5: 100 };
@@ -83,7 +83,7 @@ const REEL_TILT: number[][] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
-/** Free spins: the loose cells are even (no reel tilt) and richer in Zeus. */
+/** Free spins: the loose cells are even (no reel tilt) and richer in Medusa. */
 const FREE_TILT = [1, 1, 1, 1, 1, 1, 1, 1, 2.5];
 const REEL_WEIGHTS = REEL_TILT.map((tilt) => SYMBOLS.slice(0, PAYING).map((s, i) => s.weight * tilt[i]));
 const FREE_WEIGHTS = SYMBOLS.slice(0, PAYING).map((s, i) => s.weight * FREE_TILT[i]);
@@ -103,7 +103,7 @@ function drawCell(rng: Rng, col: number, free: boolean): number {
   return drawPaying(rng, free ? FREE_WEIGHTS : REEL_WEIGHTS[col]);
 }
 
-/** Test outcomes: temples on the next base spin, or a screen flooded with Zeus in the free spins. */ // TEST-BUTTONS
+/** Test outcomes: temples on the next base spin, or a screen flooded with Medusa in the free spins. */ // TEST-BUTTONS
 export type OlympusForce = 'free3' | 'free5' | 'flood'; // TEST-BUTTONS
 
 export function spinGrid(rng: Rng, free: boolean, force?: OlympusForce): Grid { // TEST-BUTTONS
@@ -111,11 +111,11 @@ export function spinGrid(rng: Rng, free: boolean, force?: OlympusForce): Grid { 
   for (let c = 0; c < COLS; c++) {
     if (free) {
       const roll = force === 'flood' ? 0 : rng(); // TEST-BUTTONS
-      if (roll < FREE_ZEUS_STACK) {
-        grid.push(Array(ROWS).fill(ZEUS));
+      if (roll < FREE_MEDUSA_STACK) {
+        grid.push(Array(ROWS).fill(MEDUSA));
         continue;
       }
-      if (WILD_REELS.includes(c) && roll < FREE_ZEUS_STACK + FREE_WILD_STACK) {
+      if (WILD_REELS.includes(c) && roll < FREE_MEDUSA_STACK + FREE_WILD_STACK) {
         grid.push(Array(ROWS).fill(WILD));
         continue;
       }
@@ -139,14 +139,14 @@ export function scatterCount(grid: Grid): number {
 export function stackedReels(grid: Grid): number[] {
   const reels: number[] = [];
   grid.forEach((column, c) => {
-    if (column.every((s) => s === column[0]) && (column[0] === WILD || column[0] === ZEUS)) reels.push(c);
+    if (column.every((s) => s === column[0]) && (column[0] === WILD || column[0] === MEDUSA)) reels.push(c);
   });
   return reels;
 }
 
-/** Reels fully covered by Zeus. */
-export function zeusReels(grid: Grid): number[] {
-  return stackedReels(grid).filter((c) => grid[c][0] === ZEUS);
+/** Reels fully covered by Medusa. */
+export function medusaReels(grid: Grid): number[] {
+  return stackedReels(grid).filter((c) => grid[c][0] === MEDUSA);
 }
 
 export function lineWins(grid: Grid): LineWin[] {

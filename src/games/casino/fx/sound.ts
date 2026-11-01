@@ -163,6 +163,54 @@ export function playBonusTrigger(): void {
   [0, 2, 4, 7].forEach((n, i) => tone(C_MAJOR[n] * 2, 0.5 + i * 0.07, 0.25, 'square', 0.1));
 }
 
+/**
+ * Suspense while the last bonus reel slows down: a drone rising over `durationMs`
+ * with a quickening heartbeat. Returns a function that cuts it short.
+ */
+export function playSuspense(durationMs: number): () => void {
+  const ctx = ensureContext();
+  if (!ctx || !master || muted) return () => {};
+  const t = ctx.currentTime;
+  const end = t + durationMs / 1000;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.09, t + 0.3);
+  gain.gain.setValueAtTime(0.09, end - 0.1);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(400, t);
+  filter.frequency.exponentialRampToValueAtTime(2400, end);
+  filter.connect(gain).connect(master);
+  // Two detuned saws a fifth apart, both climbing an octave: the tension rises.
+  const voices = [110, 165].map((freq) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 2, end);
+    osc.connect(filter);
+    osc.start(t);
+    osc.stop(end + 0.05);
+    return osc;
+  });
+  // Heartbeat: thumps closer and closer together.
+  let at = 0.15;
+  let gap = 0.55;
+  while (at < durationMs / 1000 - 0.1) {
+    tone(70, at, 0.12, 'sine', 0.45, 45);
+    tone(70, at + 0.14, 0.1, 'sine', 0.3, 45);
+    at += gap;
+    gap = Math.max(0.28, gap * 0.85);
+  }
+  return () => {
+    const now = ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    voices.forEach((osc) => osc.stop(now + 0.1));
+  };
+}
+
 /** Dull buzz for a losing spin (kept very quiet). */
 export function playLose(): void {
   tone(200, 0, 0.18, 'triangle', 0.08, 150);

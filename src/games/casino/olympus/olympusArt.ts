@@ -1,35 +1,45 @@
-// Inline SVG art for Foudre de l'Olympe: Zeus's head and the temple scatter.
+// Inline SVG art for Le Regard de Medusa: Medusa's head and the temple scatter.
 // Gradients live once in OLYMPUS_DEFS (mounted at the screen root, never display:none).
 
 export const OLYMPUS_DEFS = `<svg class="oly-defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs>
 <radialGradient id="oz-sky" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#e6f3ff"/><stop offset="0.65" stop-color="#8ec3ff"/><stop offset="1" stop-color="#3f7ad8"/></radialGradient>
 <linearGradient id="oz-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2a8"/><stop offset="0.5" stop-color="#f2c230"/><stop offset="1" stop-color="#b8820c"/></linearGradient>
-<linearGradient id="oz-hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient>
-<radialGradient id="oz-skin" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#ffe3c8"/><stop offset="1" stop-color="#eab48c"/></radialGradient>
+<radialGradient id="om-disc" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#e6fff0"/><stop offset="0.65" stop-color="#7fd6a0"/><stop offset="1" stop-color="#1f7a4a"/></radialGradient>
+<linearGradient id="om-snake" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9be36a"/><stop offset="1" stop-color="#2f8f3e"/></linearGradient>
+<radialGradient id="om-skin" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#e8f7dc"/><stop offset="1" stop-color="#a9d39a"/></radialGradient>
 <linearGradient id="ot-marble" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2dccd"/></linearGradient>
 <radialGradient id="ot-glow" cx="50%" cy="55%" r="55%"><stop offset="0" stop-color="#ffe9a0" stop-opacity="0.9"/><stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/></radialGradient>
 </defs></svg>`;
 
-const LEAF = (x: number, y: number, a: number) =>
-  `<ellipse cx="${x}" cy="${y}" rx="6" ry="3" transform="rotate(${a} ${x} ${y})" fill="url(#oz-gold)" stroke="#8a5f00" stroke-width="0.8"/>`;
+/** One hair snake: a wavy body from (x, y) along angle `a`, ending in a small head with a red tongue. */
+const SNAKE = (x: number, y: number, a: number) =>
+  `<g transform="rotate(${a} ${x} ${y})">` +
+  `<path d="M${x} ${y}q-4 -5 0 -9t0 -9" stroke="#1e5a2a" stroke-width="7" fill="none" stroke-linecap="round"/>` +
+  `<path d="M${x} ${y}q-4 -5 0 -9t0 -9" stroke="url(#om-snake)" stroke-width="5" fill="none" stroke-linecap="round"/>` +
+  `<ellipse cx="${x}" cy="${y - 20}" rx="4.2" ry="3.4" fill="url(#om-snake)" stroke="#1e5a2a" stroke-width="1"/>` +
+  `<circle cx="${x - 1.5}" cy="${y - 21}" r="0.9" fill="#ffd400"/><circle cx="${x + 1.5}" cy="${y - 21}" r="0.9" fill="#ffd400"/>` +
+  `<path d="M${x} ${y - 23}v-2.5l-1 -1.2M${x} ${y - 25.5}l1 -1.2" stroke="#e0283c" stroke-width="0.8" fill="none"/>` +
+  `</g>`;
 
-/** Zeus's head: white hair and beard, gold laurel, a gold bolt on the brow, sky-blue disc. */
-export const ZEUS_HEAD = `<svg viewBox="0 0 100 100" class="oly-art oly-zeus-art" aria-hidden="true">
-<circle cx="50" cy="50" r="48" fill="url(#oz-sky)" stroke="url(#oz-gold)" stroke-width="3"/>
-<path d="M24 72C12 62 13 40 21 28C26 14 40 8 50 8C60 8 74 14 79 28C87 40 88 62 76 72C72 64 28 64 24 72Z" fill="url(#oz-hair)" stroke="#9fb0c8" stroke-width="1.2"/>
-<ellipse cx="50" cy="44" rx="17" ry="19" fill="url(#oz-skin)" stroke="#b9805a" stroke-width="1"/>
-<path d="M30 46C27 60 28 74 34 84Q38 92 44 90Q50 98 56 90Q62 92 66 84C72 74 73 60 70 46C66 56 60 60 50 60C40 60 34 56 30 46Z" fill="url(#oz-hair)" stroke="#9fb0c8" stroke-width="1.2"/>
-<path d="M38 68q4 6 0 12M50 66q2 8 0 16M62 68q-4 6 0 12" stroke="#b7c3d6" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-<path d="M50 54C44 52 38 54 35 59C40 58 45 58 50 57C55 58 60 58 65 59C62 54 56 52 50 54Z" fill="#ffffff" stroke="#9fb0c8" stroke-width="1"/>
-<path d="M36 38l10 3M64 38l-10 3" stroke="#e8edf5" stroke-width="4" stroke-linecap="round"/>
-<path d="M36 38l10 3M64 38l-10 3" stroke="#8d9bb0" stroke-width="1" stroke-linecap="round" fill="none"/>
-<ellipse cx="43" cy="45" rx="2.6" ry="3" fill="#1d2b55"/><ellipse cx="57" cy="45" rx="2.6" ry="3" fill="#1d2b55"/>
-<circle cx="44" cy="44" r="0.9" fill="#fff"/><circle cx="58" cy="44" r="0.9" fill="#fff"/>
-<path d="M50 46q-2 5 1 6" stroke="#b9805a" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-<ellipse cx="38" cy="51" rx="3" ry="1.8" fill="#f19a8a" opacity="0.5"/><ellipse cx="62" cy="51" rx="3" ry="1.8" fill="#f19a8a" opacity="0.5"/>
-${LEAF(26, 32, -60)}${LEAF(31, 24, -40)}${LEAF(38, 19, -20)}${LEAF(74, 32, 60)}${LEAF(69, 24, 40)}${LEAF(62, 19, 20)}
-<path d="M54 3L46 15H51L47 27L59 12H53L57 3Z" fill="url(#oz-gold)" stroke="#8a5f00" stroke-width="1.2" stroke-linejoin="round"/>
+/** Medusa's head: hair of green snakes, pale green skin, gold diadem with an emerald, glowing gold eyes, emerald disc. */
+export const MEDUSA_HEAD = `<svg viewBox="0 0 100 100" class="oly-art oly-medusa-art" aria-hidden="true">
+<circle cx="50" cy="50" r="48" fill="url(#om-disc)" stroke="url(#oz-gold)" stroke-width="3"/>
+${SNAKE(32, 44, -70)}${SNAKE(34, 36, -40)}${SNAKE(43, 32, -12)}${SNAKE(57, 32, 12)}${SNAKE(66, 36, 40)}${SNAKE(68, 44, 70)}
+<path d="M28 44C24 58 26 72 30 80C34 74 33 62 34 54ZM72 44C76 58 74 72 70 80C66 74 67 62 66 54Z" fill="url(#om-snake)" stroke="#1e5a2a" stroke-width="1"/>
+<path d="M50 84C39 84 31 72 31 54C31 40 39 30 50 30C61 30 69 40 69 54C69 72 61 84 50 84Z" fill="url(#om-skin)" stroke="#4f7d4a" stroke-width="1.2"/>
+<path d="M33 40C37 32 44 28 50 28C56 28 63 32 67 40C60 36 40 36 33 40Z" fill="#2f7d3c" stroke="#1e5a2a" stroke-width="1"/>
+<path d="M34 38Q50 30 66 38L64 42Q50 35 36 42Z" fill="url(#oz-gold)" stroke="#8a5f00" stroke-width="1"/>
+<path d="M50 31l3.5 4.5L50 40l-3.5 -4.5Z" fill="#18a35a" stroke="#8a5f00" stroke-width="1"/>
+<path d="M38 50q5 -3 9 0M53 50q4 -3 9 0" stroke="#2c4a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<ellipse cx="42.5" cy="55" rx="4" ry="2.8" fill="#fff6b0"/><ellipse cx="57.5" cy="55" rx="4" ry="2.8" fill="#fff6b0"/>
+<ellipse cx="42.5" cy="55" rx="1.2" ry="2.6" fill="#7a5200"/><ellipse cx="57.5" cy="55" rx="1.2" ry="2.6" fill="#7a5200"/>
+<path d="M50 58q-2 6 1 7" stroke="#4f7d4a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+<path d="M44 72q6 4 12 0q-6 2 -12 0Z" fill="#9c2a4a" stroke="#6e1a33" stroke-width="1"/>
+<ellipse cx="37" cy="64" rx="3" ry="1.8" fill="#7fc98a" opacity="0.6"/><ellipse cx="63" cy="64" rx="3" ry="1.8" fill="#7fc98a" opacity="0.6"/>
 </svg>`;
+
+/** Lobby icon: the head with its own gradients (the lobby has no OLYMPUS_DEFS). */
+export const MEDUSA_ICON = OLYMPUS_DEFS + MEDUSA_HEAD;
 
 /** The temple scatter: marble temple with a gold pediment on a warm glow. */
 export const TEMPLE = `<svg viewBox="0 0 100 100" class="oly-art oly-temple-art" aria-hidden="true">

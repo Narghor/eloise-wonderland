@@ -3,7 +3,7 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, pay } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
-  playBonusTrigger, playLose, playReelStop, playSmallWin, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
+  playBonusTrigger, playLose, playReelStop, playSmallWin, playSuspense, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, type WinLinesHandle,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -237,7 +237,9 @@ export function renderLuna(root: HTMLElement): () => void {
         cells[reel].forEach((c) => c.classList.add('luna-tension'));
         setMessage('Encore un livre…', 'luna-tension-text');
       }
+      const stopSuspense = tense ? playSuspense(TENSION_MS) : undefined;
       await wait(reel === 0 ? (fast ? FREE_REEL_MS : REEL_MS) : tense ? TENSION_MS : fast ? FREE_STAGGER : REEL_STAGGER);
+      stopSuspense?.();
       playReelStop(reel);
       cells[reel].forEach((cell, row) => {
         if (!rolling.has(cell)) return;
