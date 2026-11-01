@@ -1,7 +1,7 @@
 // Inline SVG art for Le Regard de Medusa: Medusa's head and the temple scatter.
 // Gradients live once in OLYMPUS_DEFS (mounted at the screen root, never display:none).
 
-export const OLYMPUS_DEFS = `<svg class="oly-defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs>
+export const OLYMPUS_DEFS = `<svg class="oly-defs fx-defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs>
 <radialGradient id="oz-sky" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#e6f3ff"/><stop offset="0.65" stop-color="#8ec3ff"/><stop offset="1" stop-color="#3f7ad8"/></radialGradient>
 <linearGradient id="oz-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2a8"/><stop offset="0.5" stop-color="#f2c230"/><stop offset="1" stop-color="#b8820c"/></linearGradient>
 <radialGradient id="om-disc" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#e6fff0"/><stop offset="0.65" stop-color="#7fd6a0"/><stop offset="1" stop-color="#1f7a4a"/></radialGradient>

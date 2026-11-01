@@ -63,8 +63,8 @@
   font-size: 1.6rem;
 }
 .casino-table-icon.is-svg { overflow: hidden; background: #1b1350; }
-.casino-table-icon.is-svg > svg:not(.luna-defs) { width: 100%; height: 100%; }
-.casino-table-icon .luna-defs { position: absolute; width: 0; height: 0; }
+.casino-table-icon.is-svg > svg:not(.fx-defs) { width: 100%; height: 100%; }
+/* Gradient holders of an icon: kept out of the layout and of the clicks. */
 
 .casino-cashier {
   display: grid;

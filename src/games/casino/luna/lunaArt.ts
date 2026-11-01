@@ -3,7 +3,7 @@
 // -----------------------------------------------
 // Gradients live once in LUNA_DEFS (mounted at the screen root, never display:none).
 
-export const LUNA_DEFS = `<svg class="luna-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+export const LUNA_DEFS = `<svg class="luna-defs fx-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
 <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c8"/><stop offset=".45" stop-color="#f2c75c"/><stop offset=".55" stop-color="#c8902a"/><stop offset="1" stop-color="#ffe7a0"/></linearGradient>
 <linearGradient id="lg-silver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#b9c4e8"/><stop offset="1" stop-color="#eef2ff"/></linearGradient>
 <linearGradient id="lg-rose" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd3f0"/><stop offset=".5" stop-color="#d266b4"/><stop offset="1" stop-color="#ffc2e6"/></linearGradient>
