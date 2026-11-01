@@ -138,17 +138,38 @@
   background: rgba(233, 196, 106, 0.3);
 }
 .luna-cell svg { width: 100%; height: 100%; display: block; }
-.luna-rolling svg { filter: blur(1.5px); opacity: 0.7; }
+/* No blur filter: on a phone it re-rasterizes every cell on every frame of the roll. */
+/* A real drum: each symbol slides down through its cell, one cell per symbol change (110 ms). */
+.luna-rolling svg { opacity: 0.7; animation: luna-scroll 0.11s linear infinite; }
+@keyframes luna-scroll { from { transform: translateY(-70%); } to { transform: translateY(70%); } }
+/* The next reel to stop: a faint gold sheen, not a white veil over the purple. */
+.luna-reel.fx-streak::after { background: linear-gradient(transparent 20%, rgb(255 211 107 / 0.28) 50%, transparent 80%); }
 .luna-landed { animation: luna-land 0.25s ease-out; }
 .luna-is-book { background: radial-gradient(circle, #6a3fd0 0%, #2a1260 80%); }
 .luna-tension { box-shadow: inset 0 0 14px 4px #b9a2ff; }
 .luna-tension-text { color: #6a3fd0; }
-.luna-book-pay { box-shadow: inset 0 0 14px 4px #ffd36b; animation: luna-glow 1.4s ease-in-out infinite alternate; }
+/* A paying book: a fixed glow whose opacity breathes (an animated shadow repaints every frame). */
+.luna-book-pay { box-shadow: inset 0 0 8px 2px #ffd36b; }
+.luna-book-pay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 16px 5px #ffd36b;
+  animation: luna-glow 1.4s ease-in-out infinite alternate;
+}
 .luna-sticky {
   background: radial-gradient(circle, #9a6bff 0%, #3a1a80 80%);
   box-shadow: 0 0 0 2px #ffd36b inset, inset 0 0 12px 2px rgba(255, 211, 107, 0.6);
 }
 .luna-dim { opacity: 0.35; }
+
+/* Shared over-the-reels messages (fx.css), in the book's night purple. */
+.luna-reels {
+  --fx-pop-bg: linear-gradient(rgb(75 42 160 / 0.95), rgb(26 12 70 / 0.95));
+  --fx-pop-label: #e8dcff;
+  --fx-stamp-bg: radial-gradient(circle, rgb(40 20 100 / 0.55), rgb(10 6 38 / 0.88));
+}
 
 .luna-expand-layer { position: absolute; inset: 6px; pointer-events: none; }
 .luna-expand {
@@ -303,7 +324,7 @@
 
 @keyframes luna-twinkle { from { opacity: 0.5; } to { opacity: 0.9; } }
 @keyframes luna-land { 0% { transform: translateY(-8%); } 70% { transform: translateY(3%); } 100% { transform: none; } }
-@keyframes luna-glow { from { box-shadow: inset 0 0 8px 2px #ffd36b; } to { box-shadow: inset 0 0 16px 5px #ffd36b; } }
+@keyframes luna-glow { from { opacity: 0; } to { opacity: 1; } }
 @keyframes luna-expand { from { transform: scaleY(0.33); opacity: 0.4; } to { transform: scaleY(1); opacity: 1; } }
 @keyframes luna-flip { from { transform: rotateY(90deg); } to { transform: none; } }
 @keyframes luna-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -316,7 +337,7 @@
 @keyframes luna-reveal { from { transform: translate(-50%, -50%) scale(0); } to { transform: translate(-50%, -50%) scale(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .luna-sky, .luna-book-pay, .luna-landed, .luna-expand-art, .luna-page, .luna-intro-book { animation: none; }
+  .luna-sky, .luna-book-pay::after, .luna-landed, .luna-rolling svg, .luna-expand-art, .luna-page, .luna-intro-book { animation: none; }
   .luna-page { opacity: 0; }
   .luna-intro-symbol, .luna-intro-name { animation-duration: 0.01s; animation-delay: 0s; }
 }

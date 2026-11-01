@@ -1,6 +1,9 @@
 import './slots.css';
 import { el, topBar } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, pay, winJackpot } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot } from '../chips';
+
+/** This machine's key in the casino lobby, which shows its best win. */
+const LOBBY_ID = 'sous';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
   playLose, playReelStop, playSmallWin, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
@@ -137,12 +140,14 @@ export function renderSlots(root: HTMLElement): () => void {
       playBonusTrigger();
       shake(machine, 3);
       const won = winJackpot(MACHINE_ID, stake * JACKPOT_MIN_X);
+      noteWin(LOBBY_ID, won, stake);
       message.textContent = `💎 JACKPOT : ${won.toLocaleString('fr-FR')} jetons ! 💎`;
       message.className = 'slots-message slots-message-big';
       refresh();
       await showBigWin(document.body, won, stake, 'JACKPOT !');
     } else if (result.total > 0) {
       pay(result.total);
+      noteWin(LOBBY_ID, result.total, stake);
       const tier = winTier(result.total, stake);
       const paths: WinPath[] = result.wins.map((win) => ({
         cells: PAYLINES[win.line].slice(0, win.count).map((row, reel) => [reel, row] as [number, number]),

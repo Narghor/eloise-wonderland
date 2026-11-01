@@ -21,27 +21,35 @@ export interface CasinoSave {
   refilledOn: string;
   /** Progressive jackpot pool, per machine id. */
   jackpots: Record<string, number>;
+  /** Best single win (a spin or a whole bonus) in stakes, per machine id. */
+  bestWins: Record<string, number>;
 }
 
 export function loadCasino(): CasinoSave {
   const raw = readGame(GAME_ID);
   if (typeof raw !== 'object' || raw === null) {
-    return { chips: STARTING_CHIPS, record: STARTING_CHIPS, refilledOn: todayKey(), jackpots: {} };
+    return { chips: STARTING_CHIPS, record: STARTING_CHIPS, refilledOn: todayKey(), jackpots: {}, bestWins: {} };
   }
   const data = raw as Record<string, unknown>;
   const chips = isCount(data.chips) ? data.chips : 0;
-  const jackpots: Record<string, number> = {};
-  if (typeof data.jackpots === 'object' && data.jackpots !== null) {
-    for (const [id, value] of Object.entries(data.jackpots)) {
-      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) jackpots[id] = value;
-    }
-  }
   return {
     chips,
     record: isCount(data.record) ? Math.max(data.record, chips) : chips,
     refilledOn: typeof data.refilledOn === 'string' ? data.refilledOn : '',
-    jackpots,
+    jackpots: readAmounts(data.jackpots),
+    bestWins: readAmounts(data.bestWins),
   };
+}
+
+/** A saved { machine id: amount } map, keeping only the valid amounts. */
+function readAmounts(value: unknown): Record<string, number> {
+  const amounts: Record<string, number> = {};
+  if (typeof value === 'object' && value !== null) {
+    for (const [id, amount] of Object.entries(value)) {
+      if (typeof amount === 'number' && Number.isFinite(amount) && amount >= 0) amounts[id] = amount;
+    }
+  }
+  return amounts;
 }
 
 function saveCasino(save: CasinoSave): void {
@@ -120,6 +128,28 @@ export function winJackpot(machineId: string, minimum = 0): number {
   save.chips += won;
   saveCasino(save);
   return won;
+}
+
+// -----------------------------------------------
+// BEST WIN PER MACHINE
+// -----------------------------------------------
+
+/** Remembers a win if it is the machine's best so far, in stakes. Returns true on a new record. */
+export function noteWin(machineId: string, amount: number, stake: number): boolean {
+  if (amount <= 0 || stake <= 0) return false;
+  const times = Math.round((amount / stake) * 10) / 10;
+  // A win below the stake is a loss in disguise: "record ×0,2" would read as a joke.
+  if (times < 1) return false;
+  const save = loadCasino();
+  if (times <= (save.bestWins[machineId] ?? 0)) return false;
+  save.bestWins[machineId] = times;
+  saveCasino(save);
+  return true;
+}
+
+/** The machine's best win in stakes, or 0 when it never paid. */
+export function bestWin(machineId: string): number {
+  return loadCasino().bestWins[machineId] ?? 0;
 }
 
 function isCount(value: unknown): value is number {

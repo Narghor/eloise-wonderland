@@ -135,6 +135,9 @@ export interface WinPath {
 
 const LINE_COLORS = ['#ffd23f', '#ff4fa3', '#3fe0ff', '#7dff6a', '#ff8a3d', '#b98bff', '#ff5a5a', '#5affc8', '#fff36b', '#6b9dff'];
 
+/** More winning lines than this and drawWinLines only highlights the cells. */
+const MAX_DRAWN_LINES = 3;
+
 export interface WinLinesHandle {
   /** Removes the drawing and the cell highlights. */
   clear(): void;
@@ -146,6 +149,8 @@ export interface WinLinesHandle {
  * in turn (looping) while `onShow(index)` lets the caller caption it.
  */
 export function drawWinLines(host: HTMLElement, cells: HTMLElement[][], wins: WinPath[], onShow?: (index: number) => void): WinLinesHandle {
+  // Beyond a few lines the drawing is a tangle: only the cells are highlighted.
+  const drawn = wins.length <= MAX_DRAWN_LINES;
   host.classList.add('fx-lines-host');
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'fx-lines');
@@ -159,6 +164,10 @@ export function drawWinLines(host: HTMLElement, cells: HTMLElement[][], wins: Wi
     const color = win.color ?? LINE_COLORS[i % LINE_COLORS.length];
     const g = document.createElementNS(SVG_NS, 'g');
     g.style.setProperty('--fx-line', color);
+    if (!drawn) {
+      svg.append(g);
+      return g;
+    }
     if (win.path) {
       const points = win.path.map((row, reel) => center(reel, row));
       const first = cells[0][win.path[0]].getBoundingClientRect();
@@ -232,7 +241,8 @@ export function burst(host: HTMLElement, count = 24, kind: 'coins' | 'confetti' 
   const amount = prefersReducedMotion() ? Math.min(count, 8) : count;
   host.classList.add('fx-burst-host');
   for (let i = 0; i < amount; i++) {
-    const p = el('span', { class: `fx-particle fx-${kind}`, 'aria-hidden': 'true', text: kind === 'coins' ? '🪙' : '' });
+    // Coins are drawn in CSS: the coin emoji is missing on Windows 10 and shows as an empty box.
+    const p = el('span', { class: `fx-particle fx-${kind}`, 'aria-hidden': 'true' });
     const angle = Math.random() * Math.PI * 2;
     const distance = 80 + Math.random() * 160;
     p.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
@@ -249,7 +259,7 @@ export function burst(host: HTMLElement, count = 24, kind: 'coins' | 'confetti' 
 export function rain(host: HTMLElement, count = 12, kind: 'coins' | 'confetti' = 'confetti'): void {
   const amount = prefersReducedMotion() ? Math.min(count, 4) : count;
   for (let i = 0; i < amount; i++) {
-    const p = el('span', { class: `fx-fall${kind === 'confetti' ? ' fx-confetti' : ''}`, 'aria-hidden': 'true', text: kind === 'coins' ? '🪙' : '' });
+    const p = el('span', { class: `fx-fall fx-${kind}`, 'aria-hidden': 'true' });
     p.style.setProperty('--x', `${Math.random() * 100}%`);
     p.style.setProperty('--drift', `${Math.random() * 80 - 40}px`);
     p.style.setProperty('--rot', `${Math.random() * 360 - 180}deg`);
@@ -307,14 +317,15 @@ export function countUp(target: HTMLElement, to: number, ms: number, format: (n:
 /**
  * Full-screen big win celebration over `host`: tiered title, counter climbing to `amount`,
  * coins and fanfare. A tap skips the count, a second tap (or a few seconds) closes it.
- * `title` overrides the tier title (e.g. "JACKPOT !"). Resolves once closed.
+ * `title` overrides the tier title (e.g. "JACKPOT !"); `themeClass` lets a machine restyle it.
+ * Resolves once closed.
  */
-export function showBigWin(host: HTMLElement, amount: number, stake: number, title?: string): Promise<void> {
+export function showBigWin(host: HTMLElement, amount: number, stake: number, title?: string, themeClass = ''): Promise<void> {
   const tier = Math.max(1, winTier(amount, stake)) as 1 | 2 | 3;
   const value = el('strong', { class: 'fx-bigwin-amount', text: '0' });
   const overlay = el(
     'div',
-    { class: `fx-bigwin fx-bigwin-${tier}`, role: 'dialog', 'aria-live': 'assertive' },
+    { class: `fx-bigwin fx-bigwin-${tier}${themeClass ? ` ${themeClass}` : ''}`, role: 'dialog', 'aria-live': 'assertive' },
     el('div', { class: 'fx-bigwin-halo', 'aria-hidden': 'true' }),
     el('p', { class: 'fx-bigwin-title', text: title ?? TIER_TITLES[tier] }),
     value,
@@ -357,4 +368,82 @@ export function tapToSpin(area: HTMLElement, spinButton: HTMLButtonElement): voi
     if ((event.target as HTMLElement).closest('button, a, .casino-test-bar')) return;
     if (!spinButton.disabled) spinButton.click();
   });
+}
+// -----------------------------------------------
+// OVER-THE-REELS MESSAGES (themed per machine with --fx-pop-* variables)
+// -----------------------------------------------
+
+/** From this many times the stake, the win pop counts up instead of showing the amount at once. */
+const COUNTED_WIN_X = 3;
+
+export interface WinPopOptions {
+  /** A line above the amount. */
+  label?: string;
+  durationMs?: number;
+  /** Given, a win of COUNTED_WIN_X stakes or more climbs with coin ticks under a tier title. */
+  stake?: number;
+}
+
+/** A spin's win, big in the middle of `host` (position: relative) for a moment. */
+export function winPop(host: HTMLElement, amount: number, { label = '', durationMs = 1600, stake }: WinPopOptions = {}): void {
+  host.querySelector(':scope > .fx-winpop')?.remove();
+  const ratio = stake ? amount / stake : 0;
+  const counted = ratio >= COUNTED_WIN_X;
+  const duration = counted ? durationMs + 900 : durationMs;
+  const pop = el('div', { class: `fx-winpop${counted ? ' fx-winpop-counted' : ''}`, 'aria-hidden': 'true' });
+  pop.style.animationDuration = `${duration}ms`;
+  const title = label || (counted ? (ratio >= 10 ? 'GROS GAIN' : 'BEAU GAIN') : '');
+  if (title) pop.append(el('span', { class: 'fx-winpop-label', text: title }));
+  const value = el('b', { text: `+${amount.toLocaleString('fr-FR')}` });
+  pop.append(value);
+  host.append(pop);
+  if (counted) countUp(value, amount, Math.min(1400, 500 + ratio * 60), (n) => `+${n.toLocaleString('fr-FR')}`);
+  window.setTimeout(() => pop.remove(), duration);
+}
+
+/** A big stamp ("+10" / "TOURS GRATUITS") over `host` with turning rays; a tap or `durationMs` closes it. */
+export function stampBanner(host: HTMLElement, big: string, label: string, durationMs = 2200): Promise<void> {
+  const banner = el(
+    'div',
+    { class: 'fx-stamp', role: 'status' },
+    el('div', { class: 'fx-rays', 'aria-hidden': 'true' }),
+    el('p', { class: 'fx-stamp-big', text: big }),
+    el('p', { class: 'fx-stamp-label', text: label }),
+  );
+  host.append(banner);
+  burst(host, 18, 'confetti');
+  return new Promise((resolve) => {
+    let done = false;
+    const close = (): void => {
+      if (done) return;
+      done = true;
+      banner.classList.add('fx-stamp-out');
+      window.setTimeout(() => {
+        banner.remove();
+        resolve();
+      }, 250);
+    };
+    banner.addEventListener('click', close);
+    window.setTimeout(close, durationMs);
+  });
+}
+
+/**
+ * The cells that triggered a bonus blow up one by one, then a golden blast with rays covers `host`.
+ * Resolves when the blast is over; the cells keep no class afterwards.
+ */
+export async function igniteCells(host: HTMLElement, lit: HTMLElement[], onEach?: () => void): Promise<void> {
+  const pause = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+  host.querySelector(':scope > .fx-winpop')?.remove();
+  for (const cell of lit) {
+    cell.classList.add('fx-ignite');
+    onEach?.();
+    await pause(260);
+  }
+  const blast = el('div', { class: 'fx-blast', 'aria-hidden': 'true' }, el('div', { class: 'fx-rays' }));
+  host.append(blast);
+  burst(host, 26, 'coins');
+  await pause(1300);
+  blast.remove();
+  lit.forEach((cell) => cell.classList.remove('fx-ignite'));
 }

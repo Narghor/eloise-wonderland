@@ -76,6 +76,11 @@
 @keyframes bonus-jp-hit { from { transform: scale(1); filter: brightness(1); } to { transform: scale(1.08); filter: brightness(1.3); } }
 
 .bonus-window {
+  position: relative;
+  /* Shared over-the-reels messages (fx.css), in the cabinet's lacquered red. */
+  --fx-pop-bg: linear-gradient(rgb(154 20 46 / 0.95), rgb(58 4 14 / 0.95));
+  --fx-pop-label: #ffe0b0;
+  --fx-stamp-bg: radial-gradient(circle, rgb(90 10 25 / 0.55), rgb(26 5 8 / 0.88));
   background: #1a0508;
   border-radius: 12px;
   padding: 6px;
@@ -100,7 +105,8 @@
   min-width: 0;
   overflow: hidden;
 }
-.bonus-rolling { filter: blur(2px); transform: translateY(2px); }
+/* No blur filter: on a phone it re-rasterizes every cell on every frame of the roll. */
+.bonus-rolling { position: relative; opacity: 0.7; animation: fx-reel-jitter 0.09s linear infinite alternate; }
 .bonus-landed { animation: bonus-land 0.3s cubic-bezier(0.3, 1.8, 0.5, 1); }
 .bonus-win { background: var(--accent-soft); outline: 2px solid var(--accent-strong); }
 .bonus-empty { background: rgb(255 255 255 / 0.08); box-shadow: inset 0 0 0 1px rgb(233 185 73 / 0.35); }
@@ -114,6 +120,23 @@
 }
 .bonus-coin-jp { background: radial-gradient(circle at 35% 30%, #ffd1e3, #e0457b 60%, #8a1c45); color: white; }
 .bonus-pop { animation: bonus-pop 0.45s ease-out; }
+
+/* Hold & Spin running total, inside the cabinet. */
+.bonus-total:empty { display: none; }
+.bonus-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: linear-gradient(#5a3700, #2e1b00);
+  box-shadow: inset 0 0 0 2px #e9b949;
+  color: #fff3b0;
+  font-weight: 800;
+}
+.bonus-total span { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.bonus-total b { font-size: 1.5rem; color: #ffe08a; font-variant-numeric: tabular-nums; }
 
 .bonus-respins { display: flex; justify-content: center; gap: 8px; min-height: 0; }
 .bonus-respins:not(:empty) { min-height: 12px; }
@@ -162,7 +185,6 @@
   font-weight: 700;
   z-index: 50;
   overflow: hidden;
-  animation: bonus-flash 1s ease-in-out 2 alternate;
 }
 .bonus-celebrate-door { font-size: 4rem; animation: bonus-pop 0.6s ease-out; }
 .bonus-celebrate-text { font-size: 3.2rem; text-shadow: 0 0 16px #ff4fa3, 0 4px 0 #7a0d4a; animation: bonus-pop 0.6s ease-out; }
@@ -170,14 +192,23 @@
 .bonus-small-light { font-size: 0.85em; opacity: 0.85; }
 @keyframes bonus-land { from { transform: translateY(-20%); } to { transform: none; } }
 @keyframes bonus-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
-@keyframes bonus-flash { from { background: rgb(59 24 71 / 0.85); } to { background: rgb(120 50 110 / 0.92); } }
 
-.bonus-door { box-shadow: 0 0 10px 3px #ffd54f; animation: bonus-glow 0.8s ease-in-out infinite alternate; }
+/* A door's halo: a fixed shadow whose opacity breathes (an animated shadow repaints every frame). */
+.bonus-door { position: relative; overflow: visible; box-shadow: 0 0 6px 2px #ffd54f; }
+.bonus-door::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 16px 6px #ffb300;
+  animation: bonus-glow 0.8s ease-in-out infinite alternate;
+}
 .bonus-door-open { animation: bonus-door-open 1.1s ease-in forwards; }
 .bonus-tension { box-shadow: 0 0 12px 4px #ff7043; animation: bonus-shake 0.6s ease-in-out infinite; }
 .bonus-tension-text { color: #e64a19; animation: bonus-pop 0.5s ease-out; }
 
-@keyframes bonus-glow { from { box-shadow: 0 0 6px 2px #ffd54f; } to { box-shadow: 0 0 16px 6px #ffb300; } }
+@keyframes bonus-glow { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bonus-door-open {
   0% { transform: perspective(300px) rotateY(0); background: #fff3b0; }
   100% { transform: perspective(300px) rotateY(-85deg); background: #ffd54f; opacity: 0.6; }

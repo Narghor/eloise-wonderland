@@ -1,0 +1,40 @@
+/* Casino ticket: a purple scratch card under a mini game's win banner. */
+.ticket {
+  align-self: center;
+  width: min(100%, 320px);
+  margin: 10px auto 0;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(160deg, #6a3fd0, #2a1260);
+  box-shadow: 0 6px 18px rgb(42 18 96 / 0.4);
+  animation: ticket-drop 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.ticket-title { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.18em; color: #ffe08a; }
+.ticket-zone {
+  position: relative;
+  margin-top: 8px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fffaf0;
+  color: #2a1260;
+}
+.ticket-amount { font-size: 1.7rem; font-weight: 900; }
+.ticket-cover { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: pointer; transition: opacity 0.4s; }
+.ticket-zone.is-open .ticket-cover { opacity: 0; pointer-events: none; }
+.ticket-zone.is-open .ticket-amount { animation: ticket-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.ticket-link { display: block; margin-top: 6px; font-size: 0.75rem; color: #e8dcff; }
+.ticket-skip { margin-top: 4px; border: 0; background: none; color: #e8dcff; text-decoration: underline; font-size: 0.8rem; cursor: pointer; }
+.ticket [hidden] { display: none; }
+
+@keyframes ticket-drop { from { transform: translateY(-40px) rotate(-6deg) scale(0.6); opacity: 0; } }
+@keyframes ticket-pop { from { transform: scale(0.3); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket, .ticket-zone.is-open .ticket-amount { animation: none; }
+}

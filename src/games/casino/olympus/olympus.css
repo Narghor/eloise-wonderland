@@ -91,7 +91,8 @@
   background: linear-gradient(180deg, #e3eee4 0%, #fbfffb 45%, #cfdfd2 100%);
   box-shadow: inset 0 0 0 1px rgb(201 162 39 / 0.45);
 }
-.oly-rolling { filter: blur(1px); opacity: 0.75; }
+/* No blur filter: on a phone it re-rasterizes 30 cells every frame of the roll. */
+.oly-rolling { position: relative; opacity: 0.7; animation: fx-reel-jitter 0.09s linear infinite alternate; }
 .oly-landed { animation: oly-land 0.2s ease-out; }
 .oly-cell.oly-win { background: #fff3b0; outline: 2px solid #d4af37; }
 .oly-cell.oly-medusa { background: radial-gradient(circle, #f0fff4, #8fdcaa 65%, #2f8f5a); padding: 1px; }
@@ -104,6 +105,16 @@
   background: radial-gradient(circle at 50% 55%, #6a3aa3, #24104a 75%);
   box-shadow: inset 0 0 0 2px #f2c230, 0 0 8px 2px rgb(255 205 70 / 0.55);
   animation: oly-glow 1.8s ease-in-out infinite alternate;
+}
+/* The breathing halo: a fixed shadow whose opacity moves (cheap), instead of an animated shadow. */
+.oly-cell.oly-scatter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 14px 5px rgb(255 205 70 / 0.85);
+  animation: oly-fade 1.8s ease-in-out infinite alternate;
 }
 .oly-art { width: 100%; height: 100%; display: block; }
 .oly-inline-art { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: middle; }
@@ -140,17 +151,27 @@
   width: 96%;
   height: auto;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 2px 3px rgb(10 60 30 / 0.5));
 }
 .oly-tall { font-family: Georgia, 'Times New Roman', serif; font-weight: 900; font-size: clamp(8px, 2.4vw, 13px); letter-spacing: 0.08em; }
 .oly-reel-medusa .oly-tall { color: #0f4a2a; }
 
 /* Four or more Medusa columns: a slow green glow around the cabinet, no flash. */
-.oly-flooded { box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 0 28px 8px rgb(90 230 140 / 0.75); animation: oly-flood 2.4s ease-in-out infinite alternate; }
-@keyframes oly-flood {
-  from { box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 0 18px 4px rgb(90 230 140 / 0.5); }
-  to { box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 0 34px 12px rgb(120 255 170 / 0.85); }
+/* Glows around the cabinet: fixed shadows on pseudo-elements, only their opacity is animated. */
+.oly-machine::before,
+.oly-machine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
 }
+.oly-machine::before { box-shadow: 0 0 34px 12px rgb(120 255 170 / 0.85); }
+.oly-machine::after { box-shadow: 0 0 24px 8px rgb(120 255 170 / 0.9); }
+.oly-flooded::before { animation: oly-fade 2.4s ease-in-out infinite alternate; }
+.oly-struck::after { animation: oly-flash 1.2s ease-in-out; }
+@keyframes oly-fade { from { opacity: 0.35; } to { opacity: 1; } }
+@keyframes oly-flash { 0%, 100% { opacity: 0; } 40% { opacity: 1; } }
 
 /* Free spins: the lair darkens. */
 .oly-in-feature .oly-sky {
@@ -159,6 +180,69 @@
     radial-gradient(ellipse 60% 30% at 50% 6%, rgb(120 255 170 / 0.3), transparent 70%),
     radial-gradient(ellipse at 50% 0%, #1f6a45, #0b2a1c 60%, #04140c);
 }
+
+/* ---- effects: only transform and opacity move, so phones keep up ---- */
+.oly-sky { position: relative; }
+
+/* A Medusa column lands: a white flash, then a gold ring that spreads from her head. */
+.oly-reel-medusa .oly-tall::before,
+.oly-reel-medusa .oly-tall::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+.oly-reel-medusa .oly-tall::before {
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  animation: oly-column-flash 0.35s ease-out;
+}
+/* Never fully white: at full strength the column read as an empty blank tile. */
+@keyframes oly-column-flash { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+.oly-reel-medusa .oly-tall::after {
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  aspect-ratio: 1;
+  margin: -50% 0 0 -50%;
+  border-radius: 50%;
+  border: 3px solid #f2c230;
+  opacity: 0;
+  animation: oly-ring 0.8s ease-out;
+}
+@keyframes oly-ring { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+
+/* Her gaze: a green wave sweeps the reels when the first Medusa column lands. */
+.oly-sky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 35%, rgb(150 255 190 / 0.55) 47%, rgb(255 255 255 / 0.7) 50%, rgb(150 255 190 / 0.55) 53%, transparent 65%) no-repeat;
+  background-size: 300% 100%;
+  opacity: 0;
+}
+/* Background-position, not transform: the wave must stay inside the reels (no overflow clip, it would cut the temple glow). */
+.oly-gaze::after { animation: oly-sweep 0.9s ease-in-out; }
+@keyframes oly-sweep {
+  from { opacity: 1; background-position: 100% 0; }
+  to { opacity: 1; background-position: 0 0; }
+}
+
+/* Shared over-the-reels messages (fx.css), in Medusa's jade. */
+.oly-sky {
+  --fx-pop-bg: linear-gradient(rgb(31 106 69 / 0.94), rgb(11 42 28 / 0.94));
+  --fx-pop-label: #c8ffd9;
+  --fx-stamp-bg: radial-gradient(circle, rgb(10 40 25 / 0.55), rgb(4 20 12 / 0.85));
+}
+
+/* A temple's own glow animation would otherwise win over the shared ignite kick. */
+.oly-cell.oly-scatter.fx-ignite { z-index: 3; animation: fx-ignite 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.oly-cell.oly-scatter.fx-ignite::after { inset: -20%; border-radius: 50%; box-shadow: none; animation: fx-ring 0.7s ease-out both; }
+
+/* The feature's closing big win in Medusa's jade, whatever the tier. */
+.fx-bigwin.oly-bigwin .fx-bigwin-title { color: #8cffb0; text-shadow: 0 0 16px #2fd27a, 0 4px 0 #0b4a2a; }
 
 /* ---- texts and controls ---- */
 .oly-message { min-height: 1.4em; font-weight: 700; }
@@ -199,11 +283,6 @@
 .oly-fs-box b { font-size: 1.7rem; line-height: 1.1; color: #fff; text-transform: none; }
 .oly-fs-totalbox b { color: #ffe08a; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-.oly-struck { animation: oly-struck 1.2s ease-in-out; }
-@keyframes oly-struck {
-  0%, 100% { filter: none; }
-  40% { filter: drop-shadow(0 0 14px rgb(120 255 170 / 0.9)); }
-}
 
 .oly-intro {
   position: fixed; inset: 0; z-index: 50; overflow: hidden;
@@ -213,7 +292,7 @@
   animation: oly-intro-in 0.35s ease-out;
 }
 .oly-intro p { margin: 0; }
-.oly-intro-bolt { font-size: 5rem; animation: oly-pop 0.6s ease-out, oly-glow-text 1.2s ease-in-out infinite alternate; }
+.oly-intro-bolt { font-size: 5rem; animation: oly-pop 0.6s ease-out; }
 .oly-intro-count { font-size: 5rem; font-weight: 900; line-height: 1; color: #ffd54f; text-shadow: 0 0 20px #ffb300, 0 4px 0 #7a5a00; animation: oly-pop 0.7s ease-out; }
 .oly-intro-title { font-size: 2rem; font-weight: 900; letter-spacing: 0.06em; }
 .oly-intro-text { font-weight: 700; max-width: 22em; }
@@ -222,14 +301,10 @@
 @keyframes oly-land { from { transform: translateY(-20%); } to { transform: none; } }
 @keyframes oly-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
 @keyframes oly-intro-in { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: none; } }
-@keyframes oly-glow-text { from { text-shadow: 0 0 10px #ffd54f; } to { text-shadow: 0 0 40px #fff, 0 0 20px #ffb300; } }
-@keyframes oly-glow {
-  from { box-shadow: inset 0 0 0 2px #f2c230, 0 0 5px 1px rgb(255 205 70 / 0.45); transform: scale(1); }
-  to { box-shadow: inset 0 0 0 2px #ffe68a, 0 0 14px 5px rgb(255 205 70 / 0.85); transform: scale(1.04); }
-}
+@keyframes oly-glow { to { transform: scale(1.04); } }
 .oly-intro-bolt .oly-inline-art { width: 9rem; height: 9rem; }
 @keyframes oly-shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .oly-flooded, .oly-scatter, .oly-tension { animation: none; }
+  .oly-flooded::before, .oly-scatter, .oly-scatter::after, .oly-tension { animation: none; }
 }

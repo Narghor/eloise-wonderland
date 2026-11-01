@@ -1,9 +1,10 @@
 import './bonus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, pay, winJackpot } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot } from '../chips';
 import {
-  armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
+  armSoundUnlock, burst, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
   playCoinTick, playDoorOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
+  winPop, igniteCells,
   type WinLinesHandle, type WinPath,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -39,6 +40,8 @@ import {
 } from './bonusLogic';
 
 const BACK_CASINO: BackLink = { href: '#/casino', label: 'Casino' };
+/** This machine's key in the casino lobby, which shows its best win. */
+const LOBBY_ID = 'porte';
 const REEL_MS = 700;
 const REEL_STAGGER = 220;
 const TENSION_MS = 2200;
@@ -64,7 +67,6 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   let levelIndex = 0;
   let busy = false;
   let lines: WinLinesHandle | null = null;
-  let skipCount: (() => void) | null = null;
 
   const balance = el('span', { class: 'bonus-balance' });
   const jackpotValues = JACKPOT_NAMES.map(() => el('span', { class: 'bonus-jp-value' }));
@@ -78,12 +80,16 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   /** cells[col][row], the layout the fx kit expects. */
   const cells: HTMLElement[][] = Array.from({ length: COLS }, (_, c) => Array.from({ length: ROWS }, (_, r) => cellViews[r * COLS + c]));
   const respinsView = el('div', { class: 'bonus-respins' });
+  /** The Hold & Spin running total, inside the cabinet right above the coins. */
+  const totalView = el('div', { class: 'bonus-total' });
+  const reelWindow = el('div', { class: 'bonus-window' }, grid);
   const machine = el(
     'div',
     { class: 'bonus-machine' },
     el('div', { class: 'bonus-plaque', text: '🚪 Porte aux Jackpots 🚪' }),
     jackpotsView,
-    el('div', { class: 'bonus-window' }, grid),
+    totalView,
+    reelWindow,
     respinsView,
   );
   const lights = marquee(machine, 10);
@@ -153,8 +159,6 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   async function spin(): Promise<void> {
     const lv = level();
     if (busy || !bet(lv.bet)) return;
-    skipCount?.();
-    skipCount = null;
     lines?.clear();
     lines = null;
     feedJackpot(MACHINE_ID, lv.bet * JACKPOT_FEED);
@@ -177,6 +181,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     const triggered = triggersBonus(result);
     if (won > 0) {
       pay(won);
+      noteWin(LOBBY_ID, won, lv.bet);
       refresh();
       await celebrateBase(wins, won, lv.bet, triggered);
     } else if (!triggered) {
@@ -208,26 +213,27 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     });
     if (wins.length > 1) detail.textContent = `${wins.length} lignes gagnantes !`;
     const multiple = won / stake;
-    const suffix = multiple >= 1 ? ` (×${multiple.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} ta mise)` : '';
+    const label = multiple >= 1 ? `×${multiple.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} ta mise` : '';
     const tier = winTier(won, stake);
-    message.className = `bonus-message bonus-win-text${tier > 0 ? ' bonus-big' : ''}`;
     if (tier > 0 && !triggered) {
       lights.setMode('big');
       shake(machine, tier >= 2 ? 3 : 2);
-      message.textContent = `+${won} jetons${suffix}`;
+      winPop(reelWindow, won);
       await showBigWin(document.body, won, stake);
     } else {
       lights.setMode('win');
       playSmallWin();
       if (multiple >= 2) shake(machine, 1);
-      burst(machine, Math.min(30, 6 + Math.round(multiple * 4)), 'coins');
-      skipCount = countUp(message, won, Math.min(1500, 400 + multiple * 200), (n) => `+${n} jetons${n === won ? suffix : ''}`);
+      burst(reelWindow, Math.min(30, 6 + Math.round(multiple * 4)), 'coins');
+      winPop(reelWindow, won, { label, stake });
     }
+    message.textContent = '';
+    message.className = 'bonus-message';
   }
 
   async function animateReels(result: Grid): Promise<void> {
-    cellViews.forEach((v) => (v.className = 'bonus-cell bonus-rolling'));
-    const stopLoop = playSpinLoop();
+    cellViews.forEach((v) => (v.className = 'bonus-cell bonus-rolling fx-streak'));
+    const stopLoop = playSpinLoop('door');
     const roll = window.setInterval(() => {
       cellViews.forEach((v, i) => {
         if (v.classList.contains('bonus-rolling')) v.textContent = randomGlyph(i % COLS);
@@ -289,23 +295,24 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   async function runBonus(bonus: BonusResult, lv: BetLevel): Promise<void> {
     lines?.clear();
     lines = null;
-    skipCount?.();
     playBonusTrigger();
     lights.setMode('big');
-    shake(machine, 3);
     message.textContent = 'Les portes s’ouvrent !';
     message.className = 'bonus-message bonus-big';
     detail.textContent = '';
-    cellViews.forEach((v) => {
-      if (v.classList.contains('bonus-door')) v.classList.add('bonus-door-open');
-    });
-    playDoorOpen(0.35);
-    await wait(1300);
+    const doors = cellViews.filter((v) => v.classList.contains('bonus-door'));
+    wait(doors.length * 260).then(() => shake(machine, 3));
+    await igniteCells(reelWindow, doors, () => playReelStop(4));
+    doors.forEach((v) => v.classList.add('bonus-door-open'));
+    playDoorOpen(0);
+    await wait(1100);
     await intro(lv);
     if (disposed) return;
 
     screen.classList.add('bonus-in-feature');
+    message.textContent = '';
     message.className = 'bonus-message';
+    paintTotal(0);
     cellViews.forEach((v) => {
       v.className = 'bonus-cell bonus-empty';
       v.textContent = '';
@@ -326,7 +333,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         v.className = `bonus-cell bonus-coin bonus-pop${coin.kind === 'jackpot' ? ' bonus-coin-jp' : ''}`;
         v.textContent = coin.kind === 'value' ? `${value}` : JACKPOT_NAMES[coin.tier];
         running += value;
-        message.textContent = `Bonus : ${running.toLocaleString('fr-FR')} jetons`;
+        paintTotal(running);
         playReelStop(i % COLS);
         playCoinTick();
         if (coin.kind === 'jackpot') {
@@ -341,31 +348,29 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         }
         if (disposed) return;
       }
-      if (step.fresh.length > 0 && step !== bonus.steps[0]) {
-        lights.setMode('win');
-        message.className = 'bonus-message bonus-big';
-      }
+      if (step.fresh.length > 0 && step !== bonus.steps[0]) lights.setMode('win');
       await wait(STEP_MS);
-      message.className = 'bonus-message';
     }
 
     pay(bonus.chips);
+    noteWin(LOBBY_ID, bonus.chips, lv.bet);
     refresh();
     lights.setMode('big');
     shake(machine, 3);
-    burst(machine, 40, 'coins');
-    message.className = 'bonus-message bonus-big';
+    burst(reelWindow, 40, 'coins');
     const ratio = Math.round(bonus.chips / lv.bet);
-    await new Promise<void>((resolve) => {
-      skipCount = countUp(message, bonus.chips, 1800, (n) => `Bonus : ${n.toLocaleString('fr-FR')} jetons`, resolve);
-    });
+    winPop(reelWindow, bonus.chips, { label: `Bonus · ×${ratio} ta mise`, durationMs: 2000 });
+    await wait(2000);
+    if (disposed) return;
     await showBigWin(document.body, bonus.chips, lv.bet, 'BONUS TERMINÉ !');
+    totalView.replaceChildren();
     message.textContent = `Bonus : ${bonus.chips.toLocaleString('fr-FR')} jetons (×${ratio} ta mise) !`;
     if (bonus.grand) {
       jackpotBoxes[3].classList.add('bonus-jp-hit');
       const pool = winJackpot(MACHINE_ID);
       const prize = grandPrize(pool, lv.bet);
       pay(prize - pool);
+      noteWin(LOBBY_ID, bonus.chips + prize, lv.bet);
       refresh();
       shake(machine, 3);
       await showBigWin(document.body, prize, lv.bet, 'JACKPOT GRAND !');
@@ -378,10 +383,13 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     screen.classList.remove('bonus-in-feature');
   }
 
+  function paintTotal(amount: number): void {
+    totalView.replaceChildren(el('span', { text: 'Bonus' }), el('b', { text: `${amount.toLocaleString('fr-FR')} jetons` }));
+  }
+
   refresh();
   return () => {
     disposed = true;
-    skipCount?.();
     lines?.clear();
     for (const id of timers) {
       window.clearTimeout(id);

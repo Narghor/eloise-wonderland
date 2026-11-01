@@ -1,6 +1,7 @@
 import { el } from '../dom';
 import type { Difficulty } from '../difficulty';
 import { UNGRADED_CHALLENGE_STARS, completeChallenge } from '../daily/daily';
+import { rollCasinoTicket } from '../games/casino/ticket';
 import { companionCanvas } from './companionArt';
 import { UNGRADED_STARS, addCoins, earnCoins, loadCompanion } from './companionSave';
 
@@ -9,6 +10,12 @@ import { UNGRADED_STARS, addCoins, earnCoins, loadCompanion } from './companionS
  * `stars` is null for games without a grade; `challenge` is the day of a daily challenge.
  */
 export function levelReward(stars: number | null, difficulty: Difficulty, challenge?: string): HTMLElement {
+  const banner = companionReward(stars, difficulty, challenge);
+  const ticket = rollCasinoTicket(difficulty);
+  return ticket ? el('div', { class: 'reward-stack' }, banner, ticket) : banner;
+}
+
+function companionReward(stars: number | null, difficulty: Difficulty, challenge?: string): HTMLElement {
   if (challenge) {
     const pay = completeChallenge(challenge, stars ?? UNGRADED_CHALLENGE_STARS);
     if (pay) {

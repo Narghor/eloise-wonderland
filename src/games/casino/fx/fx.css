@@ -80,7 +80,6 @@
   stroke-width: 5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 4px var(--fx-line));
   stroke-dasharray: 2000;
   stroke-dashoffset: 2000;
   animation: fx-draw 0.6s ease-out forwards;
@@ -90,7 +89,6 @@
   fill: none;
   stroke: var(--fx-line);
   stroke-width: 3;
-  filter: drop-shadow(0 0 6px var(--fx-line));
 }
 
 @keyframes fx-draw { to { stroke-dashoffset: 0; } }
@@ -122,6 +120,14 @@
   height: 12px;
   background: hsl(var(--hue), 90%, 60%);
   border-radius: 2px;
+}
+
+.fx-coins {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c2, #f2c230 45%, #b8820c);
+  box-shadow: inset 0 0 0 2px #a8730a;
 }
 
 @keyframes fx-fly {
@@ -269,4 +275,130 @@
 .casino-test-button {
   border: 1px solid #e65100; background: white; color: #bf360c; border-radius: 999px;
   padding: 4px 10px; font: inherit; font-weight: 700; cursor: pointer;
+}
+/* ---- over-the-reels messages: only transform and opacity animate, so phones keep up ---- */
+/* A machine themes them by setting --fx-pop-bg, --fx-pop-label and --fx-stamp-bg on the host. */
+.fx-winpop {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 26px 8px;
+  border-radius: 18px;
+  pointer-events: none;
+  background: var(--fx-pop-bg, linear-gradient(rgb(60 20 90 / 0.94), rgb(20 6 40 / 0.94)));
+  box-shadow: inset 0 0 0 3px #d4af37, 0 6px 20px rgb(0 0 0 / 0.45);
+  transform: translate(-50%, -50%);
+  animation: fx-winpop 1.6s ease-out both;
+}
+.fx-winpop b {
+  font-size: clamp(2rem, 10vw, 3.4rem);
+  font-weight: 900;
+  line-height: 1.05;
+  color: #ffe08a;
+  text-shadow: 0 0 12px #ffb300, 0 3px 0 #5a3c00;
+  white-space: nowrap;
+}
+.fx-winpop-label { font-weight: 900; font-size: clamp(0.8rem, 3.6vw, 1.05rem); letter-spacing: 0.06em; color: var(--fx-pop-label, #fff3c4); text-transform: uppercase; }
+@keyframes fx-winpop {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  15% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
+  25% { transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+.fx-stamp {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--fx-stamp-bg, radial-gradient(circle, rgb(30 10 50 / 0.55), rgb(10 2 20 / 0.85)));
+  cursor: pointer;
+  animation: fx-fade-in 0.2s ease-out;
+}
+.fx-stamp p { margin: 0; position: relative; text-align: center; }
+.fx-stamp-big {
+  font-size: clamp(3.4rem, 18vw, 6rem);
+  font-weight: 900;
+  line-height: 1;
+  color: #ffe08a;
+  text-shadow: 0 0 18px #ffb300, 0 4px 0 #7a5a00;
+  animation: fx-stamp 0.55s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.fx-stamp-label {
+  font-size: clamp(1rem, 5vw, 1.5rem);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #fff3c4;
+  text-shadow: 0 2px 0 #000;
+  animation: fx-stamp 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) 0.12s both;
+}
+.fx-stamp-out { opacity: 0; transition: opacity 0.25s; }
+@keyframes fx-stamp { from { transform: scale(3); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.fx-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  margin: -80% 0 0 -80%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgb(255 224 120 / 0.28) 0 10deg, transparent 10deg 30deg);
+  animation: fx-spin-rays 6s linear infinite;
+}
+@keyframes fx-spin-rays { to { transform: rotate(360deg); } }
+
+/* A bonus trigger: each scatter kicks and rings, then a golden blast covers the reels. */
+/* Doubled class: it must beat each machine's own landing animation, whatever the stylesheet order. */
+.fx-ignite.fx-ignite { position: relative; z-index: 3; animation: fx-ignite 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.fx-ignite::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  border: 4px solid #ffe08a;
+  pointer-events: none;
+  animation: fx-ring 0.7s ease-out both;
+}
+@keyframes fx-ignite { 0% { transform: scale(1); } 50% { transform: scale(1.35); } 100% { transform: scale(1.12); } }
+@keyframes fx-ring { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+.fx-blast {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(255 236 150 / 0.75), rgb(255 190 40 / 0.25) 55%, transparent 80%);
+  animation: fx-blast 1.3s ease-out both;
+}
+@keyframes fx-blast { 0% { opacity: 0; } 15% { opacity: 1; } 70% { opacity: 0.8; } 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-rays, .fx-ignite, .fx-ignite::after { animation: none; }
+}
+/* ---- spinning reels: a sense of speed without any blur filter (transform only, no repaint) ---- */
+/* A machine opts in by giving its rolling cells position: relative, overflow: hidden and these animations. */
+@keyframes fx-reel-streak { from { transform: translateY(-100%); } to { transform: translateY(100%); } }
+@keyframes fx-reel-jitter { from { transform: translateY(-3px); } to { transform: translateY(3px); } }
+.fx-streak::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(transparent 20%, rgb(255 255 255 / 0.55) 50%, transparent 80%);
+  animation: fx-reel-streak 0.28s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-streak::after { animation: none; opacity: 0; }
 }

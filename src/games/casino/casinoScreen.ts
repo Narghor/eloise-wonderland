@@ -1,7 +1,7 @@
 import './casino.css';
 import { el, topBar } from '../../dom';
 import { loadCompanion } from '../../companion/companionSave';
-import { CHIPS_PER_COIN, DAILY_GIFT, buyChips, claimDailyGift, loadCasino, pay } from './chips';
+import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, loadCasino, pay } from './chips';
 import { burst, playBonusTrigger } from './fx';
 import { renderSlots } from './slots/slotsScreen';
 import { renderBonusSlot } from './bonus/bonusScreen';
@@ -31,6 +31,13 @@ export function renderCasino(root: HTMLElement, params: string[]): () => void {
   if (game) return game.render(root);
   renderLobby(root);
   return () => {};
+}
+
+/** "Ton record : ×312 ta mise" under a machine that has already paid; nothing otherwise. */
+function bestWinLine(id: string): HTMLElement[] {
+  const times = bestWin(id);
+  if (times <= 0) return [];
+  return [el('span', { class: 'casino-best-win', text: `🏆 Ton record : ×${times.toLocaleString('fr-FR')} ta mise` })];
 }
 
 function renderLobby(root: HTMLElement): void {
@@ -84,7 +91,13 @@ function renderLobby(root: HTMLElement): void {
         'a',
         { class: 'menu-card', href: `#/casino/${id}` },
         icon,
-        el('span', { class: 'menu-card-text' }, el('strong', { text: game.title }), el('span', { class: 'menu-card-hint', text: game.hint })),
+        el(
+          'span',
+          { class: 'menu-card-text' },
+          el('strong', { text: game.title }),
+          el('span', { class: 'menu-card-hint', text: game.hint }),
+          ...bestWinLine(id),
+        ),
       ),
     );
   }

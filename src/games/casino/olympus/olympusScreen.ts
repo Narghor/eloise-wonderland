@@ -1,10 +1,10 @@
 import './olympus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, pay } from '../chips';
+import { bet, chips, noteWin, pay } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playLose, playReelStop, playMedusaAwake, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
-  tapToSpin, winTier, type WinLinesHandle,
+  tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import {
@@ -35,11 +35,18 @@ import {
 import { OLYMPUS_DEFS, TEMPLE, MEDUSA_HEAD } from './olympusArt';
 
 const BACK_CASINO: BackLink = { href: '#/casino', label: 'Casino' };
+/** This machine's key in the casino lobby, which shows its best win. */
+const LOBBY_ID = 'olympe';
 const REEL_MS = 650;
 const REEL_STAGGER = 140;
 const TENSION_MS = 1300;
-const FREE_REEL_MS = 380;
-const FREE_STAGGER = 90;
+const FREE_REEL_MS = 550;
+const FREE_STAGGER = 140;
+/** Pause after a free spin, so its result can be read before the next one rolls. */
+const FREE_PAUSE_MS = 900;
+const FREE_WIN_PAUSE_MS = 1700;
+/** A win of 3 stakes or more climbs in its pop: the pause waits for it. */
+const FREE_COUNTED_PAUSE_MS = 2500;
 const SYMBOL_NAMES = ['Valet', 'Dame', 'Roi', 'As', 'Amphore', 'Bouclier', 'Chouette', 'Trident', 'Medusa'];
 
 export function renderOlympus(root: HTMLElement): () => void {
@@ -58,7 +65,6 @@ export function renderOlympus(root: HTMLElement): () => void {
   let betIndex = 0;
   let busy = false;
   let lines: WinLinesHandle | null = null;
-  let skipCount: (() => void) | null = null;
 
   const balance = el('span', { class: 'oly-balance' });
   /** cells[col][row], the layout drawWinLines expects. */
@@ -77,11 +83,12 @@ export function renderOlympus(root: HTMLElement): () => void {
   const cellViews = cells.flat();
   const grid = el('div', { class: 'oly-grid' }, ...reels);
   const featureBar = el('div', { class: 'oly-feature-bar' });
+  const sky = el('div', { class: 'oly-sky' }, grid);
   const temple = el(
     'div',
     { class: 'oly-temple' },
     el('div', { class: 'oly-pediment' }, el('span', { text: 'LE REGARD DE MEDUSA' })),
-    el('div', { class: 'oly-colonnade' }, el('div', { class: 'oly-column', 'aria-hidden': 'true' }), el('div', { class: 'oly-sky' }, grid), el('div', { class: 'oly-column', 'aria-hidden': 'true' })),
+    el('div', { class: 'oly-colonnade' }, el('div', { class: 'oly-column', 'aria-hidden': 'true' }), sky, el('div', { class: 'oly-column', 'aria-hidden': 'true' })),
     el('div', { class: 'oly-stylobate' }),
   );
   const machine = el('div', { class: 'oly-machine' }, featureBar, temple);
@@ -154,7 +161,6 @@ export function renderOlympus(root: HTMLElement): () => void {
     const stake = currentBet();
     if (busy || !bet(stake)) return;
     busy = true;
-    skipCount?.();
     clearLines();
     setMessage('');
     lights.setMode('spin');
@@ -170,18 +176,18 @@ export function renderOlympus(root: HTMLElement): () => void {
     const scatters = scatterCount(result);
     if (won > 0) {
       pay(won);
+      noteWin(LOBBY_ID, won, stake);
       showLines(wins);
       lights.setMode('win');
       if (winTier(won, stake) > 0) {
         shake(machine, 2);
-        setMessage(`+${won} jetons`, 'oly-win-text');
+        winPop(sky, won);
         refresh();
         await showBigWin(document.body, won, stake);
       } else {
         playSmallWin();
-        burst(machine, Math.min(24, 6 + Math.round((won / stake) * 4)), 'coins');
-        skipCount = countUp(message, won, Math.min(1500, 400 + (won / stake) * 200), (n) => `+${n} jetons`);
-        message.className = 'oly-message oly-win-text';
+        burst(sky, Math.min(24, 6 + Math.round((won / stake) * 4)), 'coins');
+        winPop(sky, won, { stake });
       }
     } else if (scatters < MIN_SCATTERS) {
       lights.setMode('idle');
@@ -221,16 +227,17 @@ export function renderOlympus(root: HTMLElement): () => void {
   }
 
   async function animateReels(result: Grid, fast: boolean): Promise<void> {
-    cellViews.forEach((v) => (v.className = 'oly-cell oly-rolling'));
+    cellViews.forEach((v) => (v.className = 'oly-cell oly-rolling fx-streak'));
     reels.forEach((reel) => (reel.className = 'oly-reel'));
     machine.classList.remove('oly-flooded');
     const roll = window.setInterval(() => {
       cellViews.forEach((v) => {
-        if (v.classList.contains('oly-rolling')) paintCell(v, randomSymbol());
+        // Plain glyphs while rolling: re-parsing the SVG art 30 times per tick froze phones.
+        if (v.classList.contains('oly-rolling')) v.textContent = SYMBOLS[randomSymbol()].glyph;
       });
-    }, 70);
+    }, 90);
     timers.add(roll);
-    const stopLoop = playSpinLoop();
+    const stopLoop = playSpinLoop('medusa');
     let scattersShown = 0;
     const stacks = medusaReels(result);
     let struck = false;
@@ -276,8 +283,10 @@ export function renderOlympus(root: HTMLElement): () => void {
   /** A lightning glow around the machine; never drawn over the reels. */
   function strike(): void {
     machine.classList.remove('oly-struck');
+    sky.classList.remove('oly-gaze');
     void machine.offsetWidth;
     machine.classList.add('oly-struck');
+    sky.classList.add('oly-gaze');
   }
 
   /** Plays the feature from `pending.next` (0 = fresh, with the intro). The chips are already paid. */
@@ -287,10 +296,9 @@ export function renderOlympus(root: HTMLElement): () => void {
     if (fresh) {
       playBonusTrigger();
       playMedusaAwake(0.3);
-      strike();
-      shake(machine, 3);
+      clearLines();
       setMessage('Les temples s’illuminent !', 'oly-big');
-      await wait(1200);
+      await igniteTemples();
       await showIntro(startSpins);
       if (disposed) return;
     }
@@ -309,6 +317,7 @@ export function renderOlympus(root: HTMLElement): () => void {
 
     for (let i = pending.next; i < feature.spins.length; i++) {
       const step = feature.spins[i];
+      clearLines();
       lights.setMode('spin');
       spinsValue.textContent = `${step.spinsLeft - step.added}`;
       await animateReels(step.grid, true);
@@ -323,12 +332,10 @@ export function renderOlympus(root: HTMLElement): () => void {
       if (step.added > 0) {
         playBonusTrigger();
         strike();
-        setMessage(`+${step.added} tours gratuits !`, 'oly-big');
-        await wait(1400);
-      } else if (won > 0) {
-        setMessage(medusaCount === COLS ? `Medusa partout ! +${won} jetons !` : medusaCount >= 2 ? `${medusaCount} colonnes de Medusa : +${won} jetons !` : `+${won} jetons`, 'oly-win-text');
-      } else {
         setMessage('');
+        await stampBanner(sky, `+${step.added}`, 'TOURS GRATUITS');
+      } else if (won > 0) {
+        winPop(sky, won, { label: medusaCount === COLS ? 'Medusa partout !' : medusaCount >= 2 ? `${medusaCount} colonnes de Medusa` : '', stake });
       }
       if (won > 0) {
         lights.setMode('win');
@@ -337,7 +344,7 @@ export function renderOlympus(root: HTMLElement): () => void {
         countUp(totalValue, won, 600, (n) => `${from + n}`);
         if (won >= stake * 10) burst(machine, 16, 'coins');
       }
-      await wait(won > 0 ? 1000 : 450);
+      await wait(won >= stake * 3 ? FREE_COUNTED_PAUSE_MS : won > 0 ? FREE_WIN_PAUSE_MS : FREE_PAUSE_MS);
       pending.next = i + 1;
       savePending(pending);
     }
@@ -353,12 +360,23 @@ export function renderOlympus(root: HTMLElement): () => void {
       if (disposed) return;
     }
     savePending(null);
+    noteWin(LOBBY_ID, totalChips, stake);
     refresh();
     setMessage(`Tours gratuits : ${totalChips} jetons`, 'oly-win-text');
-    await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'MEDUSA PAIE !' : 'TOURS GRATUITS');
+    await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'MEDUSA PAIE !' : 'TOURS GRATUITS', 'oly-bigwin');
     featureBar.replaceChildren();
     machine.classList.remove('oly-flooded');
     screen.classList.remove('oly-in-feature');
+  }
+
+  /** The temples that triggered the feature blow up one by one, then the whole lair blazes gold. */
+  async function igniteTemples(): Promise<void> {
+    const lit = cellViews.filter((v) => v.classList.contains('oly-scatter'));
+    wait(lit.length * 260).then(() => {
+      strike();
+      shake(machine, 3);
+    });
+    await igniteCells(sky, lit, () => playReelStop(4));
   }
 
   /** Full-screen bonus intro; a tap or a few seconds closes it. */
@@ -406,7 +424,6 @@ export function renderOlympus(root: HTMLElement): () => void {
 
   return () => {
     disposed = true;
-    skipCount?.();
     clearLines();
     document.querySelectorAll('.oly-intro').forEach((n) => n.remove());
     for (const id of timers) {

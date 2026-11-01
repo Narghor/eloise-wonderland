@@ -1,10 +1,10 @@
 import './luna.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, pay } from '../chips';
+import { bet, chips, noteWin, pay } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playBookOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
-  tapToSpin, winTier, type WinLinesHandle,
+  tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import { LUNA_DEFS, OPEN_BOOK, SYMBOL_ART } from './lunaArt';
@@ -14,11 +14,18 @@ import {
 } from './lunaLogic';
 
 const BACK_CASINO: BackLink = { href: '#/casino', label: 'Casino' };
+/** This machine's key in the casino lobby, which shows its best win. */
+const LOBBY_ID = 'eloise';
 const REEL_MS = 600;
 const REEL_STAGGER = 170;
 const TENSION_MS = 1200;
-const FREE_REEL_MS = 420;
-const FREE_STAGGER = 110;
+const FREE_REEL_MS = 550;
+const FREE_STAGGER = 140;
+/** Pause after a free spin, so its result can be read before the next one rolls. */
+const FREE_PAUSE_MS = 900;
+const FREE_WIN_PAUSE_MS = 1700;
+/** A win of 3 stakes or more climbs in its pop: the pause waits for it. */
+const FREE_COUNTED_PAUSE_MS = 2500;
 const HELP_GLYPHS = ['10', 'J', 'Q', 'K', 'A', '🧪', '🔮', '🦉', '👸'];
 
 export function renderLuna(root: HTMLElement): () => void {
@@ -37,7 +44,6 @@ export function renderLuna(root: HTMLElement): () => void {
   let betIndex = 0;
   let busy = false;
   let lines: WinLinesHandle | null = null;
-  let skipCount: (() => void) | null = null;
   let gamble: { amount: number; stake: number; steps: number } | null = null;
 
   const balance = el('span', { class: 'luna-balance' });
@@ -144,7 +150,6 @@ export function renderLuna(root: HTMLElement): () => void {
     if (busy || !bet(stake)) return;
     endGamble();
     busy = true;
-    skipCount?.();
     clearBoard();
     setMessage('');
     lights.setMode('spin');
@@ -159,19 +164,19 @@ export function renderLuna(root: HTMLElement): () => void {
     const triggered = result.books >= MIN_BOOKS;
     if (won > 0) {
       pay(won);
+      noteWin(LOBBY_ID, won, stake);
       showLines(result.wins);
       if (result.bookMult > 0) markBooks(result.grid);
       lights.setMode('win');
       if (winTier(won, stake) > 0) {
         shake(machine, 2);
-        setMessage(`+${won} jetons`, 'luna-win-text');
+        winPop(reels, won);
         refresh();
         await showBigWin(document.body, won, stake);
       } else {
         playSmallWin();
-        burst(machine, Math.min(24, 6 + Math.round((won / stake) * 4)), 'coins');
-        skipCount = countUp(message, won, Math.min(1500, 400 + (won / stake) * 200), (n) => `+${n} jetons`);
-        message.className = 'luna-message luna-win-text';
+        burst(reels, Math.min(24, 6 + Math.round((won / stake) * 4)), 'coins');
+        winPop(reels, won, { stake });
       }
     } else if (!triggered) {
       lights.setMode('idle');
@@ -227,11 +232,14 @@ export function renderLuna(root: HTMLElement): () => void {
       cell.classList.remove('luna-landed', 'luna-sticky', 'luna-tension');
       rolling.add(cell);
     }));
-    const roll = window.setInterval(() => rolling.forEach((cell) => setArt(cell, randomSymbol())), 80);
+    // The streak runs only down the next reel to stop: the eye follows the one that matters.
+    const strips = [...reels.querySelectorAll<HTMLElement>(':scope > .luna-reel')];
+    const roll = window.setInterval(() => rolling.forEach((cell) => setArt(cell, randomSymbol())), 110);
     timers.add(roll);
-    const stopLoop = playSpinLoop();
+    const stopLoop = playSpinLoop('book');
     let booksShown = 0;
     for (let reel = 0; reel < REELS; reel++) {
+      strips[reel].classList.add('fx-streak');
       const tense = !fast && booksShown === MIN_BOOKS - 1;
       if (tense) {
         cells[reel].forEach((c) => c.classList.add('luna-tension'));
@@ -241,6 +249,7 @@ export function renderLuna(root: HTMLElement): () => void {
       await wait(reel === 0 ? (fast ? FREE_REEL_MS : REEL_MS) : tense ? TENSION_MS : fast ? FREE_STAGGER : REEL_STAGGER);
       stopSuspense?.();
       playReelStop(reel);
+      strips[reel].classList.remove('fx-streak');
       cells[reel].forEach((cell, row) => {
         if (!rolling.has(cell)) return;
         rolling.delete(cell);
@@ -271,10 +280,14 @@ export function renderLuna(root: HTMLElement): () => void {
     lights.setMode('big');
     if (fresh) {
       playBonusTrigger();
-      playBookOpen(0.3);
-      shake(machine, 2);
+      clearBoard();
       setMessage('Le livre s’ouvre…', 'luna-big');
-      await wait(1100);
+      const books = cells.flat().filter((c) => c.classList.contains('luna-is-book'));
+      wait(books.length * 260).then(() => {
+        playBookOpen(0);
+        shake(machine, 3);
+      });
+      await igniteCells(reels, books, () => playReelStop(4));
       await showIntro(feature.special);
       if (disposed) return;
     }
@@ -300,6 +313,7 @@ export function renderLuna(root: HTMLElement): () => void {
     for (let i = pending.next; i < feature.spins.length; i++) {
       const step = feature.spins[i];
       clearBoard();
+      setMessage('');
       lights.setMode('spin');
       spinsValue.textContent = `${step.spinsLeft - step.added}`;
       await animateReels(step.grid, true, sticky);
@@ -313,25 +327,23 @@ export function renderLuna(root: HTMLElement): () => void {
       }
       const won = chipsFor(step.mult, stake);
       showLines(step.wins);
-      if (step.wins.length > 0) await wait(900);
+      if (won > 0 && !step.expand) winPop(reels, won, { stake });
       if (step.expand) {
+        // The plain lines first, then the expansion takes over the reels.
+        if (step.wins.length > 0) await wait(900);
         lines?.clear();
         lines = null;
         await playExpansion(step.expand.reels, feature.special);
-        setMessage(`${SYMBOLS[feature.special].name} se déploie : +${chipsFor(step.expand.mult, stake)} jetons`, 'luna-win-text');
+        winPop(reels, chipsFor(step.expand.mult, stake), { label: `${SYMBOLS[feature.special].name} se déploie`, stake });
         await wait(1300);
       }
       if (step.added > 0) {
         playBonusTrigger();
-        setMessage(`+${step.added} tours gratuits ! Nouveau chapitre : les livres collés s’envolent.`, 'luna-big');
-        await wait(1600);
+        setMessage('Nouveau chapitre : les livres collés s’envolent.', 'luna-big');
+        await stampBanner(reels, `+${step.added}`, 'TOURS GRATUITS');
         // The logic clears the sticky books on a retrigger.
         sticky = new Set();
         paintSticky(sticky);
-      } else if (won > 0 && !step.expand) {
-        setMessage(`+${won} jetons`, 'luna-win-text');
-      } else if (won === 0) {
-        setMessage('');
       }
       if (won > 0) {
         lights.setMode('win');
@@ -340,7 +352,7 @@ export function renderLuna(root: HTMLElement): () => void {
         countUp(totalValue, won, 600, (n) => `${from + n}`);
         if (won >= stake * 10) burst(machine, 16, 'coins');
       }
-      await wait(won > 0 ? 900 : 450);
+      await wait(won >= stake * 3 ? FREE_COUNTED_PAUSE_MS : won > 0 ? FREE_WIN_PAUSE_MS : FREE_PAUSE_MS);
       pending.next = i + 1;
       savePending(pending);
     }
@@ -349,6 +361,7 @@ export function renderLuna(root: HTMLElement): () => void {
     savePending(null);
     cells.flat().forEach((c) => c.classList.remove('luna-sticky'));
     const totalChips = chipsFor(feature.mult, stake);
+    noteWin(LOBBY_ID, totalChips, stake);
     refresh();
     setMessage(`Tours gratuits : ${totalChips} jetons`, 'luna-win-text');
     await showBigWin(document.body, totalChips, stake, totalChips >= stake * 20 ? 'ELOISE RAYONNE !' : 'TOURS GRATUITS');
@@ -516,7 +529,6 @@ export function renderLuna(root: HTMLElement): () => void {
 
   return () => {
     disposed = true;
-    skipCount?.();
     lines?.clear();
     document.querySelectorAll('.luna-intro').forEach((n) => n.remove());
     for (const id of timers) {
@@ -533,8 +545,18 @@ function headerPortrait(): HTMLElement {
   return node;
 }
 
+/** Each symbol's SVG parsed once; the rolling reels clone it instead of re-parsing markup every tick. */
+const parsedArt = new Map<number, DocumentFragment>();
+
 function setArt(node: HTMLElement, symbol: number): void {
-  node.innerHTML = SYMBOL_ART[symbol];
+  let art = parsedArt.get(symbol);
+  if (!art) {
+    const template = document.createElement('template');
+    template.innerHTML = SYMBOL_ART[symbol];
+    art = template.content;
+    parsedArt.set(symbol, art);
+  }
+  node.replaceChildren(art.cloneNode(true));
   node.dataset.symbol = SYMBOLS[symbol].key;
 }
 

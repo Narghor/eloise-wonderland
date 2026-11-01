@@ -118,13 +118,36 @@ function noise(start: number, duration: number, volume = 0.2, lowpass = 800): vo
 
 const C_MAJOR = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
 
-/** Starts the reel spin ticking loop. Returns a function that stops it. */
-export function playSpinLoop(): () => void {
+/** Each machine's reel sound: classic ticks, wooden door clacks, a snake rattle, harp notes. */
+export type SpinVoice = 'classic' | 'door' | 'medusa' | 'book';
+
+const SPIN_VOICES: Record<SpinVoice, { everyMs: number; play: (step: number) => void }> = {
+  classic: { everyMs: 75, play: (step) => tone(step % 2 === 0 ? 1400 : 1100, 0, 0.03, 'square', 0.04) },
+  door: {
+    everyMs: 90,
+    play: (step) => {
+      tone(step % 2 === 0 ? 320 : 260, 0, 0.05, 'triangle', 0.12, 180);
+      noise(0, 0.025, 0.06, 1500);
+    },
+  },
+  medusa: {
+    everyMs: 70,
+    play: (step) => {
+      noise(0, 0.035, step % 3 === 0 ? 0.1 : 0.05, 7000);
+      if (step % 4 === 0) tone(110, 0, 0.06, 'sine', 0.08);
+    },
+  },
+  book: {
+    everyMs: 110,
+    play: (step) => tone([C_MAJOR[0], C_MAJOR[2], C_MAJOR[4], C_MAJOR[5], C_MAJOR[4], C_MAJOR[2]][step % 6] * 2, 0, 0.12, 'sine', 0.05),
+  },
+};
+
+/** Starts the reel spin loop in the machine's voice. Returns a function that stops it. */
+export function playSpinLoop(voice: SpinVoice = 'classic'): () => void {
+  const { everyMs, play } = SPIN_VOICES[voice];
   let step = 0;
-  const id = window.setInterval(() => {
-    tone(step % 2 === 0 ? 1400 : 1100, 0, 0.03, 'square', 0.04);
-    step++;
-  }, 75);
+  const id = window.setInterval(() => play(step++), everyMs);
   return () => window.clearInterval(id);
 }
 
