@@ -1,14 +1,88 @@
 import { el } from './dom';
-import { exportSave, importSave } from './save';
+import { exportSave, importSave, readGame } from './save';
 import { isColored } from './creatures/creature';
 import { creatureCanvas } from './creatures/creatureCanvas';
 import { loadGarden } from './creatures/garden';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
 import { loadCasino } from './games/casino/chips';
-import { CHALLENGE_GAME_NAMES, challengeGameOn, loadDaily, streak, todayKey } from './daily/daily';
+import { grantDailyGift } from './games/casino/casinoScreen';
+import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
+
+// -----------------------------------------------
+// THE GAMES, BY FAMILY
+// -----------------------------------------------
+
+interface GameEntry {
+  id: ChallengeGame;
+  href: string;
+  name: string;
+  iconClass: string;
+  /** Block of the site save; read raw here so the home page stays light. */
+  saveId: string;
+  /** Field counting finished levels, and the word for one. */
+  doneField: string;
+  unit: [string, string];
+}
+
+const GAMES: Record<ChallengeGame, GameEntry> = {
+  picross: { id: 'picross', href: '#/picross', name: 'Picross', iconClass: '', saveId: 'picross', doneField: 'solvedBySize', unit: ['grille', 'grilles'] },
+  potions: { id: 'potions', href: '#/fioles', name: 'Fioles', iconClass: 'is-potions', saveId: 'potions', doneField: 'done', unit: ['niveau', 'niveaux'] },
+  mahjong: { id: 'mahjong', href: '#/mahjong', name: 'Mahjong', iconClass: 'is-mahjong', saveId: 'mahjong', doneField: 'gamesWon', unit: ['partie', 'parties'] },
+  box: { id: 'box', href: '#/rangement', name: 'Boîte à trésors', iconClass: 'is-box', saveId: 'box', doneField: 'boxesDone', unit: ['boîte', 'boîtes'] },
+  pastry: { id: 'pastry', href: '#/patisserie', name: 'Pâtisserie', iconClass: 'is-pastry', saveId: 'pastry', doneField: 'cakesDone', unit: ['gâteau', 'gâteaux'] },
+  glass: { id: 'glass', href: '#/vitrail', name: 'Vitraux', iconClass: 'is-glass', saveId: 'stainedGlass', doneField: 'windowsDone', unit: ['vitrail', 'vitraux'] },
+  bouquet: { id: 'bouquet', href: '#/bouquet', name: 'Bouquets', iconClass: 'is-bouquet', saveId: 'bouquet', doneField: 'ordersDone', unit: ['bouquet', 'bouquets'] },
+  vegetables: { id: 'vegetables', href: '#/potager', name: 'Potager', iconClass: 'is-vegetables', saveId: 'vegetables', doneField: 'seasonsDone', unit: ['saison', 'saisons'] },
+  sand: { id: 'sand', href: '#/sable', name: 'Bouteilles de sable', iconClass: 'is-sand', saveId: 'sand', doneField: 'modelsDone', unit: ['bouteille', 'bouteilles'] },
+  bracelets: { id: 'bracelets', href: '#/bracelets', name: 'Bracelets', iconClass: 'is-bracelets', saveId: 'bracelets', doneField: 'braceletsDone', unit: ['bracelet', 'bracelets'] },
+  embroidery: { id: 'embroidery', href: '#/broderie', name: 'Broderie', iconClass: 'is-embroidery', saveId: 'embroidery', doneField: 'piecesDone', unit: ['ouvrage', 'ouvrages'] },
+  mosaic: { id: 'mosaic', href: '#/mosaique', name: 'Mosaïque', iconClass: 'is-mosaic', saveId: 'mosaic', doneField: 'mosaicsDone', unit: ['mosaïque', 'mosaïques'] },
+  beads: { id: 'beads', href: '#/perles', name: 'Perles à repasser', iconClass: 'is-beads', saveId: 'beads', doneField: 'piecesDone', unit: ['motif', 'motifs'] },
+  bubbles: { id: 'bubbles', href: '#/bulles', name: 'Bulles mélangées', iconClass: 'is-bubbles', saveId: 'bubbles', doneField: 'cleared', unit: ['niveau', 'niveaux'] },
+  icing: { id: 'icing', href: '#/glacage', name: 'Glaçage', iconClass: 'is-icing', saveId: 'icing', doneField: 'cookiesDone', unit: ['biscuit', 'biscuits'] },
+  tea: { id: 'tea', href: '#/salon', name: 'Salon de thé', iconClass: 'is-tea', saveId: 'tea', doneField: 'servicesDone', unit: ['service', 'services'] },
+};
+
+const SECTIONS: { title: string; games: ChallengeGame[] }[] = [
+  { title: 'Réflexion', games: ['picross', 'potions', 'mahjong', 'box', 'pastry', 'glass', 'bouquet', 'vegetables'] },
+  { title: 'Création', games: ['sand', 'bracelets', 'embroidery', 'mosaic', 'beads'] },
+  { title: 'Adresse et rapidité', games: ['bubbles', 'icing', 'tea'] },
+];
+
+function readBlock(entry: GameEntry): Record<string, unknown> {
+  const raw = readGame(entry.saveId);
+  return typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+}
+
+function doneCount(entry: GameEntry): number {
+  const value = readBlock(entry)[entry.doneField];
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value).reduce<number>((sum, count) => sum + (typeof count === 'number' ? count : 0), 0);
+  }
+  return 0;
+}
+
+/** The level left unfinished, or null; challenge levels are resumed from the daily card. */
+function levelInProgress(entry: GameEntry): { number: number | null } | null {
+  const current = readBlock(entry).current;
+  if (typeof current !== 'object' || current === null) return null;
+  const fields = current as Record<string, unknown>;
+  if (typeof fields.challenge === 'string') return null;
+  const number = typeof fields.number === 'number' ? fields.number : typeof fields.level === 'number' ? fields.level : null;
+  return { number };
+}
+
+// -----------------------------------------------
+// PAGE
+// -----------------------------------------------
 
 export function renderHome(root: HTMLElement): () => void {
+  grantDailyGift();
+  const sections = SECTIONS.map(({ title, games }) =>
+    homeSection(title, games.map((id) => gameTile(GAMES[id])), title === 'Création' ? [gardenTile()] : []),
+  );
   root.append(
     el(
       'header',
@@ -20,82 +94,8 @@ export function renderHome(root: HTMLElement): () => void {
       { class: 'home' },
       companionCard(),
       dailyCard(),
-      el(
-        'a',
-        { class: 'game-card', href: '#/picross' },
-        picrossIcon(),
-        el(
-          'span',
-          { class: 'game-card-text' },
-          el('strong', { text: 'Picross' }),
-          el('span', { text: 'Retrouver la petite bête cachée grâce aux chiffres' }),
-        ),
-      ),
-      gardenCard(),
-      el(
-        'a',
-        { class: 'game-card', href: '#/sable' },
-        el('span', { class: 'game-card-icon is-sand', 'aria-hidden': 'true' }),
-        el(
-          'span',
-          { class: 'game-card-text' },
-          el('strong', { text: 'Bouteilles de sable' }),
-          el('span', { text: 'Verser le sable en couches pour reproduire le modèle' }),
-        ),
-      ),
-      el(
-        'a',
-        { class: 'game-card', href: '#/vitrail' },
-        el('span', { class: 'game-card-icon is-glass', 'aria-hidden': 'true' }),
-        el(
-          'span',
-          { class: 'game-card-text' },
-          el('strong', { text: 'Vitraux' }),
-          el('span', { text: 'Colorier le verre sans que deux voisins se ressemblent' }),
-        ),
-      ),
-      el(
-        'a',
-        { class: 'game-card', href: '#/bulles' },
-        el('span', { class: 'game-card-icon is-bubbles', 'aria-hidden': 'true' }),
-        el(
-          'span',
-          { class: 'game-card-text' },
-          el('strong', { text: 'Bulles mélangées' }),
-          el('span', { text: 'Mélanger les couleurs pour faire éclater les bulles' }),
-        ),
-      ),
-      el(
-        'a',
-        { class: 'game-card', href: '#/glacage' },
-        el('span', { class: 'game-card-icon is-icing', 'aria-hidden': 'true' }),
-        el(
-          'span',
-          { class: 'game-card-text' },
-          el('strong', { text: 'Glaçage' }),
-          el('span', { text: 'Décorer des biscuits en suivant les pointillés' }),
-        ),
-      ),
-      el(
-        'a',
-        { class: 'game-card', href: '#/fioles' },
-        el('span', { class: 'game-card-icon is-potions', 'aria-hidden': 'true' }),
-        el(
-          'span',
-          { class: 'game-card-text' },
-          el('strong', { text: 'Fioles' }),
-          el('span', { text: 'Trier les couleurs, une seule par fiole' }),
-        ),
-      ),
-      gameCard('#/bracelets', 'is-bracelets', 'Bracelets brésiliens', 'Nouer les fils pour reproduire le motif'),
-      gameCard('#/broderie', 'is-embroidery', 'Broderie', 'Broder au point de croix, proprement, même à l’envers'),
-      gameCard('#/mosaique', 'is-mosaic', 'Mosaïque', 'Poser les tesselles sans dépasser ni se tromper de couleur'),
-      gameCard('#/bouquet', 'is-bouquet', 'Bouquets', 'Composer le bouquet que la cliente a commandé'),
-      gameCard('#/perles', 'is-beads', 'Perles à repasser', 'Refaire le motif avec juste les perles qu’il faut'),
-      gameCard('#/rangement', 'is-box', 'Boîte à trésors', 'Tout ranger dans la boîte sans laisser de trou'),
-      gameCard('#/patisserie', 'is-pastry', 'Pâtisserie', 'Monter le gâteau couche par couche, parfois à l’aveugle'),
-      gameCard('#/potager', 'is-vegetables', 'Potager', 'Planter, arroser, récolter avant la fin de la saison'),
-      gameCard('#/salon', 'is-tea', 'Salon de thé', 'Servir les clientes avant qu’elles perdent patience'),
+      ...resumeRow(),
+      ...sections,
       casinoCard(),
       savePanel(),
     ),
@@ -103,8 +103,18 @@ export function renderHome(root: HTMLElement): () => void {
   return () => {};
 }
 
-function picrossIcon(): HTMLElement {
-  return pixelIcon(['01010', '11111', '11111', '01110', '00100']);
+function homeSection(title: string, tiles: HTMLElement[], leading: HTMLElement[]): HTMLElement {
+  return el(
+    'section',
+    { class: 'home-section' },
+    el('h2', { class: 'home-section-title', text: title }),
+    el('div', { class: 'home-grid' }, ...leading, ...tiles),
+  );
+}
+
+function gameIcon(entry: GameEntry): HTMLElement {
+  if (entry.id === 'picross') return pixelIcon(['01010', '11111', '11111', '01110', '00100']);
+  return el('span', { class: `game-card-icon ${entry.iconClass}`, 'aria-hidden': 'true' });
 }
 
 function pixelIcon(rows: string[], extraClass = ''): HTMLElement {
@@ -115,36 +125,66 @@ function pixelIcon(rows: string[], extraClass = ''): HTMLElement {
   return icon;
 }
 
-function gardenCard(): HTMLElement {
-  const creatures = loadGarden();
-  const pending = creatures.filter((creature) => !isColored(creature)).length;
-  const lastColored = creatures.filter(isColored).at(-1);
-
-  const icon = lastColored
-    ? el('span', { class: 'game-card-icon is-creature', 'aria-hidden': 'true' }, creatureCanvas(lastColored, 53))
-    : pixelIcon(['00100', '01110', '10101', '01110', '01010'], 'is-garden');
-
-  let summary = 'Tes petites bêtes apparaîtront ici';
-  if (creatures.length > 0) {
-    summary = creatures.length === 1 ? '1 petite bête' : `${creatures.length} petites bêtes`;
-    if (pending > 0) summary += ` · ${pending} à colorier`;
-  }
-
+function tile(href: string, icon: HTMLElement, name: string, progress: string, extraClass = ''): HTMLElement {
   return el(
     'a',
-    { class: 'game-card', href: '#/jardin' },
+    { class: `game-tile ${extraClass}`, href },
     icon,
-    el('span', { class: 'game-card-text' }, el('strong', { text: 'Le Jardin' }), el('span', { text: summary })),
+    el('strong', { class: 'game-tile-name', text: name }),
+    el('span', { class: 'game-tile-progress', text: progress }),
   );
 }
 
-function gameCard(href: string, iconClass: string, title: string, text: string): HTMLElement {
-  return el(
-    'a',
-    { class: 'game-card', href },
-    el('span', { class: `game-card-icon ${iconClass}`, 'aria-hidden': 'true' }),
-    el('span', { class: 'game-card-text' }, el('strong', { text: title }), el('span', { text })),
-  );
+function gameTile(entry: GameEntry): HTMLElement {
+  const done = doneCount(entry);
+  const progress = done === 0 ? 'À découvrir' : `${done} ${done === 1 ? entry.unit[0] : entry.unit[1]}`;
+  return tile(entry.href, gameIcon(entry), entry.name, progress);
+}
+
+function gardenTile(): HTMLElement {
+  const creatures = loadGarden();
+  const pending = creatures.filter((creature) => !isColored(creature)).length;
+  const lastColored = creatures.filter(isColored).at(-1);
+  const icon = lastColored
+    ? el('span', { class: 'game-card-icon is-creature', 'aria-hidden': 'true' }, creatureCanvas(lastColored, 53))
+    : pixelIcon(['00100', '01110', '10101', '01110', '01010'], 'is-garden');
+  let progress = 'Coloriage';
+  if (pending > 0) progress = `${pending} à colorier`;
+  else if (creatures.length > 0) progress = creatures.length === 1 ? '1 petite bête' : `${creatures.length} petites bêtes`;
+  return tile('#/jardin', icon, 'Le Jardin', progress);
+}
+
+function resumeRow(): HTMLElement[] {
+  const chips: HTMLElement[] = [];
+  for (const { games } of SECTIONS) {
+    for (const id of games) {
+      const entry = GAMES[id];
+      const level = levelInProgress(entry);
+      if (!level) continue;
+      chips.push(
+        el(
+          'a',
+          { class: 'resume-chip', href: entry.href },
+          gameIcon(entry),
+          el(
+            'span',
+            { class: 'resume-chip-text' },
+            el('strong', { text: entry.name }),
+            el('span', { text: level.number !== null ? `n° ${level.number} en cours` : 'En cours' }),
+          ),
+        ),
+      );
+    }
+  }
+  if (chips.length === 0) return [];
+  return [
+    el(
+      'section',
+      { class: 'home-section' },
+      el('h2', { class: 'home-section-title', text: 'Reprendre' }),
+      el('div', { class: 'resume-row' }, ...chips),
+    ),
+  ];
 }
 
 function casinoCard(): HTMLElement {
@@ -152,7 +192,12 @@ function casinoCard(): HTMLElement {
     'a',
     { class: 'game-card casino-card', href: '#/casino' },
     el('span', { class: 'game-card-icon is-casino', 'aria-hidden': 'true', text: '🎰' }),
-    el('span', { class: 'game-card-text' }, el('strong', { text: 'Casino' }), el('span', { text: `${loadCasino().chips} jetons à jouer` })),
+    el(
+      'span',
+      { class: 'game-card-text' },
+      el('strong', { text: 'Casino' }),
+      el('span', { class: 'chip-pill', text: `${loadCasino().chips} jetons` }),
+    ),
   );
 }
 
@@ -161,14 +206,14 @@ function companionCard(): HTMLElement {
   return el(
     'a',
     { class: 'home-companion', href: '#/compagnon' },
-    companionPortrait(companion.look, 80),
+    companionPortrait(companion.look, 56),
     el(
       'span',
       { class: 'home-companion-text' },
       el('strong', { text: companion.name }),
-      el('span', { class: 'coin-pill', text: `${companion.coins} 🪙` }),
-      el('span', { text: 'Gagne des pièces en jouant pour l’habiller' }),
+      el('span', { text: 'L’habiller avec tes pièces' }),
     ),
+    el('span', { class: 'coin-pill', text: `${companion.coins} 🪙` }),
   );
 }
 
@@ -177,16 +222,23 @@ function dailyCard(): HTMLElement {
   const today = todayKey();
   const stars = save.days[today];
   const run = streak(save, today);
-  const status = stars === undefined ? `Aujourd'hui : ${CHALLENGE_GAME_NAMES[challengeGameOn(today)]}` : 'Réussi ! Reviens demain';
+  const game = GAMES[challengeGameOn(today)];
+  const done = stars !== undefined;
   return el(
     'a',
-    { class: `game-card daily-card${stars === undefined ? ' is-pending' : ''}`, href: '#/defi' },
-    el('span', { class: 'game-card-icon is-daily', 'aria-hidden': 'true', text: stars === undefined ? '★' : '✓' }),
+    { class: `daily-hero${done ? ' is-done' : ''}`, href: '#/defi' },
     el(
       'span',
-      { class: 'game-card-text' },
-      el('strong', { text: 'Défi du jour' }),
-      el('span', { text: run > 1 ? `${status} · série de ${run} jours` : status }),
+      { class: 'daily-hero-text' },
+      el('span', { class: 'daily-hero-label', text: done ? 'Défi du jour réussi !' : 'Défi du jour' }),
+      el('strong', { text: game.name }),
+      el('span', { class: 'daily-hero-hint', text: done ? `${'★'.repeat(stars)} · reviens demain` : 'Une partie pour gagner des pièces' }),
+    ),
+    el(
+      'span',
+      { class: 'daily-hero-side' },
+      gameIcon(game),
+      el('span', { class: 'streak-pill', text: run > 0 ? `🔥 ${run} jour${run > 1 ? 's' : ''}` : '🔥 0' }),
     ),
   );
 }

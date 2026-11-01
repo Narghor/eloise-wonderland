@@ -19,6 +19,7 @@ import { renderBox } from './games/box/boxScreen';
 import { renderPastry } from './games/pastry/pastryScreen';
 import { renderVegetables } from './games/vegetables/vegetablesScreen';
 import { renderTea } from './games/tea/teaScreen';
+import { renderMahjong } from './games/mahjong/mahjongScreen';
 import { renderCasino } from './games/casino/casinoScreen';
 import { requestPersistentStorage } from './save';
 
@@ -46,6 +47,7 @@ const routes: Record<string, Screen> = {
   patisserie: renderPastry,
   potager: renderVegetables,
   salon: renderTea,
+  mahjong: renderMahjong,
   casino: renderCasino,
 };
 

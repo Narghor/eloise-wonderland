@@ -18,6 +18,7 @@ import { startBoxChallenge } from '../games/box/boxScreen';
 import { startPastryChallenge } from '../games/pastry/pastryScreen';
 import { startVegetablesChallenge } from '../games/vegetables/vegetablesScreen';
 import { startTeaChallenge } from '../games/tea/teaScreen';
+import { startMahjongChallenge } from '../games/mahjong/mahjongScreen';
 import {
   CHALLENGE_GAME_NAMES,
   challengeGameOn,
@@ -45,6 +46,7 @@ const START: Record<ChallengeGame, (day: string) => void> = {
   pastry: startPastryChallenge,
   vegetables: startVegetablesChallenge,
   tea: startTeaChallenge,
+  mahjong: startMahjongChallenge,
 };
 
 const WEEKDAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];

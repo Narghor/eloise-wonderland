@@ -76,6 +76,10 @@ a {
   }
 
   .game-card:hover,
+  .game-tile:hover,
+  .resume-chip:hover,
+  .daily-hero:hover,
+  .home-companion:hover,
   .size-card:hover,
   .garden-tile:hover {
     outline: 2px solid var(--accent);
@@ -343,10 +347,166 @@ a {
 
 .home {
   display: grid;
-  gap: 16px;
-  max-width: 560px;
+  gap: 20px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 8px 16px 32px;
+}
+
+.home-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.home-section-title {
+  padding-left: 4px;
+  font-size: 1.05rem;
+  color: var(--accent-strong);
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .home-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 860px) {
+  .home-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.game-tile {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 4px;
+  padding: 14px 8px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  text-align: center;
+}
+
+.game-tile .game-card-icon {
+  margin-bottom: 4px;
+}
+
+.game-tile-name {
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.game-tile-progress {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.resume-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scroll-snap-type: x proximity;
+}
+
+.resume-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 8px 14px 8px 8px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 0 0 2px var(--accent-soft);
+  text-decoration: none;
+  scroll-snap-align: start;
+}
+
+.resume-chip .game-card-icon {
+  transform: scale(0.7);
+  margin: -10px;
+}
+
+.resume-chip-text {
+  display: grid;
+}
+
+.resume-chip-text span {
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.daily-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fff3c4, #ffd0e0);
+  box-shadow: var(--shadow), 0 0 0 2px #f2c94c;
+  text-decoration: none;
+}
+
+.daily-hero.is-done {
+  box-shadow: var(--shadow);
+}
+
+.daily-hero-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.daily-hero-label {
+  color: #8a6400;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.daily-hero-text strong {
+  font-size: 1.35rem;
+}
+
+.daily-hero-hint {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.daily-hero-side {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.streak-pill,
+.chip-pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: white;
+  color: var(--accent-strong);
+  font-weight: 800;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.game-card-text .chip-pill {
+  justify-self: start;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .game-card {
@@ -446,7 +606,8 @@ a {
 .game-card-icon.is-box,
 .game-card-icon.is-pastry,
 .game-card-icon.is-vegetables,
-.game-card-icon.is-tea {
+.game-card-icon.is-tea,
+.game-card-icon.is-mahjong {
   width: 69px;
   height: 69px;
   padding: 0;
@@ -529,6 +690,15 @@ a {
     #fde3d6;
 }
 
+.game-card-icon.is-mahjong {
+  background:
+    radial-gradient(circle at 50% 46%, #f48fb1 0 7px, transparent 8px),
+    radial-gradient(circle at 30% 70%, #6cc17a 0 4px, transparent 5px),
+    radial-gradient(circle at 70% 70%, #6f95e6 0 4px, transparent 5px),
+    linear-gradient(160deg, #fff 0 55%, #ffe4ec 100%);
+  box-shadow: inset -4px -5px 0 #d9b48f, inset 0 0 0 2px #e8cdb4;
+}
+
 .game-card-icon.is-daily {
   width: 69px;
   height: 69px;
@@ -539,10 +709,6 @@ a {
   color: #b58900;
   font-size: 2rem;
   font-weight: 800;
-}
-
-.daily-card.is-pending {
-  box-shadow: var(--shadow), 0 0 0 2px #f2c94c;
 }
 
 .game-card-icon.is-creature {
@@ -729,8 +895,8 @@ a {
 .home-companion {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 10px 16px 10px 10px;
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -746,7 +912,11 @@ a {
   font-size: 1.15rem;
 }
 
-.home-companion-text span:last-child {
+.home-companion-text span {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+}
+
+.home-companion .coin-pill {
+  margin-left: auto;
 }

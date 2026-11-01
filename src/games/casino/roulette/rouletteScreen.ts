@@ -177,7 +177,7 @@ export function renderRoulette(root: HTMLElement): () => void {
   }
 
   function refresh(): void {
-    balance.textContent = `${chips()} jetons`;
+    balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
     for (const [id, button] of cells) {
       const amount = bets.get(id);
       button.querySelector('.rl-stack')?.remove();

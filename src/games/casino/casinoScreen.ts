@@ -1,10 +1,12 @@
 import './casino.css';
 import { el, topBar } from '../../dom';
 import { loadCompanion } from '../../companion/companionSave';
-import { CHIPS_PER_COIN, buyChips, canRefillToday, claimDailyRefill, loadCasino, pay } from './chips';
+import { CHIPS_PER_COIN, DAILY_GIFT, buyChips, claimDailyGift, loadCasino, pay } from './chips';
+import { burst, playBonusTrigger } from './fx';
 import { renderSlots } from './slots/slotsScreen';
 import { renderBonusSlot } from './bonus/bonusScreen';
 import { renderOlympus } from './olympus/olympusScreen';
+import { renderLuna } from './luna/lunaScreen';
 import { renderBlackjack } from './blackjack/blackjackScreen';
 import { renderRoulette } from './roulette/rouletteScreen';
 
@@ -12,6 +14,7 @@ const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: s
   sous: { render: renderSlots, icon: '🍒', title: 'Machine à sous', hint: '5 rouleaux, jackpot progressif' },
   porte: { render: renderBonusSlot, icon: '🚪', title: 'Machine à porte', hint: 'Décroche le bonus, plus la mise est haute, mieux il paie' },
   olympe: { render: renderOlympus, icon: '⚡', title: 'Foudre de l’Olympe', hint: 'Presque rien sans les temples, tout avec les tours gratuits' },
+  eloise: { render: renderLuna, icon: '🌙', title: 'Eloise’s Book', hint: 'Ouvre le livre : un symbole se déploie sur tout le rouleau' },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
   roulette: { render: renderRoulette, icon: '🎡', title: 'Roulette', hint: 'Européenne, un seul zéro' },
 };
@@ -20,6 +23,7 @@ const COIN_PACKS = [1, 10, 50, 100];
 
 /** `#/casino` shows the lobby, `#/casino/<game>` a table. */
 export function renderCasino(root: HTMLElement, params: string[]): () => void {
+  grantDailyGift();
   const game = GAMES[params[0] ?? ''];
   if (game) return game.render(root);
   renderLobby(root);
@@ -27,12 +31,8 @@ export function renderCasino(root: HTMLElement, params: string[]): () => void {
 }
 
 function renderLobby(root: HTMLElement): void {
-  const refill = claimDailyRefill();
   const save = loadCasino();
   const coins = loadCompanion().coins;
-
-  const status = el('p', { class: 'casino-status', role: 'status' });
-  if (refill > 0) status.textContent = `Recharge du jour : +${refill} jetons`;
 
   const packs = el('div', { class: 'casino-packs' });
   for (const pack of COIN_PACKS) {
@@ -46,25 +46,28 @@ function renderLobby(root: HTMLElement): void {
     packs.append(button);
   }
 
+  const record = el('span', { class: 'casino-record', text: `Record : ${save.record} jetons` });
   const bank = el(
     'section',
     { class: 'casino-bank' },
     el('strong', { class: 'casino-balance', text: `${save.chips} jetons` }),
-    el('span', { class: 'casino-record', text: `Record : ${save.record} jetons` }),
-    status,
+    record,
   );
-  // Secret: five quick taps on the balance give 100 chips.
-  let taps = 0;
-  let lastTap = 0;
-  bank.addEventListener('click', () => {
-    const now = Date.now();
-    taps = now - lastTap < 600 ? taps + 1 : 1;
-    lastTap = now;
-    if (taps < 5) return;
-    pay(100);
-    root.replaceChildren();
-    renderLobby(root);
+  // Secret: holding the record line for 3 s gives 1000 chips.
+  let holdTimer = 0;
+  const release = () => window.clearTimeout(holdTimer);
+  record.addEventListener('pointerdown', () => {
+    release();
+    holdTimer = window.setTimeout(() => {
+      pay(1000);
+      root.replaceChildren();
+      renderLobby(root);
+    }, 3000);
   });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) record.addEventListener(type, release);
+  record.addEventListener('contextmenu', (event) => event.preventDefault());
+  record.style.userSelect = 'none';
+  record.style.webkitUserSelect = 'none';
 
   const tables = el('div', { class: 'casino-tables' });
   for (const [id, game] of Object.entries(GAMES)) {
@@ -98,12 +101,27 @@ function renderLobby(root: HTMLElement): void {
           packs,
           el('p', {
             class: 'casino-note',
-            text: canRefillToday()
-              ? 'Reviens sur cet écran pour toucher ta recharge du jour.'
-              : 'Sous 200 jetons, le casino te recharge à 200 une fois par jour.',
+            text: `Chaque jour, ta première visite t’offre ${DAILY_GIFT.toLocaleString('fr-FR')} jetons.`,
           }),
         ),
       ),
     ),
   );
+}
+
+/** Grants the daily gift on the first visit of the day and celebrates it with a toast. */
+export function grantDailyGift(): void {
+  const given = claimDailyGift();
+  if (given === 0) return;
+  const toast = el(
+    'div',
+    { class: 'casino-gift-toast', role: 'status' },
+    el('span', { 'aria-hidden': 'true', text: '🎁' }),
+    el('strong', { text: `Cadeau du jour : +${given.toLocaleString('fr-FR')} jetons` }),
+  );
+  document.body.append(toast);
+  burst(toast, 28, 'coins');
+  playBonusTrigger();
+  window.setTimeout(() => toast.classList.add('is-leaving'), 3500);
+  window.setTimeout(() => toast.remove(), 4000);
 }

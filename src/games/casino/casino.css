@@ -88,3 +88,33 @@
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+.casino-gift-toast,
+.casino-gift-toast.fx-burst-host {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd86b, #ff9ad5);
+  color: #3a1240;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  animation: casino-gift-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+.casino-gift-toast.is-leaving {
+  opacity: 0;
+  transform: translate(-50%, -20px);
+}
+
+@keyframes casino-gift-in {
+  from { opacity: 0; transform: translate(-50%, -30px) scale(0.8); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}

@@ -1,8 +1,10 @@
 // -----------------------------------------------
 // BLACKJACK RULES (no DOM)
 // -----------------------------------------------
-// 6 decks, dealer stands on soft 17, blackjack pays 3:2, dealer peeks for blackjack,
-// double on any first two cards (also after split), one split, split aces get one card.
+// 6 decks, dealer stands on soft 17, blackjack pays 3:2, European no-hole-card:
+// the dealer gets one card at the deal and draws the rest after the player.
+// Against a dealer blackjack only the original bet is lost (extra double/split stakes come back).
+// Double on any first two cards (also after split), one split, split aces get one card.
 
 export type Suit = 'S' | 'H' | 'D' | 'C';
 export interface Card {
@@ -97,16 +99,17 @@ export class Round {
   results: HandResult[] = [];
 
   private readonly shoe: Shoe;
+  private readonly originalStake: number;
 
   constructor(shoe: Shoe, stake: number) {
     this.shoe = shoe;
+    this.originalStake = stake;
     const player: Card[] = [];
     player.push(shoe.draw());
     this.dealer.push(shoe.draw());
     player.push(shoe.draw());
-    this.dealer.push(shoe.draw());
     this.hands.push({ cards: player, stake, fromSplit: false, splitAces: false, done: false, doubled: false });
-    if (isBlackjack(player) || isBlackjack(this.dealer)) this.finish();
+    if (isBlackjack(player)) this.finish();
   }
 
   get hand(): Hand {
@@ -164,6 +167,8 @@ export class Round {
   private finish(): void {
     this.phase = 'over';
     this.active = Math.min(this.active, this.hands.length - 1);
+    // The second dealer card is always drawn, so a dealer blackjack is known before anything else.
+    this.dealer.push(this.shoe.draw());
     const dealerBj = isBlackjack(this.dealer);
     const first = this.hands[0];
     if (this.hands.length === 1 && isBlackjack(first.cards)) {
@@ -171,7 +176,8 @@ export class Round {
       return;
     }
     if (dealerBj) {
-      this.results = this.hands.map(() => ({ outcome: 'lose', payout: 0 }));
+      // Original bet only: hand 0 carries the original stake, every extra stake is refunded.
+      this.results = this.hands.map((h, i) => ({ outcome: 'lose', payout: h.stake - (i === 0 ? this.originalStake : 0) }));
       return;
     }
     if (this.hands.some((h) => totalOf(h.cards).best <= 21)) {

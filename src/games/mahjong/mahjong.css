@@ -1,0 +1,302 @@
+.mj,
+.mj-game {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.mj-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #fde3ec;
+  font-size: 1.8rem;
+}
+
+/* ----------------------------------------------- */
+/* MENU                                            */
+/* ----------------------------------------------- */
+
+.mj-menu {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.mj-menu-note {
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.mj-gallery-section h2 {
+  margin: 8px 0;
+  font-size: 1.05rem;
+}
+
+.mj-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.mj-layout {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.mj-layout.is-done {
+  box-shadow: var(--shadow), 0 0 0 2px #9bd3a6;
+}
+
+.mj-layout-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.mj-preview {
+  width: 120px;
+  height: 76px;
+}
+
+.mj-dim {
+  justify-self: center;
+  font-size: 0.9rem;
+}
+
+/* ----------------------------------------------- */
+/* BOARD                                           */
+/* ----------------------------------------------- */
+
+.mj-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 12px 4px;
+  color: var(--muted);
+}
+
+.mj-clock {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.mj-frame {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 6px 6px 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.mj-frame.is-zoomed {
+  justify-content: flex-start;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.mj-frame.is-zoomed .mj-board {
+  margin: 0 auto;
+}
+
+.mj-board {
+  position: relative;
+  flex-shrink: 0;
+  --w: 30px;
+  --h: 39px;
+  --d: 4px;
+}
+
+.mj-tile {
+  position: absolute;
+  width: var(--w);
+  height: var(--h);
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.mj-tile[hidden] {
+  display: none;
+}
+
+/* The face, its thickness (right and bottom, thicker the higher the tile stands) and a cast shadow
+   that grows with the height. Higher layers are slightly lighter and warmer. */
+.mj-tile {
+  --e: calc(var(--d) * (1 + var(--z, 0) * 0.45));
+  --lit: calc(0.93 + var(--z, 0) * 0.035);
+}
+
+.mj-face {
+  position: absolute;
+  inset: 0 1px 1px 0;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--w) * 0.16);
+  background: linear-gradient(160deg, #fffaf0 0%, var(--face) 60%);
+  box-shadow:
+    inset 0 0 0 1px rgb(120 80 60 / 0.3),
+    inset 0 calc(var(--w) * -0.08) 0 var(--band),
+    1px 1px 0 #f6e6d2,
+    calc(var(--d) * 0.5) calc(var(--d) * 0.5) 0 #e6c6a2,
+    var(--d) var(--d) 0 #d4ab84,
+    var(--e) var(--e) 0 #b48660,
+    calc(var(--e) + 1px) calc(var(--e) + 1px) 0 #7d5a40,
+    calc(var(--e) + 2px) calc(var(--e) + 3px) calc(var(--e) * 1.2 + 2px) rgb(60 25 35 / calc(0.3 + var(--z, 0) * 0.07));
+  filter: brightness(var(--lit)) sepia(calc(var(--z, 0) * 0.04));
+  font-size: calc(var(--w) * 0.7);
+  line-height: 1;
+  transition: transform 0.12s, filter 0.15s;
+}
+
+.mj-tile[data-suit='fruit'] { --face: #ffd5e2; --band: #f48fb1; }
+.mj-tile[data-suit='animal'] { --face: #d4f0cf; --band: #6cc17a; }
+.mj-tile[data-suit='sweet'] { --face: #ffeab8; --band: #f0b43c; }
+.mj-tile[data-suit='honor'] { --face: #d6e4ff; --band: #6f95e6; }
+.mj-tile[data-suit='season'] { --face: #e8dcff; --band: #a07ee0; }
+.mj-tile[data-suit='flower'] { --face: #ffdcc8; --band: #ef8a5a; }
+
+.mj-board.is-dim .mj-tile.is-blocked .mj-face {
+  filter: brightness(calc(var(--lit) * 0.78)) saturate(0.55);
+}
+
+.mj-tile.is-selected .mj-face {
+  transform: translate(-2px, -3px);
+  filter: brightness(calc(var(--lit) + 0.08));
+  box-shadow:
+    0 0 0 3px var(--accent-strong),
+    var(--d) var(--d) 0 #d9b48f,
+    calc(var(--d) + 3px) calc(var(--d) + 5px) 8px rgb(70 30 40 / 0.4);
+}
+
+.mj-tile.is-hint .mj-face {
+  animation: mj-hint 0.9s ease-in-out infinite;
+}
+
+@keyframes mj-hint {
+  50% {
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 3px #ffcc33, var(--d) var(--d) 0 #d9b48f;
+  }
+}
+
+.mj-tile.is-bumped .mj-face {
+  animation: mj-bump 0.25s;
+}
+
+@keyframes mj-bump {
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.mj-tile.is-gone {
+  pointer-events: none;
+  animation: mj-gone 0.38s ease-in forwards;
+}
+
+@keyframes mj-gone {
+  30% { transform: translateY(-6px) scale(1.12); opacity: 1; }
+  100% { transform: translateY(-16px) scale(0.4); opacity: 0; }
+}
+
+.mj-sparkle {
+  position: absolute;
+  z-index: 99999;
+  pointer-events: none;
+  font-size: calc(var(--w) * 0.9);
+  animation: mj-sparkle 0.7s ease-out forwards;
+}
+
+@keyframes mj-sparkle {
+  0% { transform: scale(0.3) rotate(0); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-24px) scale(1.4) rotate(40deg); opacity: 0; }
+}
+
+.mj-board.is-shuffling .mj-face {
+  animation: mj-shuffle 0.45s ease-in-out;
+}
+
+@keyframes mj-shuffle {
+  50% { transform: rotateY(90deg); }
+}
+
+.mj-confetti {
+  position: absolute;
+  top: 100%;
+  z-index: 100000;
+  font-size: 1.6rem;
+  pointer-events: none;
+  animation: mj-confetti 1.9s ease-out forwards;
+}
+
+@keyframes mj-confetti {
+  0% { transform: translateY(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(-110vh) rotate(540deg); opacity: 0; }
+}
+
+.mj-notice {
+  text-align: center;
+  padding: 0 16px;
+}
+
+.mj-notice p {
+  margin: 6px 0;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.mj-tools {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.mj-tools .button {
+  min-width: 96px;
+}
+
+.mj-result {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 16px 24px;
+  text-align: center;
+}
+
+.mj-result:empty {
+  display: none;
+}
+
+.mj-result h2 {
+  margin: 8px 0 0;
+}
+
+.mj-result-line {
+  margin: 0;
+}

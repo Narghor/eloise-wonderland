@@ -3,7 +3,7 @@
 // -----------------------------------------------
 // A cake is a list of layers, bottom first. Always: a sponge at the bottom, a glaze on top and
 // nowhere else, never two identical layers touching. Clues describe a hidden cake; the generator
-// adds clues until a brute-force solver finds a single cake that fits them.
+// adds clues until a solver that only crosses out, like a player, rebuilds the whole cake.
 
 import type { LevelTable } from '../../difficulty';
 import { shuffled } from '../../random';
@@ -168,6 +168,142 @@ export function solutions(puzzle: Omit<Puzzle, 'layers'> & { layers: readonly (K
 }
 
 // -----------------------------------------------
+// HUMAN SOLVER
+// -----------------------------------------------
+// Reads the clues one at a time and crosses out what each one forbids, the way a player does.
+// No guessing beyond "if this layer were X, a clue would break right away".
+
+/** One bit per ingredient (index in KIND_IDS): a layer's still-possible ingredients. */
+type Domains = number[];
+
+const bit = (kind: KindId) => 1 << KIND_IDS.indexOf(kind);
+const maskOf = (target: Target) => KIND_IDS.reduce((mask, kind, i) => (matches(kind, target) ? mask | (1 << i) : mask), 0);
+const isSingle = (mask: number) => mask !== 0 && (mask & (mask - 1)) === 0;
+const sizeOf = (mask: number) => {
+  let size = 0;
+  for (let m = mask; m; m &= m - 1) size++;
+  return size;
+};
+
+/** Crosses out what each clue and rule forbids, until nothing moves; false when the cake became impossible. */
+function propagate(domains: Domains, clues: readonly Clue[]): boolean {
+  const masks = new Map<Target, number>();
+  const mask = (target: Target) => {
+    let m = masks.get(target);
+    if (m === undefined) masks.set(target, (m = maskOf(target)));
+    return m;
+  };
+  const n = domains.length;
+  let changed = true;
+  const keep = (i: number, allowed: number) => {
+    const next = domains[i] & allowed;
+    if (next !== domains[i]) {
+      domains[i] = next;
+      changed = true;
+    }
+  };
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < n; i++) {
+      if (domains[i] === 0) return false;
+      if (!isSingle(domains[i])) continue;
+      if (i > 0) keep(i - 1, ~domains[i]);
+      if (i + 1 < n) keep(i + 1, ~domains[i]);
+    }
+    for (const clue of clues) {
+      switch (clue.type) {
+        case 'at':
+          keep(clue.index, mask(clue.target));
+          break;
+        case 'count': {
+          const m = mask(clue.target);
+          let must = 0;
+          let may = 0;
+          for (const d of domains) {
+            if ((d & ~m) === 0) must++;
+            if (d & m) may++;
+          }
+          if (must > clue.count || may < clue.count) return false;
+          for (let i = 0; i < n; i++) {
+            if (must === clue.count && (domains[i] & ~m) !== 0) keep(i, ~m);
+            if (may === clue.count && (domains[i] & m) !== 0) keep(i, m);
+          }
+          break;
+        }
+        case 'under': {
+          const lower = mask(clue.lower);
+          const upper = mask(clue.upper);
+          let spot = -1;
+          let spots = 0;
+          for (let i = 0; i + 1 < n; i++) {
+            if (domains[i] & lower && domains[i + 1] & upper) [spot, spots] = [i, spots + 1];
+          }
+          if (spots === 0) return false;
+          if (spots === 1) {
+            keep(spot, lower);
+            keep(spot + 1, upper);
+          }
+          break;
+        }
+        case 'never': {
+          const a = mask(clue.a);
+          const b = mask(clue.b);
+          for (let i = 0; i < n; i++) {
+            for (const j of [i - 1, i + 1]) {
+              if (j < 0 || j >= n) continue;
+              if ((domains[i] & ~a) === 0) keep(j, ~b);
+              if ((domains[i] & ~b) === 0) keep(j, ~a);
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+  return domains.every((d) => d !== 0);
+}
+
+/** True when a player can rebuild the cake by crossing out, plus (when allowed) one-step "what if" checks. */
+export function humanSolvable(puzzle: Puzzle, whatIf = true): boolean {
+  const domains = humanDomains(puzzle, whatIf);
+  return domains !== null && domains.every((d, i) => d === bit(puzzle.layers[i]));
+}
+
+/** What is left possible for each layer once the player has crossed out all they can; null if contradictory. */
+function humanDomains(puzzle: Puzzle, whatIf: boolean): Domains | null {
+  const last = puzzle.layers.length - 1;
+  const inPool = (family: (f: Family) => boolean) => puzzle.pool.reduce((m, k) => (family(KINDS[k].family) ? m | bit(k) : m), 0);
+  const bottom = inPool((f) => f === 'sponge');
+  const top = inPool((f) => f === 'glaze');
+  const middle = inPool((f) => f !== 'glaze');
+  const domains: Domains = puzzle.layers.map((kind, i) => (!puzzle.hidden[i] ? bit(kind) : i === 0 ? bottom : i === last ? top : middle));
+  if (!propagate(domains, puzzle.clues)) return null;
+  for (let progress = whatIf; progress; ) {
+    progress = false;
+    for (let i = 0; i <= last; i++) {
+      if (isSingle(domains[i])) continue;
+      for (let m = domains[i]; m; m &= m - 1) {
+        const option = m & -m;
+        const trial = [...domains];
+        trial[i] = option;
+        if (!propagate(trial, puzzle.clues)) {
+          domains[i] &= ~option;
+          progress = true;
+        }
+      }
+      if (progress && !propagate(domains, puzzle.clues)) return null;
+    }
+  }
+  return domains;
+}
+
+/** How many choices the player still has to rule out: 0 means solved. */
+function openChoices(puzzle: Puzzle, whatIf: boolean): number {
+  const domains = humanDomains(puzzle, whatIf);
+  return domains === null ? Infinity : domains.reduce((sum, d) => sum + sizeOf(d) - 1, 0);
+}
+
+// -----------------------------------------------
 // LEVELS AND GENERATION
 // -----------------------------------------------
 
@@ -178,15 +314,17 @@ export interface PastryTier {
   sponges: number;
   creams: number;
   glazes: number;
+  /** Whether the player may need a one-step "what if this layer were X" check, or only direct crossing out. */
+  whatIf: boolean;
 }
 
 /** One tier per difficulty, easiest first. */
 export const PASTRY_TIERS: readonly PastryTier[] = [
-  { layers: 4, hidden: 0, sponges: 2, creams: 2, glazes: 2 },
-  { layers: 6, hidden: 0, sponges: 3, creams: 3, glazes: 3 },
-  { layers: 6, hidden: 3, sponges: 2, creams: 2, glazes: 2 },
-  { layers: 7, hidden: 5, sponges: 2, creams: 2, glazes: 2 },
-  { layers: 7, hidden: 7, sponges: 2, creams: 2, glazes: 2 },
+  { layers: 4, hidden: 0, sponges: 2, creams: 2, glazes: 2, whatIf: false },
+  { layers: 6, hidden: 0, sponges: 3, creams: 3, glazes: 3, whatIf: false },
+  { layers: 6, hidden: 3, sponges: 2, creams: 2, glazes: 2, whatIf: false },
+  { layers: 7, hidden: 5, sponges: 2, creams: 2, glazes: 2, whatIf: false },
+  { layers: 7, hidden: 7, sponges: 2, creams: 2, glazes: 2, whatIf: true },
 ];
 
 export const PASTRY_LEVELS: LevelTable = [1, 2, 3, 4, 5];
@@ -258,28 +396,35 @@ export function generatePuzzle(tier: PastryTier, random: () => number = Math.ran
     const puzzle: Puzzle = { pool, layers, hidden, clues: [] };
     if (tier.hidden === 0) return puzzle;
 
-    const candidates = allCakes(pool, tier.layers);
-    let left = solutions(puzzle, candidates);
+    // Clues are added until the human solver rebuilds the cake: unique AND reachable by deduction.
+    const whatIf = tier.whatIf;
     const unused = shuffled(trueClues(layers, pool, hidden), random);
-    while (left.length > 1 && unused.length > 0) {
-      // Among a few random clues, the one that rules out the most cakes.
-      const sample = unused.slice(0, 6);
-      let best = sample[0];
-      let bestScore = -1;
-      for (const clue of sample) {
-        const score = (left.length - left.filter((cake) => holds(clue, cake)).length) * weight(clue);
+    /** The clue among `clues` that lets the player cross out the most, or null if none helps. */
+    const bestOf = (clues: readonly Clue[], deep: boolean): Clue | null => {
+      const before = openChoices(puzzle, deep);
+      let best: Clue | null = null;
+      let bestScore = 0;
+      for (const clue of clues) {
+        const score = (before - openChoices({ ...puzzle, clues: [...puzzle.clues, clue] }, deep)) * weight(clue);
         if (score > bestScore) [best, bestScore] = [clue, score];
       }
+      return best;
+    };
+    let open = openChoices(puzzle, false);
+    while (open > 0 && puzzle.clues.length <= MAX_CLUES) {
+      // Direct crossing out first, on a random sample; the slower "what if" ranking only when that stalls.
+      const best = bestOf(unused.slice(0, 8), false) ?? bestOf(unused, false) ?? (whatIf ? bestOf(unused.slice(0, 12), true) : null);
+      if (best === null) break;
       unused.splice(unused.indexOf(best), 1);
-      if (bestScore <= 0) continue;
       puzzle.clues.push(best);
-      left = left.filter((cake) => holds(best, cake));
-    }
-    if (left.length !== 1) continue;
-    // Drop the clues the others already imply.
+      open = openChoices(puzzle, false);
+      if (open > 0 && whatIf) open = openChoices(puzzle, true);    }
+    if (open !== 0) continue;
+    // Drop the clues the others already make useless.
     for (const clue of [...puzzle.clues]) {
       const without = puzzle.clues.filter((other) => other !== clue);
-      if (solutions({ ...puzzle, clues: without }, candidates).length === 1) puzzle.clues = without;
+      const lighter = { ...puzzle, clues: without };
+      if (openChoices(lighter, false) === 0 || (whatIf && openChoices(lighter, true) === 0)) puzzle.clues = without;
     }
     if (puzzle.clues.length <= MAX_CLUES) {
       puzzle.clues = shuffled(puzzle.clues, random);

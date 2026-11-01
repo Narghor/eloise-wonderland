@@ -1,0 +1,272 @@
+/* Casino FX kit: shake, bulbs, win lines, particles, big win, paytable diagrams. */
+
+.fx-mute {
+  border: 0;
+  background: transparent;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+/* ---- shake ---- */
+.fx-shake-1 { animation: fx-shake 0.3s linear; --fx-amp: 2px; }
+.fx-shake-2 { animation: fx-shake 0.5s linear; --fx-amp: 6px; }
+.fx-shake-3 { animation: fx-shake 0.7s linear; --fx-amp: 12px; }
+
+@keyframes fx-shake {
+  10%, 50%, 90% { transform: translate(calc(var(--fx-amp) * -1), calc(var(--fx-amp) * 0.5)); }
+  30%, 70% { transform: translate(var(--fx-amp), calc(var(--fx-amp) * -0.5)); }
+  100% { transform: none; }
+}
+
+/* ---- marquee bulbs ---- */
+.fx-marquee-host { position: relative; }
+
+.fx-marquee {
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+}
+
+.fx-bulb {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: #6b4a12;
+  box-shadow: none;
+}
+
+/* Photosensitivity: every bulb fades smoothly, never faster than ~1 cycle per 0.75 s. */
+.fx-marquee-idle .fx-bulb { animation: fx-bulb 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.8s); }
+.fx-marquee-spin .fx-bulb { animation: fx-bulb 1.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.4s); }
+.fx-marquee-win .fx-bulb { animation: fx-bulb-all 1.6s ease-in-out infinite; }
+.fx-marquee-big .fx-bulb { animation: fx-bulb-rainbow 3s ease-in-out infinite; animation-delay: calc(var(--i) * -1s); }
+
+@keyframes fx-bulb {
+  0%, 100% { background: #6b4a12; box-shadow: none; }
+  33% { background: #ffe066; box-shadow: 0 0 8px 2px #ffd23f; }
+  66% { background: #6b4a12; box-shadow: none; }
+}
+
+@keyframes fx-bulb-all {
+  0%, 100% { background: #c9a23a; box-shadow: 0 0 4px 1px #ffd23f; }
+  50% { background: #fff6c2; box-shadow: 0 0 10px 3px #ffd23f; }
+}
+
+@keyframes fx-bulb-rainbow {
+  0%, 100% { background: #ff8ac4; box-shadow: 0 0 8px 2px #ff4fa3; }
+  33% { background: #ffe066; box-shadow: 0 0 8px 2px #ffd23f; }
+  66% { background: #8aeeff; box-shadow: 0 0 8px 2px #3fe0ff; }
+}
+
+/* ---- win lines ---- */
+.fx-lines-host { position: relative; }
+
+.fx-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.fx-line {
+  fill: none;
+  stroke: var(--fx-line);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px var(--fx-line));
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: fx-draw 0.6s ease-out forwards;
+}
+
+.fx-line-box {
+  fill: none;
+  stroke: var(--fx-line);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px var(--fx-line));
+}
+
+@keyframes fx-draw { to { stroke-dashoffset: 0; } }
+
+.fx-cell-win {
+  animation: fx-cell-pop 1.4s ease-in-out infinite;
+  background: radial-gradient(circle, #fff6c2 0%, #ffd23f 70%) !important;
+}
+
+@keyframes fx-cell-pop {
+  50% { transform: scale(1.12); }
+}
+
+/* ---- particles ---- */
+.fx-burst-host { position: relative; }
+
+.fx-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  z-index: 5;
+  font-size: 1.4rem;
+  animation: fx-fly 1.1s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+.fx-confetti {
+  width: 8px;
+  height: 12px;
+  background: hsl(var(--hue), 90%, 60%);
+  border-radius: 2px;
+}
+
+@keyframes fx-fly {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 120px)) rotate(var(--rot)); opacity: 0; }
+}
+
+/* ---- big win ---- */
+.fx-bigwin {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  background: radial-gradient(circle, rgba(60, 10, 70, 0.85) 0%, rgba(10, 0, 20, 0.92) 70%);
+  color: #fff;
+  cursor: pointer;
+  animation: fx-fade-in 0.25s ease-out;
+}
+
+.fx-bigwin-out { opacity: 0; transition: opacity 0.25s; }
+
+@keyframes fx-fade-in { from { opacity: 0; } }
+
+/* A soft halo behind the title that breathes slowly: no rays, no strobing. */
+.fx-bigwin-halo {
+  position: absolute;
+  width: min(90vw, 460px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 210, 63, 0.28) 0%, rgba(255, 138, 61, 0.1) 45%, transparent 70%);
+  animation: fx-halo 4s ease-in-out infinite alternate;
+  z-index: -1;
+}
+
+@keyframes fx-halo { from { transform: scale(0.92); opacity: 0.7; } to { transform: scale(1.05); opacity: 1; } }
+
+/* Confetti and coins that drift down from the top. */
+.fx-fall {
+  position: absolute;
+  top: -40px;
+  left: var(--x);
+  pointer-events: none;
+  z-index: 1;
+  font-size: 1.3rem;
+  animation: fx-fall var(--dur) linear forwards;
+}
+
+@keyframes fx-fall {
+  from { transform: translate(0, 0) rotate(0deg); }
+  to { transform: translate(var(--drift), 110vh) rotate(var(--rot)); }
+}
+
+.fx-bigwin-title {
+  margin: 0;
+  font-size: clamp(2rem, 11vw, 3.6rem);
+  font-weight: 900;
+  text-align: center;
+  max-width: calc(100vw - 32px);
+  color: #ffd23f;
+  text-shadow: 0 0 12px #ff8a3d, 0 4px 0 #a0410b;
+  animation: fx-title 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both, fx-glow 1.2s ease-in-out 0.6s infinite alternate;
+}
+
+.fx-bigwin-2 .fx-bigwin-title { color: #ff8af0; text-shadow: 0 0 14px #ff4fa3, 0 4px 0 #7a0d4a; }
+.fx-bigwin-3 .fx-bigwin-title { color: #9ff3ff; text-shadow: 0 0 18px #3fe0ff, 0 0 30px #ff4fa3, 0 4px 0 #0d3a7a; }
+
+@keyframes fx-title { from { transform: scale(0.2) rotate(-10deg); opacity: 0; } }
+@keyframes fx-glow { to { transform: scale(1.04); filter: brightness(1.15); } }
+
+.fx-bigwin-amount {
+  font-size: clamp(2.4rem, 14vw, 4.4rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px #ffd23f;
+}
+
+.fx-bigwin-unit { font-weight: 700; opacity: 0.8; }
+.fx-bigwin-hint { margin-top: 24px; font-size: 0.85rem; opacity: 0.6; }
+
+/* ---- paytable diagrams ---- */
+.fx-paylines {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.fx-payline { margin: 0; text-align: center; }
+
+.fx-payline figcaption { font-size: 0.75rem; color: var(--muted); }
+
+.fx-payline-grid {
+  display: grid;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 6px;
+  background: var(--line);
+}
+
+.fx-payline-grid span {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--bg);
+}
+
+.fx-payline-grid span.fx-payline-on { background: var(--accent-strong); }
+
+.fx-payouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.fx-payout {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+
+.fx-payout-name { margin: 0 0 4px; font-weight: 800; }
+
+.fx-payout ul { margin: 0; padding: 0; list-style: none; font-size: 0.85rem; }
+.fx-payout li b { display: inline-block; min-width: 3.2em; }
+.fx-payout-chips { color: var(--muted); }
+
+.fx-rules h3 { margin: 12px 0 4px; font-size: 1rem; }
+.fx-rules ul { margin: 0; padding-left: 18px; font-size: 0.9rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-bigwin-halo, .fx-cell-win, .fx-marquee .fx-bulb { animation: none; }
+}
+
+/* TEST-BUTTONS: temporary bar, remove with fx/testMode.ts */
+.casino-test-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px; border: 2px dashed #e65100; border-radius: 10px; background: #fff3e0; font-size: 0.8rem;
+}
+.casino-test-bar > b { color: #e65100; letter-spacing: 0.1em; }
+.casino-test-state { color: #8d5a2b; width: 100%; }
+.casino-test-button {
+  border: 1px solid #e65100; background: white; color: #bf360c; border-radius: 999px;
+  padding: 4px 10px; font: inherit; font-weight: 700; cursor: pointer;
+}

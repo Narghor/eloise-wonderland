@@ -1,7 +1,7 @@
 // -----------------------------------------------
 // BONUS SLOT ("machine a porte") - pure maths, no DOM
 // -----------------------------------------------
-// Base game: 5x3, 10 lines, low return. A door on reels 1, 3 and 5 opens the
+// Base game: 5x3, 10 lines, small and medium wins. A door on reels 1, 3 and 5 opens the
 // Hold & Spin bonus. Its coins are worth multiples of the bet, and higher bets
 // unlock bigger jackpots, so the RTP rises a little with the bet.
 
@@ -14,21 +14,24 @@ export const JACKPOT_FEED = 0.01;
 export const GRAND_MIN_BETS = 500;
 
 export type Rng = () => number;
+/** 'door' opens the bonus; a number forces that jackpot tier in it. */ // TEST-BUTTONS
+export type BonusForce = 'door' | number; // TEST-BUTTONS
 
 export interface BetLevel {
   bet: number;
   /** Highest jackpot reachable: 0 Mini, 1 Minor, 2 Major, 3 Grand. */
   jackpotTier: number;
-  /** Measured RTP (see the simulation), shown in the rules. */
-  rtp: number;
 }
 
+// Simulated RTP (4M spins, pool feed included): 94.8 / 95.7 / 96.4 / 96.6 by tier.
 export const BET_LEVELS: BetLevel[] = [
-  { bet: 10, jackpotTier: 0, rtp: 92.2 },
-  { bet: 20, jackpotTier: 1, rtp: 92.2 },
-  { bet: 50, jackpotTier: 1, rtp: 92.4 },
-  { bet: 100, jackpotTier: 2, rtp: 93.5 },
-  { bet: 200, jackpotTier: 3, rtp: 93.8 },
+  { bet: 10, jackpotTier: 0 },
+  { bet: 20, jackpotTier: 0 },
+  { bet: 50, jackpotTier: 1 },
+  { bet: 100, jackpotTier: 1 },
+  { bet: 200, jackpotTier: 2 },
+  { bet: 500, jackpotTier: 3 },
+  { bet: 1000, jackpotTier: 3 },
 ];
 
 // -----------------------------------------------
@@ -44,12 +47,12 @@ export interface SymbolDef {
 }
 
 export const SYMBOLS: SymbolDef[] = [
-  { id: 'cherry', glyph: '🍒', weight: 30, pays: [0.25, 0.6, 1.5] },
-  { id: 'lemon', glyph: '🍋', weight: 26, pays: [0.35, 1, 2.5] },
-  { id: 'bell', glyph: '🔔', weight: 18, pays: [0.6, 2, 5] },
-  { id: 'star', glyph: '⭐', weight: 12, pays: [1.2, 4, 10] },
-  { id: 'gem', glyph: '💎', weight: 7, pays: [2.5, 8, 25] },
-  { id: 'seven', glyph: '7️⃣', weight: 4, pays: [5, 15, 60] },
+  { id: 'cherry', glyph: '🍒', weight: 30, pays: [0.15, 0.8, 2.5] },
+  { id: 'lemon', glyph: '🍋', weight: 26, pays: [0.25, 1.2, 4] },
+  { id: 'bell', glyph: '🔔', weight: 18, pays: [0.5, 2.5, 8] },
+  { id: 'star', glyph: '⭐', weight: 12, pays: [1, 5, 15] },
+  { id: 'gem', glyph: '💎', weight: 7, pays: [2, 10, 40] },
+  { id: 'seven', glyph: '7️⃣', weight: 4, pays: [4, 20, 100] },
   { id: 'door', glyph: '🚪', weight: 0, pays: [0, 0, 0] },
 ];
 export const DOOR = SYMBOLS.length - 1;
@@ -93,11 +96,12 @@ function drawSymbol(rng: Rng, column: number): number {
   return DOOR;
 }
 
-export function spinGrid(rng: Rng): Grid {
+export function spinGrid(rng: Rng, force?: BonusForce): Grid { // TEST-BUTTONS
   const grid: Grid = [];
   for (let c = 0; c < COLS; c++) {
     const column: number[] = [];
     for (let r = 0; r < ROWS; r++) column.push(drawSymbol(rng, c));
+    if (force !== undefined && DOOR_REELS.includes(c)) column[1] = DOOR; // TEST-BUTTONS
     grid.push(column);
   }
   return grid;
@@ -146,10 +150,10 @@ export const LAND_CHANCE = 0.04;
 export const JACKPOT_NAMES = ['Mini', 'Minor', 'Major', 'Grand'];
 /** Fixed jackpots in multiples of the bet (Grand is the progressive pool). */
 export const JACKPOT_MULTS = [10, 30, 100];
-const JACKPOT_WEIGHTS = [3, 0.6, 0.2];
+const JACKPOT_WEIGHTS = [3, 0.6, 0.1];
 
-const COIN_VALUES: [number, number][] = [
-  [4, 30], [5, 26], [8, 16], [12, 12], [15, 7], [25, 5], [30, 2],
+export const COIN_VALUES: [number, number][] = [
+  [4, 30], [5, 26], [8, 16], [10, 12], [15, 7], [25, 5], [40, 2],
 ];
 
 export type Coin = { kind: 'value'; mult: number } | { kind: 'jackpot'; tier: number };
@@ -188,7 +192,7 @@ export function coinChips(coin: Coin, bet: number): number {
   return coin.kind === 'value' ? coin.mult * bet : JACKPOT_MULTS[coin.tier] * bet;
 }
 
-export function playBonus(rng: Rng, level: BetLevel): BonusResult {
+export function playBonus(rng: Rng, level: BetLevel, forceTier?: number): BonusResult { // TEST-BUTTONS
   const cells: (Coin | null)[] = new Array(CELLS).fill(null);
   const order = [...Array(CELLS).keys()];
   for (let i = order.length - 1; i > 0; i--) {
@@ -197,10 +201,12 @@ export function playBonus(rng: Rng, level: BetLevel): BonusResult {
   }
   const first = order.slice(0, START_COINS);
   for (const i of first) cells[i] = drawCoin(rng, level.jackpotTier);
-  const steps: BonusStep[] = [{ cells: [...cells], fresh: first, respinsLeft: RESPINS }];
+  if (forceTier !== undefined && forceTier < 3) cells[first[0]] = { kind: 'jackpot', tier: forceTier }; // TEST-BUTTONS
+  if (forceTier === 3) for (const i of order) cells[i] ??= drawCoin(rng, level.jackpotTier); // TEST-BUTTONS: Grand fills the grid
+  const steps: BonusStep[] = [{ cells: [...cells], fresh: forceTier === 3 ? order : first, respinsLeft: RESPINS }]; // TEST-BUTTONS
 
   let left = RESPINS;
-  let filled = START_COINS;
+  let filled = forceTier === 3 ? CELLS : START_COINS; // TEST-BUTTONS
   while (left > 0 && filled < CELLS) {
     const fresh: number[] = [];
     for (let i = 0; i < CELLS; i++) {
@@ -214,5 +220,5 @@ export function playBonus(rng: Rng, level: BetLevel): BonusResult {
     steps.push({ cells: [...cells], fresh, respinsLeft: left });
   }
   const chips = cells.reduce((sum, c) => sum + (c ? coinChips(c, level.bet) : 0), 0);
-  return { steps, chips, grand: filled === CELLS && level.jackpotTier >= 3 };
+  return { steps, chips, grand: filled === CELLS && (level.jackpotTier >= 3 || forceTier === 3) }; // TEST-BUTTONS
 }

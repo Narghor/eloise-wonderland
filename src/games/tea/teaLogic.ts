@@ -5,10 +5,12 @@ import { mulberry32 } from '../../random';
 // -----------------------------------------------
 
 export const TEAS = {
-  green: { label: 'Thé vert', emoji: '🍵', color: '#8cc084' },
-  black: { label: 'Thé noir', emoji: '☕', color: '#7a4a2e' },
-  mint: { label: 'Menthe', emoji: '🌿', color: '#3fae7a' },
-  rooibos: { label: 'Rooibos', emoji: '🫖', color: '#c4502f' },
+  // Colors differ in lightness, not only hue (dark / light / mid teal / orange),
+  // so they stay apart for color-blind players; `ink` is the readable text color.
+  green: { label: 'Thé vert', emoji: '🍃', color: '#a6e05a', ink: '#1f3d0c' },
+  black: { label: 'Thé noir', emoji: '☕', color: '#24160f', ink: '#ffffff' },
+  mint: { label: 'Menthe', emoji: '🌿', color: '#0e7f78', ink: '#ffffff' },
+  rooibos: { label: 'Rooibos', emoji: '🍂', color: '#f08a3c', ink: '#3d1a05' },
 } as const;
 export type TeaId = keyof typeof TEAS;
 export const TEA_IDS = Object.keys(TEAS) as TeaId[];

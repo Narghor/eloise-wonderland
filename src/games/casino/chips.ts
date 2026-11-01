@@ -9,7 +9,7 @@ import { todayKey } from '../../daily/daily';
 
 const GAME_ID = 'casino';
 const STARTING_CHIPS = 1000;
-const DAILY_FLOOR = 200;
+export const DAILY_GIFT = 2500;
 export const CHIPS_PER_COIN = 10;
 const JACKPOT_SEED = 5000;
 
@@ -70,21 +70,19 @@ export function pay(amount: number): void {
   saveCasino(save);
 }
 
-/** Once a day, tops a low balance back up to the floor. Returns the chips given. */
-export function claimDailyRefill(): number {
+/** Once a day, whatever the balance, gives the daily gift. Returns the chips given (0 if already claimed today). */
+export function claimDailyGift(): number {
   const save = loadCasino();
   const today = todayKey();
-  if (save.refilledOn === today || save.chips >= DAILY_FLOOR) return 0;
-  const given = DAILY_FLOOR - save.chips;
-  save.chips = DAILY_FLOOR;
+  if (save.refilledOn === today) {
+    // A brand-new player starts with the day already counted: persist it, or tomorrow would see no date.
+    if (readGame(GAME_ID) == null) saveCasino(save);
+    return 0;
+  }
+  save.chips += DAILY_GIFT;
   save.refilledOn = today;
   saveCasino(save);
-  return given;
-}
-
-export function canRefillToday(): boolean {
-  const save = loadCasino();
-  return save.refilledOn !== todayKey() && save.chips < DAILY_FLOOR;
+  return DAILY_GIFT;
 }
 
 /** Spends companion coins for chips. One way only. Returns false when the coins are missing. */

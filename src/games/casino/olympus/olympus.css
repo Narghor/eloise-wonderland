@@ -21,11 +21,8 @@
   transition: background 0.4s;
 }
 .oly-in-feature .oly-machine { background: linear-gradient(#4b2a8a, #160b33); }
-.oly-flash .oly-machine { animation: oly-strike 0.5s ease-out; }
 
-.oly-feature-bar { display: flex; justify-content: space-between; gap: 6px; color: #fff3c4; font-size: 0.95em; }
 .oly-feature-bar:not(:empty) { margin-bottom: 8px; }
-.oly-mult b { font-size: 1.3em; color: #ffd54f; }
 
 .oly-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 
@@ -47,7 +44,7 @@
 .oly-win { background: #fff3b0; outline: 2px solid #d4af37; }
 .oly-wild { background: radial-gradient(circle, #fff9c4, #ffd54f 55%, #f57f17); }
 .oly-scatter { box-shadow: 0 0 10px 3px #ffd54f; animation: oly-glow 0.8s ease-in-out infinite alternate; }
-.oly-tension { box-shadow: 0 0 12px 4px #64b5f6; animation: oly-shake 0.15s linear infinite; }
+.oly-tension { box-shadow: 0 0 12px 4px #64b5f6; animation: oly-shake 0.6s ease-in-out infinite; }
 .oly-tension-text { color: #1565c0; animation: oly-pop 0.5s ease-out; }
 
 .oly-message { min-height: 1.4em; font-weight: 700; }
@@ -59,51 +56,72 @@
 .oly-small { font-size: 0.85em; color: var(--muted); }
 .oly-spin { min-width: 140px; }
 
-.oly-celebrate {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px;
-  background: rgb(15 30 61 / 0.9);
-  color: #ffd54f;
-  border-radius: var(--radius);
-  font-weight: 700;
-  z-index: 5;
-  animation: oly-flash 0.25s ease-in-out 6 alternate;
-}
-.oly-celebrate-bolt { font-size: 4rem; animation: oly-pop 0.6s ease-out; }
-.oly-celebrate-text { font-size: 2rem; animation: oly-pop 0.6s ease-out; }
+.oly-top-right { display: inline-flex; align-items: center; gap: 8px; }
+.oly-win-text { color: #b8860b; font-size: 1.1em; }
+.oly-paytable { text-align: left; }
+.oly-paytable-title { margin: 14px 0 6px; font-size: 1rem; }
 
-.oly-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 20;
+.oly-feature-bar { display: grid; grid-template-columns: 1fr 1.6fr; gap: 6px; }
+.oly-fs-box {
+  display: flex; flex-direction: column; align-items: center; min-width: 0;
+  background: rgb(0 0 0 / 0.35); border: 1px solid #d4af37; border-radius: 10px; padding: 4px 2px;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
 }
-.oly-rules {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 16px;
-  max-width: 400px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  text-align: left;
-}
-.oly-rules table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-.oly-rules td, .oly-rules th { padding: 3px; text-align: center; border-bottom: 1px solid var(--line); }
+.oly-fs-box span { color: #fff3c4; font-weight: 700; }
+.oly-fs-box b { font-size: 1.7rem; line-height: 1.1; color: #fff; text-transform: none; }
+.oly-fs-totalbox b { color: #7dff6a; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
+.oly-struck { animation: oly-struck 1.2s ease-in-out; }
+@keyframes oly-struck {
+  0%, 100% { filter: none; }
+  40% { filter: drop-shadow(0 0 14px rgb(150 200 255 / 0.9)); }
+}
+
+.oly-intro {
+  position: fixed; inset: 0; z-index: 50; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px;
+  text-align: center; color: #fff3c4; cursor: pointer;
+  background: radial-gradient(circle at 50% 40%, #4b2a8a, #0f1e3d 70%);
+  animation: oly-intro-in 0.35s ease-out;
+}
+.oly-intro p { margin: 0; }
+.oly-intro-bolt { font-size: 5rem; animation: oly-pop 0.6s ease-out, oly-glow-text 1.2s ease-in-out infinite alternate; }
+.oly-intro-count { font-size: 5rem; font-weight: 900; line-height: 1; color: #ffd54f; text-shadow: 0 0 20px #ffb300, 0 4px 0 #7a5a00; animation: oly-pop 0.7s ease-out; }
+.oly-intro-title { font-size: 2rem; font-weight: 900; letter-spacing: 0.06em; }
+.oly-intro-text { font-weight: 700; max-width: 22em; }
+.oly-intro-hint { margin-top: 20px; font-size: 0.85rem; opacity: 0.6; }
 @keyframes oly-land { from { transform: translateY(-20%); } to { transform: none; } }
 @keyframes oly-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
-@keyframes oly-flash { from { background: rgb(15 30 61 / 0.9); } to { background: rgb(255 248 200 / 0.95); } }
-@keyframes oly-strike { 0% { box-shadow: 0 0 0 0 #fff; } 30% { box-shadow: 0 0 30px 10px #fff59d; } 100% { box-shadow: var(--shadow); } }
+@keyframes oly-mult-pop { 0% { transform: scale(1); } 30% { transform: scale(1.35); box-shadow: 0 0 24px 8px #ffd54f; } 100% { transform: scale(1); } }
+@keyframes oly-intro-in { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: none; } }
+@keyframes oly-glow-text { from { text-shadow: 0 0 10px #ffd54f; } to { text-shadow: 0 0 40px #fff, 0 0 20px #ffb300; } }
 @keyframes oly-glow { from { box-shadow: 0 0 6px 2px #ffd54f; } to { box-shadow: 0 0 16px 6px #ffb300; } }
 @keyframes oly-shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
+
+/* Polish aligned on the classic machine: reel window, glossy cells, bold spin button. */
+.oly-machine { border-radius: 22px; box-shadow: inset 0 0 0 2px #f5d77a, 0 8px 24px rgb(0 0 0 / 0.35); }
+.oly-grid { gap: 4px; padding: 6px; border-radius: 12px; background: #0a1430; box-shadow: inset 0 4px 10px rgb(0 0 0 / 0.6); }
+.oly-cell { border-radius: 8px; }
+.oly-cell:not(.oly-wild):not(.oly-win) { background: linear-gradient(180deg, #e9e1c9 0%, #fffaf0 45%, #dcd1b2 100%); }
+.oly-spin {
+  font-size: 1.2rem; font-weight: 900; letter-spacing: 0.06em;
+  background: linear-gradient(#2b5bb5, #142c63); color: #ffe08a; box-shadow: inset 0 0 0 2px #d4af37, 0 4px 0 #0f1e3d;
+}
+.oly-spin:disabled { filter: grayscale(0.5); opacity: 0.6; }
+/* Free spins: the storm reel set (dark clouds, cold light) and full-reel stacks drawn as one tall tile. */
+.oly-in-feature .oly-machine {
+  background:
+    radial-gradient(ellipse 60% 30% at 20% 8%, rgb(160 175 210 / 0.35), transparent 70%),
+    radial-gradient(ellipse 55% 28% at 80% 4%, rgb(140 150 190 / 0.3), transparent 70%),
+    linear-gradient(#2c3550, #10131f 70%);
+  border-color: #9fb8ff;
+}
+.oly-in-feature .oly-grid { background: #0b0f1c; box-shadow: inset 0 4px 14px rgb(0 0 0 / 0.7), 0 0 0 1px #6f86c9; }
+.oly-in-feature .oly-cell:not(.oly-wild):not(.oly-win):not(.oly-stack) { background: linear-gradient(180deg, #dfe6f5 0%, #ffffff 45%, #d3dbec 100%); }
+.oly-zeus { color: #7a4b00; }
+.oly-stack { border-radius: 0; box-shadow: inset 2px 0 0 #ffd54f, inset -2px 0 0 #ffd54f; }
+.oly-stack.oly-zeus { background: linear-gradient(180deg, #ffe9a8, #f4b942); }
+.oly-stack.oly-wild { background: linear-gradient(180deg, #d9ecff, #7fb3ff); }
+.oly-stack-0 { border-radius: 10px 10px 0 0; box-shadow: inset 2px 2px 0 #ffd54f, inset -2px 0 0 #ffd54f; }
+.oly-stack-2 { border-radius: 0 0 10px 10px; box-shadow: inset 2px -2px 0 #ffd54f, inset -2px 0 0 #ffd54f; }
+.oly-in-feature .oly-grid:has(.oly-stack) { row-gap: 0; }

@@ -32,7 +32,8 @@ export type ChallengeGame =
   | 'box'
   | 'pastry'
   | 'vegetables'
-  | 'tea';
+  | 'tea'
+  | 'mahjong';
 
 const ROTATION: readonly ChallengeGame[] = [
   'picross',
@@ -50,6 +51,7 @@ const ROTATION: readonly ChallengeGame[] = [
   'pastry',
   'vegetables',
   'tea',
+  'mahjong',
 ];
 
 export const CHALLENGE_GAME_NAMES: Record<ChallengeGame, string> = {
@@ -68,6 +70,7 @@ export const CHALLENGE_GAME_NAMES: Record<ChallengeGame, string> = {
   pastry: 'Pâtisserie',
   vegetables: 'Potager',
   tea: 'Salon de thé',
+  mahjong: 'Mahjong',
 };
 
 export interface DailySave {

@@ -2,17 +2,19 @@
 // SLOTS MATHS (pure, no DOM)
 // -----------------------------------------------
 // 5 reels x 3 rows, 10 fixed paylines, weighted reel strips.
-// Base game RTP ~92.95%; the progressive jackpot adds 1% (the fed share)
-// plus ~0.05% (the seed), for ~94% in total.
+// Tuned for fun: ~37% of spins win, base RTP ~94%; the progressive jackpot
+// adds 1% (the fed share) plus ~0.05% (the seed), ~95% in total.
 
 export const MACHINE_ID = 'slots-classic';
 export const REELS = 5;
 export const ROWS = 3;
-export const BET_LEVELS = [10, 20, 50, 100, 200];
-export const MAX_BET = 200;
+export const BET_LEVELS = [10, 20, 50, 100, 200, 500, 1000];
+export const MAX_BET = 1000;
 export const JACKPOT_SHARE = 0.01;
-/** Chance of the jackpot event per spin at max bet; scales with the bet. */
-export const JACKPOT_ODDS_AT_MAX = 1 / 50000;
+/** Jackpot chance per chip bet: 1 in 50 000 at a 200 bet. Linear, so the seed's RTP share is the same at every bet. */
+export const JACKPOT_ODDS_PER_CHIP = 1 / 10_000_000;
+/** Ceiling of the per-spin jackpot chance (reached at the 1000 bet). */
+export const JACKPOT_ODDS_CAP = 1 / 10_000;
 
 export interface SymbolInfo {
   id: number;
@@ -26,27 +28,30 @@ export const WILD = 7;
 export const DIAMOND = 8;
 
 export const SYMBOLS: SymbolInfo[] = [
-  { id: 0, glyph: '🍒', name: 'Cerise', pays: [5, 25, 120] },
-  { id: 1, glyph: '🍋', name: 'Citron', pays: [5, 25, 120] },
-  { id: 2, glyph: '🍊', name: 'Orange', pays: [8, 45, 200] },
-  { id: 3, glyph: '🍇', name: 'Raisin', pays: [10, 70, 300] },
-  { id: 4, glyph: '🔔', name: 'Cloche', pays: [16, 110, 500] },
-  { id: 5, glyph: '⭐', name: 'Étoile', pays: [30, 220, 1000] },
-  { id: 6, glyph: '7️⃣', name: 'Sept', pays: [80, 400, 2000] },
-  { id: 7, glyph: '👑', name: 'Couronne (joker)', pays: [150, 800, 5000] },
+  { id: 0, glyph: '🍒', name: 'Cerise', pays: [3, 8, 25] },
+  { id: 1, glyph: '🍋', name: 'Citron', pays: [3, 8, 25] },
+  { id: 2, glyph: '🍊', name: 'Orange', pays: [4, 12, 40] },
+  { id: 3, glyph: '🍇', name: 'Raisin', pays: [5, 18, 60] },
+  { id: 4, glyph: '🔔', name: 'Cloche', pays: [7, 28, 100] },
+  { id: 5, glyph: '⭐', name: 'Étoile', pays: [11, 45, 160] },
+  { id: 6, glyph: '7️⃣', name: 'Sept', pays: [22, 90, 350] },
+  { id: 7, glyph: '👑', name: 'Couronne (joker)', pays: [35, 140, 550] },
   { id: 8, glyph: '💎', name: 'Diamant', pays: [0, 0, 0] },
 ];
 
 /** Count of each symbol per reel (index = symbol id, wild included, no diamond). */
 const STRIP_COUNTS: number[][] = [
-  [7, 7, 6, 5, 4, 3, 2, 1],
-  [7, 7, 6, 5, 4, 3, 2, 1],
-  [7, 7, 6, 5, 4, 3, 2, 1],
-  [7, 7, 6, 5, 4, 3, 2, 1],
-  [7, 7, 6, 5, 4, 3, 2, 1],
+  [10, 10, 7, 6, 4, 3, 2, 5],
+  [10, 10, 7, 6, 4, 3, 2, 5],
+  [10, 10, 7, 6, 4, 3, 2, 5],
+  [10, 10, 7, 6, 4, 3, 2, 5],
+  [10, 10, 7, 6, 4, 3, 2, 5],
 ];
 
-/** Spreads the counts into a strip, interleaving symbols deterministically. */
+/** Symbols placed in blocks of this size on the strip (stacks make multi-line wins). */
+const STACK_SIZE = [3, 3, 3, 3, 2, 2, 1, 2];
+
+/** Spreads the counts into a strip, interleaving stacked symbols deterministically. */
 function buildStrip(counts: number[], offset: number): number[] {
   const left = counts.slice();
   const strip: number[] = [];
@@ -60,8 +65,9 @@ function buildStrip(counts: number[], offset: number): number[] {
       tries++;
       if (tries > left.length * 2) break;
     }
-    left[cursor]--;
-    strip.push(cursor);
+    const block = Math.min(left[cursor], STACK_SIZE[cursor]);
+    for (let k = 0; k < block; k++) strip.push(cursor);
+    left[cursor] -= block;
   }
   return strip;
 }
@@ -99,6 +105,7 @@ export interface SpinResult {
 }
 
 export type Rng = () => number;
+export type SlotsForce = 'big' | 'mega' | 'jackpot'; // TEST-BUTTONS
 
 function lineWin(grid: number[][], line: number, lineBet: number): LineWin | null {
   const cells = PAYLINES[line].map((row, reel) => grid[reel][row]);
@@ -119,14 +126,16 @@ function lineWin(grid: number[][], line: number, lineBet: number): LineWin | nul
 }
 
 /** Spins once. `totalBet` must be a multiple of the line count. */
-export function spin(totalBet: number, rng: Rng = Math.random): SpinResult {
+export function spin(totalBet: number, rng: Rng = Math.random, force?: SlotsForce): SpinResult { // TEST-BUTTONS
   const lineBet = totalBet / PAYLINES.length;
-  if (rng() < JACKPOT_ODDS_AT_MAX * (totalBet / MAX_BET)) {
+  if (force === 'jackpot' || rng() < Math.min(JACKPOT_ODDS_CAP, JACKPOT_ODDS_PER_CHIP * totalBet)) { // TEST-BUTTONS
     const grid = STRIPS.map((strip, r) => [strip[r % strip.length], DIAMOND, strip[(r + 5) % strip.length]]);
     return { grid, stops: [0, 0, 0, 0, 0], wins: [{ line: 0, symbol: DIAMOND, count: 5, amount: 0 }], total: 0, jackpot: true };
   }
   const stops = STRIPS.map((strip) => Math.floor(rng() * strip.length));
   const grid = STRIPS.map((strip, r) => [0, 1, 2].map((row) => strip[(stops[r] + row) % strip.length]));
+  if (force === 'big') grid.forEach((column) => (column[1] = 5)); // TEST-BUTTONS: five stars on the middle line
+  if (force === 'mega') grid.forEach((column) => column.fill(WILD)); // TEST-BUTTONS: crowns everywhere
   const wins: LineWin[] = [];
   for (let line = 0; line < PAYLINES.length; line++) {
     const win = lineWin(grid, line, lineBet);

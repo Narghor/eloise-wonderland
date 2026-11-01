@@ -238,11 +238,12 @@
 }
 
 .tea-chip {
-  padding: 2px 8px;
+  padding: 3px 8px;
+  border: 1.5px solid rgb(0 0 0 / 0.35);
   border-radius: 10px;
   color: #fff;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -289,13 +290,28 @@
   border-color: var(--accent-strong);
 }
 
-.tea-dot {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
+/* Each pot wears its tea: a colored header band with the tea's symbol. */
+.tea-pot {
+  padding-top: 0;
+  overflow: hidden;
+  border-color: var(--tea);
+  border-width: 3px;
+}
+
+.tea-pot-badge {
+  display: grid;
+  place-items: center;
+  width: calc(100% + 8px);
+  height: 34px;
+  margin: 0 -4px 2px;
+  background: var(--tea);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.tea-pot-name {
+  font-weight: 700;
+  font-size: 0.8rem;
 }
 
 .tea-pot-state {

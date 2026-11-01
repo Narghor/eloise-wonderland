@@ -1,38 +1,91 @@
 .bonus-screen {
   position: relative;
-  max-width: 420px;
+  max-width: 480px;
   margin: 0 auto;
-  padding: 12px 16px 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   text-align: center;
 }
 
 .bonus-balance { font-weight: 700; color: var(--accent-strong); white-space: nowrap; }
 
-.bonus-grand {
-  font-weight: 800;
-  color: #b8860b;
-  background: #fff5d6;
-  border-radius: var(--radius);
-  padding: 6px;
-}
-.bonus-grand.bonus-locked { opacity: 0.45; }
-
+/* Cabinet: dark lacquered wood, arched like a door, double gold frame. */
 .bonus-machine {
-  background: linear-gradient(#5b2a6e, #3b1847);
-  border-radius: var(--radius);
-  padding: 10px;
-  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 16px;
+  border-radius: 60px 60px 22px 22px / 34px 34px 22px 22px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(255 190 90 / 0.25), transparent 55%),
+    linear-gradient(170deg, #7a0d1e 0%, #4a0612 55%, #2a0309 100%);
+  box-shadow: inset 0 0 0 4px #e9b949, inset 0 0 0 7px #6b4a12, inset 0 0 0 9px #e9b94966, 0 8px 24px rgb(0 0 0 / 0.35);
   transition: background 0.4s;
 }
-.bonus-in-feature .bonus-machine { background: linear-gradient(#8a5a00, #4a2c00); }
+.bonus-in-feature .bonus-machine {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(255 230 120 / 0.4), transparent 60%),
+    linear-gradient(170deg, #9a6a00 0%, #5a3700 60%, #2e1b00 100%);
+}
+
+.bonus-plaque {
+  align-self: center;
+  margin-top: 2px;
+  padding: 2px 16px;
+  border-radius: 999px;
+  background: linear-gradient(#f7d77a, #c99320);
+  color: #4a0612;
+  font-weight: 900;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 0 #6b4a12;
+}
+
+/* Jackpot header: four lit boxes, Grand the widest. */
+.bonus-jackpots {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.35fr;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 10px;
+  background: #1a0508;
+}
+.bonus-jp {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 3px 2px 4px;
+  border-radius: 7px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  transition: opacity 0.3s, filter 0.3s;
+}
+.bonus-jp-name { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+.bonus-jp-value { font-size: 0.9rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bonus-jp-0 { background: linear-gradient(#2f6b3a, #163a1d); color: #b9f6ca; }
+.bonus-jp-1 { background: linear-gradient(#1f4f8a, #0e2a4d); color: #bbdefb; }
+.bonus-jp-2 { background: linear-gradient(#7b2a9a, #3d0f52); color: #f3c4ff; }
+.bonus-jp-3 { background: linear-gradient(#ffdf6b, #c48a00); color: #4a0612; box-shadow: 0 0 10px #ffb30088; }
+.bonus-jp-3 .bonus-jp-value { font-size: 1rem; }
+.bonus-jp-locked { filter: grayscale(0.8); box-shadow: none; }
+.bonus-jp-locked { opacity: 0.5; }
+.bonus-jp-hit { animation: bonus-jp-hit 0.8s ease-in-out 4 alternate; }
+@keyframes bonus-jp-hit { from { transform: scale(1); filter: brightness(1); } to { transform: scale(1.08); filter: brightness(1.3); } }
+
+.bonus-window {
+  background: #1a0508;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: inset 0 4px 10px rgb(0 0 0 / 0.6);
+}
 
 .bonus-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .bonus-cell {
@@ -40,91 +93,88 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  border-radius: 10px;
-  font-size: clamp(18px, 7vw, 30px);
+  background: linear-gradient(180deg, #f3e6c8 0%, #fffaf0 45%, #e6d3a8 100%);
+  box-shadow: inset 0 0 0 1px #c9a24a;
+  border-radius: 8px;
+  font-size: clamp(1.4rem, 8vw, 2.4rem);
   min-width: 0;
   overflow: hidden;
 }
-.bonus-rolling { filter: blur(1px); opacity: 0.75; }
-.bonus-landed { animation: bonus-land 0.2s ease-out; }
+.bonus-rolling { filter: blur(2px); transform: translateY(2px); }
+.bonus-landed { animation: bonus-land 0.3s cubic-bezier(0.3, 1.8, 0.5, 1); }
 .bonus-win { background: var(--accent-soft); outline: 2px solid var(--accent-strong); }
-.bonus-empty { background: rgb(255 255 255 / 0.15); }
+.bonus-empty { background: rgb(255 255 255 / 0.08); box-shadow: inset 0 0 0 1px rgb(233 185 73 / 0.35); }
 .bonus-coin {
   background: radial-gradient(circle at 35% 30%, #fff3b0, #f2b705 60%, #b07d00);
   color: #4a2c00;
   font-size: clamp(11px, 3.6vw, 15px);
   font-weight: 800;
   border-radius: 50%;
+  box-shadow: 0 0 0 2px #7a5200, 0 2px 6px rgb(0 0 0 / 0.5);
 }
 .bonus-coin-jp { background: radial-gradient(circle at 35% 30%, #ffd1e3, #e0457b 60%, #8a1c45); color: white; }
 .bonus-pop { animation: bonus-pop 0.45s ease-out; }
 
-.bonus-respins { display: flex; justify-content: center; gap: 8px; min-height: 12px; margin-top: 8px; }
-.bonus-dot { width: 10px; height: 10px; border-radius: 50%; background: rgb(255 255 255 / 0.25); }
-.bonus-dot-on { background: #ffd54f; }
+.bonus-respins { display: flex; justify-content: center; gap: 8px; min-height: 0; }
+.bonus-respins:not(:empty) { min-height: 12px; }
+.bonus-dot { width: 12px; height: 12px; border-radius: 50%; background: rgb(255 255 255 / 0.2); box-shadow: inset 0 0 0 1px #e9b94988; }
+.bonus-dot-on { background: #ffd54f; box-shadow: 0 0 8px #ffb300; }
 
-.bonus-message { min-height: 1.4em; font-weight: 700; }
-.bonus-big { font-size: 1.15em; color: var(--accent-strong); animation: bonus-pop 0.5s ease-out; }
+.bonus-message { min-height: 1.5em; font-weight: 800; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.bonus-big { font-size: 1.6rem; color: #d6246e; animation: bonus-pop 0.5s ease-out; }
 
 .bonus-bet { display: flex; align-items: center; justify-content: center; gap: 16px; }
-.bonus-bet-step { width: 44px; padding: 10px 0; }
+.bonus-bet-step { min-width: 44px; }
 .bonus-bet-value { font-weight: 700; }
 .bonus-small { font-size: 0.85em; color: var(--muted); }
 
-
-.bonus-jackpots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; align-items: center; }
-.bonus-jp-chip { padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--muted); font-size: 0.85em; }
-.bonus-jp-on { background: #f2b705; color: #4a2c00; font-weight: 700; }
-
-.bonus-spin { min-width: 140px; }
+.bonus-spin {
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding-block: 14px;
+  background: linear-gradient(#c8102e, #7a0d1e);
+  color: #ffe08a;
+  box-shadow: inset 0 0 0 2px #e9b949, 0 4px 0 #4a0612;
+}
+.bonus-spin:disabled { filter: grayscale(0.5); opacity: 0.6; }
+.bonus-top-right { display: inline-flex; align-items: center; gap: 8px; }
+.bonus-detail { min-height: 1.2em; font-size: 0.9em; color: var(--muted); }
+.bonus-win-text { font-size: 1.6rem; color: #c7900a; text-shadow: 0 2px 0 rgb(0 0 0 / 0.15); }
+.bonus-machine-tense { box-shadow: inset 0 0 0 4px #e9b949, inset 0 0 0 7px #6b4a12, 0 0 24px 8px #ff7043; }
+.bonus-paytable { text-align: left; }
+.bonus-paytable-title { margin: 14px 0 6px; font-size: 1rem; }
+.bonus-jp-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 0.9rem; }
+.bonus-jp-table td, .bonus-jp-table th { padding: 4px; text-align: center; border-bottom: 1px solid var(--line); }
+.bonus-row-on { background: var(--accent-soft); font-weight: 700; }
 
 .bonus-celebrate {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgb(59 24 71 / 0.85);
+  gap: 6px;
+  padding: 16px;
+  background: rgb(59 24 71 / 0.92);
   color: #ffd54f;
-  border-radius: var(--radius);
   font-weight: 700;
-  z-index: 5;
-  animation: bonus-flash 0.3s ease-in-out 4 alternate;
+  z-index: 50;
+  overflow: hidden;
+  animation: bonus-flash 1s ease-in-out 2 alternate;
 }
-.bonus-celebrate-text { font-size: 3rem; animation: bonus-pop 0.6s ease-out; }
-
-.bonus-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 20;
-}
-.bonus-rules {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 16px;
-  max-width: 400px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  text-align: left;
-}
-.bonus-rules table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-.bonus-rules td, .bonus-rules th { padding: 3px; text-align: center; border-bottom: 1px solid var(--line); }
-
+.bonus-celebrate-door { font-size: 4rem; animation: bonus-pop 0.6s ease-out; }
+.bonus-celebrate-text { font-size: 3.2rem; text-shadow: 0 0 16px #ff4fa3, 0 4px 0 #7a0d4a; animation: bonus-pop 0.6s ease-out; }
+.bonus-celebrate-sub { font-size: 1.6rem; letter-spacing: 0.15em; color: #fff3b0; }
+.bonus-small-light { font-size: 0.85em; opacity: 0.85; }
 @keyframes bonus-land { from { transform: translateY(-20%); } to { transform: none; } }
 @keyframes bonus-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
-@keyframes bonus-flash { from { background: rgb(59 24 71 / 0.85); } to { background: rgb(217 96 140 / 0.9); } }
+@keyframes bonus-flash { from { background: rgb(59 24 71 / 0.85); } to { background: rgb(120 50 110 / 0.92); } }
 
 .bonus-door { box-shadow: 0 0 10px 3px #ffd54f; animation: bonus-glow 0.8s ease-in-out infinite alternate; }
 .bonus-door-open { animation: bonus-door-open 1.1s ease-in forwards; }
-.bonus-tension { box-shadow: 0 0 12px 4px #ff7043; animation: bonus-shake 0.15s linear infinite; }
+.bonus-tension { box-shadow: 0 0 12px 4px #ff7043; animation: bonus-shake 0.6s ease-in-out infinite; }
 .bonus-tension-text { color: #e64a19; animation: bonus-pop 0.5s ease-out; }
 
 @keyframes bonus-glow { from { box-shadow: 0 0 6px 2px #ffd54f; } to { box-shadow: 0 0 16px 6px #ffb300; } }

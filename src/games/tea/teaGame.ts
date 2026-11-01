@@ -92,10 +92,9 @@ export class TeaGame {
       const fill = el('span', { class: 'tea-pot-fill' });
       const button = el(
         'button',
-        { class: 'tea-station tea-pot', type: 'button' },
-        el('span', { class: 'tea-emoji', text: '🫖' }),
-        el('span', { class: 'tea-dot', style: `background:${TEAS[pot.tea].color}` }),
-        el('span', { text: TEAS[pot.tea].label }),
+        { class: 'tea-station tea-pot', type: 'button', style: `--tea:${TEAS[pot.tea].color};--tea-ink:${TEAS[pot.tea].ink}` },
+        el('span', { class: 'tea-pot-badge', text: TEAS[pot.tea].emoji }),
+        el('span', { class: 'tea-pot-name', text: TEAS[pot.tea].label }),
         state,
         el('span', { class: 'tea-pot-bar' }, fill),
       );
@@ -306,7 +305,8 @@ function stationButton(emoji: string, label: string): HTMLButtonElement {
 }
 
 function teaChip(tea: keyof typeof TEAS): HTMLElement {
-  return el('span', { class: 'tea-chip', style: `background:${TEAS[tea].color}`, title: TEAS[tea].label }, TEAS[tea].label);
+  const { color, ink, emoji, label } = TEAS[tea];
+  return el('span', { class: 'tea-chip', style: `background:${color};color:${ink}`, title: label }, `${emoji} ${label}`);
 }
 
 function orderParts(order: Order): (HTMLElement | string)[] {
