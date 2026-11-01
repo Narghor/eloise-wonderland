@@ -164,51 +164,108 @@ export function playBonusTrigger(): void {
 }
 
 /**
- * Suspense while the last bonus reel slows down: a drone rising over `durationMs`
- * with a quickening heartbeat. Returns a function that cuts it short.
+ * Suspense while a bonus reel slows down: a climbing arpeggio that speeds up over
+ * `durationMs`, over a swelling whoosh. Returns a function that cuts it short;
+ * follow it with playSuspenseHit or playSuspenseMiss.
  */
 export function playSuspense(durationMs: number): () => void {
   const ctx = ensureContext();
   if (!ctx || !master || muted) return () => {};
   const t = ctx.currentTime;
-  const end = t + durationMs / 1000;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.09, t + 0.3);
-  gain.gain.setValueAtTime(0.09, end - 0.1);
-  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+  const seconds = durationMs / 1000;
+  const end = t + seconds;
+  // Everything goes through one bus, so the stop can fade notes already scheduled.
+  const bus = ctx.createGain();
+  bus.gain.value = 1;
+  bus.connect(master);
+
+  // Whoosh: noise through a lowpass that opens and swells up to the landing.
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(400, t);
-  filter.frequency.exponentialRampToValueAtTime(2400, end);
-  filter.connect(gain).connect(master);
-  // Two detuned saws a fifth apart, both climbing an octave: the tension rises.
-  const voices = [110, 165].map((freq) => {
+  filter.frequency.setValueAtTime(300, t);
+  filter.frequency.exponentialRampToValueAtTime(5000, end);
+  const swell = ctx.createGain();
+  swell.gain.setValueAtTime(0.0001, t);
+  swell.gain.exponentialRampToValueAtTime(0.12, end);
+  source.connect(filter).connect(swell).connect(bus);
+  source.start(t);
+
+  // Arpeggio: up the major scale, notes closer and closer, ever higher.
+  let at = 0;
+  let gap = 0.16;
+  let step = 0;
+  while (at < seconds - 0.03) {
+    const octave = Math.floor(step / C_MAJOR.length);
+    const freq = C_MAJOR[step % C_MAJOR.length] * 2 ** octave;
+    const start = t + at;
     const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq, t);
-    osc.frequency.exponentialRampToValueAtTime(freq * 2, end);
-    osc.connect(filter);
-    osc.start(t);
-    osc.stop(end + 0.05);
-    return osc;
-  });
-  // Heartbeat: thumps closer and closer together.
-  let at = 0.15;
-  let gap = 0.55;
-  while (at < durationMs / 1000 - 0.1) {
-    tone(70, at, 0.12, 'sine', 0.45, 45);
-    tone(70, at + 0.14, 0.1, 'sine', 0.3, 45);
+    const g = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, start);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(0.05 + 0.05 * (at / seconds), start + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
+    osc.connect(g).connect(bus);
+    osc.start(start);
+    osc.stop(start + 0.1);
     at += gap;
-    gap = Math.max(0.28, gap * 0.85);
+    gap = Math.max(0.045, gap * 0.88);
+    step++;
   }
+
   return () => {
     const now = ctx.currentTime;
-    gain.gain.cancelScheduledValues(now);
-    gain.gain.setValueAtTime(gain.gain.value, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-    voices.forEach((osc) => osc.stop(now + 0.1));
+    bus.gain.cancelScheduledValues(now);
+    bus.gain.setValueAtTime(bus.gain.value, now);
+    bus.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    source.stop(now + 0.06);
   };
+}
+
+/** Doors swinging open: a wooden creak, a draught of air, then a magic shimmer. `delay` in seconds. */
+export function playDoorOpen(delay = 0): void {
+  // Creak: a rough, wobbling low saw sliding up then down.
+  tone(140, delay, 0.35, 'sawtooth', 0.06, 260);
+  tone(260, delay + 0.33, 0.3, 'sawtooth', 0.05, 180);
+  noise(delay + 0.05, 0.6, 0.18, 1200);
+  // Shimmer: a fast glissando of high bell notes as the light comes through.
+  [0, 2, 4, 5, 7].forEach((n, i) => tone(C_MAJOR[n] * 4, delay + 0.55 + i * 0.05, 0.35, 'sine', 0.07));
+}
+
+/** Medusa awakes: a long snake hiss, a stone rumble, then a low, eerie chord. `delay` in seconds. */
+export function playMedusaAwake(delay = 0): void {
+  noise(delay, 0.9, 0.22, 7000);
+  noise(delay + 0.15, 0.6, 0.12, 9000);
+  tone(55, delay + 0.2, 0.9, 'triangle', 0.4, 40);
+  noise(delay + 0.2, 0.7, 0.3, 200);
+  [0, 2, 5].forEach((n) => tone(C_MAJOR[n] / 2, delay + 0.7, 1.1, 'sawtooth', 0.045));
+  tone(C_MAJOR[7] * 2, delay + 0.75, 0.9, 'sine', 0.06, C_MAJOR[6] * 2);
+}
+
+/** The book opens: pages flicking, then a rising magic chime. `delay` in seconds. */
+export function playBookOpen(delay = 0): void {
+  for (let i = 0; i < 6; i++) noise(delay + i * 0.06, 0.05, 0.16, 3000 + i * 400);
+  [0, 2, 4, 7, 4, 7].forEach((n, i) => tone(C_MAJOR[n] * 2, delay + 0.4 + i * 0.07, 0.4, 'sine', 0.08));
+  tone(C_MAJOR[7] * 4, delay + 0.85, 0.7, 'triangle', 0.06);
+}
+
+/** The suspense resolves well: a bright strike and a sparkling chord. */
+export function playSuspenseHit(): void {
+  noise(0, 0.12, 0.35, 4000);
+  tone(130, 0, 0.25, 'triangle', 0.35, 60);
+  [0, 2, 4, 7].forEach((n) => tone(C_MAJOR[n] * 2, 0.02, 0.45, 'square', 0.07));
+  [7, 4, 7].forEach((n, i) => tone(C_MAJOR[n] * 4, 0.12 + i * 0.06, 0.12, 'sine', 0.08));
+}
+
+/** The suspense falls flat: a soft, sad slide down. */
+export function playSuspenseMiss(): void {
+  tone(C_MAJOR[4], 0, 0.22, 'triangle', 0.12, C_MAJOR[2]);
+  tone(C_MAJOR[2], 0.2, 0.4, 'triangle', 0.1, C_MAJOR[0] / 1.5);
 }
 
 /** Dull buzz for a losing spin (kept very quiet). */

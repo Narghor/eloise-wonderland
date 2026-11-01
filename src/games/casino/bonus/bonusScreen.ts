@@ -3,7 +3,7 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, feedJackpot, jackpot, pay, winJackpot } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
-  playCoinTick, playLose, playReelStop, playSmallWin, playSuspense, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
+  playCoinTick, playDoorOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
   type WinLinesHandle, type WinPath,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -259,6 +259,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         v.className = `bonus-cell bonus-landed${symbol === DOOR ? ' bonus-door' : ''}`;
         v.textContent = SYMBOLS[symbol].glyph;
       });
+      if (tense) (hasDoor(result, c) ? playSuspenseHit : playSuspenseMiss)();
       if (DOOR_REELS.includes(c) && hasDoor(result, c)) doorsShown++;
     }
     stopLoop();
@@ -298,6 +299,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     cellViews.forEach((v) => {
       if (v.classList.contains('bonus-door')) v.classList.add('bonus-door-open');
     });
+    playDoorOpen(0.35);
     await wait(1300);
     await intro(lv);
     if (disposed) return;

@@ -3,7 +3,7 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, pay } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
-  playBonusTrigger, playLose, playReelStop, playSmallWin, playSuspense, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
+  playBonusTrigger, playBookOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, type WinLinesHandle,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -250,7 +250,11 @@ export function renderLuna(root: HTMLElement): () => void {
         cell.classList.toggle('luna-is-book', s === BOOK);
         setArt(cell, s);
       });
-      booksShown += grid[reel].filter((s) => s === BOOK).length;
+      const landed = grid[reel].filter((s) => s === BOOK).length;
+      booksShown += landed;
+      // Resolve the suspense when the book lands, or when the last tense reel misses.
+      if (tense && landed > 0) playSuspenseHit();
+      else if (tense && reel === REELS - 1) playSuspenseMiss();
     }
     stopLoop();
     if (message.classList.contains('luna-tension-text')) setMessage('');
@@ -267,6 +271,7 @@ export function renderLuna(root: HTMLElement): () => void {
     lights.setMode('big');
     if (fresh) {
       playBonusTrigger();
+      playBookOpen(0.3);
       shake(machine, 2);
       setMessage('Le livre s’ouvre…', 'luna-big');
       await wait(1100);

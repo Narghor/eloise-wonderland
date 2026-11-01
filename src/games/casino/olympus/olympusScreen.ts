@@ -3,7 +3,7 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, pay } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
-  playBonusTrigger, playLose, playReelStop, playSmallWin, playSuspense, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
+  playBonusTrigger, playLose, playReelStop, playMedusaAwake, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, type WinLinesHandle,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -261,7 +261,11 @@ export function renderOlympus(root: HTMLElement): () => void {
         struck = true;
         strike();
       }
-      scattersShown += result[c].filter((s) => s === SCATTER).length;
+      const landed = result[c].filter((s) => s === SCATTER).length;
+      scattersShown += landed;
+      // Resolve the suspense when the temple lands, or when the last tense reel misses.
+      if (tense && landed > 0) playSuspenseHit();
+      else if (tense && c === COLS - 1) playSuspenseMiss();
     }
     stopLoop();
     if (message.classList.contains('oly-tension-text')) setMessage('');
@@ -282,6 +286,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     lights.setMode('big');
     if (fresh) {
       playBonusTrigger();
+      playMedusaAwake(0.3);
       strike();
       shake(machine, 3);
       setMessage('Les temples s’illuminent !', 'oly-big');
