@@ -7,14 +7,16 @@ import { renderSlots } from './slots/slotsScreen';
 import { renderBonusSlot } from './bonus/bonusScreen';
 import { renderOlympus } from './olympus/olympusScreen';
 import { renderLuna } from './luna/lunaScreen';
+import { ELOISE_ICON } from './luna/lunaArt';
 import { renderBlackjack } from './blackjack/blackjackScreen';
 import { renderRoulette } from './roulette/rouletteScreen';
 
-const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: string; title: string; hint: string }> = {
+/** `iconSvg` (trusted inline SVG) replaces the emoji `icon` in the lobby. */
+const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: string; iconSvg?: string; title: string; hint: string }> = {
   sous: { render: renderSlots, icon: '🍒', title: 'Machine à sous', hint: '5 rouleaux, jackpot progressif' },
   porte: { render: renderBonusSlot, icon: '🚪', title: 'Machine à porte', hint: 'Décroche le bonus, plus la mise est haute, mieux il paie' },
   olympe: { render: renderOlympus, icon: '⚡', title: 'Foudre de l’Olympe', hint: 'Presque rien sans les temples, tout avec les tours gratuits' },
-  eloise: { render: renderLuna, icon: '🌙', title: 'Eloise’s Book', hint: 'Ouvre le livre : un symbole se déploie sur tout le rouleau' },
+  eloise: { render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book', hint: '3 livres = 10 tours gratuits avec un symbole qui remplit les rouleaux' },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
   roulette: { render: renderRoulette, icon: '🎡', title: 'Roulette', hint: 'Européenne, un seul zéro' },
 };
@@ -71,11 +73,16 @@ function renderLobby(root: HTMLElement): void {
 
   const tables = el('div', { class: 'casino-tables' });
   for (const [id, game] of Object.entries(GAMES)) {
+    const icon = el('span', { class: 'casino-table-icon', 'aria-hidden': 'true', text: game.iconSvg ? '' : game.icon });
+    if (game.iconSvg) {
+      icon.classList.add('is-svg');
+      icon.innerHTML = game.iconSvg;
+    }
     tables.append(
       el(
         'a',
         { class: 'menu-card', href: `#/casino/${id}` },
-        el('span', { class: 'casino-table-icon', 'aria-hidden': 'true', text: game.icon }),
+        icon,
         el('span', { class: 'menu-card-text' }, el('strong', { text: game.title }), el('span', { class: 'menu-card-hint', text: game.hint })),
       ),
     );

@@ -14,7 +14,7 @@ export const FREE_SPINS = 10;
 export const MIN_BOOKS = 3;
 export const GAMBLE_MAX_STEPS = 5;
 /** A gamble never brings more than this multiple of the stake. */
-export const GAMBLE_CAP_X = 500;
+export const GAMBLE_CAP_X = 100;
 
 export const PAYLINES: number[][] = [
   [1, 1, 1, 1, 1],

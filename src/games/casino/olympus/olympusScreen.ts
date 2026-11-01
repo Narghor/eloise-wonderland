@@ -9,7 +9,6 @@ import {
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import {
   BETS,
-  CELLS,
   COLS,
   FREE_SPINS_BY_SCATTERS,
   LINES,
@@ -28,11 +27,13 @@ import {
   spinGrid,
   stackedReels,
   winMult,
+  zeusReels,
   type FreeSpinsResult,
   type OlympusForce,
   type Grid,
   type LineWin,
 } from './olympusLogic';
+import { OLYMPUS_DEFS, TEMPLE, ZEUS_HEAD } from './olympusArt';
 
 const BACK_CASINO: BackLink = { href: '#/casino', label: 'Casino' };
 const REEL_MS = 650;
@@ -61,19 +62,37 @@ export function renderOlympus(root: HTMLElement): () => void {
   let skipCount: (() => void) | null = null;
 
   const balance = el('span', { class: 'oly-balance' });
-  const cellViews: HTMLElement[] = [];
-  for (let i = 0; i < CELLS; i++) cellViews.push(el('div', { class: 'oly-cell' }, randomGlyph()));
-  const grid = el('div', { class: 'oly-grid' }, ...cellViews);
   /** cells[col][row], the layout drawWinLines expects. */
   const cells: HTMLElement[][] = [];
+  const reels: HTMLElement[] = [];
   for (let c = 0; c < COLS; c++) {
     cells.push([]);
-    for (let r = 0; r < ROWS; r++) cells[c].push(cellViews[r * COLS + c]);
+    for (let r = 0; r < ROWS; r++) {
+      const cell = el('div', { class: 'oly-cell' });
+      paintCell(cell, randomSymbol());
+      cells[c].push(cell);
+    }
+    // The tall figure belongs to the reel: shown instead of the five cells when the reel is one stack.
+    reels.push(el('div', { class: 'oly-reel' }, ...cells[c], el('div', { class: 'oly-tall', 'aria-hidden': 'true' })));
   }
+  const cellViews = cells.flat();
+  const grid = el('div', { class: 'oly-grid' }, ...reels);
   const featureBar = el('div', { class: 'oly-feature-bar' });
-  const machine = el('div', { class: 'oly-machine' }, featureBar, grid);
-  const lights = marquee(machine, 10);
-  const message = el('div', { class: 'oly-message', role: 'status', text: '3 temples 🏛️ ou plus déclenchent les tours gratuits !' });
+  const temple = el(
+    'div',
+    { class: 'oly-temple' },
+    el('div', { class: 'oly-pediment' }, el('span', { text: 'FOUDRE DE L’OLYMPE' })),
+    el('div', { class: 'oly-colonnade' }, el('div', { class: 'oly-column', 'aria-hidden': 'true' }), el('div', { class: 'oly-sky' }, grid), el('div', { class: 'oly-column', 'aria-hidden': 'true' })),
+    el('div', { class: 'oly-stylobate' }),
+  );
+  const machine = el('div', { class: 'oly-machine' }, featureBar, temple);
+  const lights = marquee(machine, 12);
+  const message = el('div', { class: 'oly-message', role: 'status' });
+  const intro = (): void => {
+    message.textContent = '3 temples 🏛️ ou plus déclenchent les tours gratuits !';
+    artify(message);
+  };
+  intro();
 
   const betLabel = el('span', { class: 'oly-bet-value' });
   const minus = el('button', { class: 'button button-secondary oly-bet-step', type: 'button', text: '−' });
@@ -86,17 +105,17 @@ export function renderOlympus(root: HTMLElement): () => void {
   const screen = el(
     'main',
     { class: 'oly-screen' },
-    el('div', { class: 'oly-title', text: '⚡ Foudre de l’Olympe ⚡' }),
     machine,
     message,
-    el('div', { class: 'oly-bet' }, minus, el('div', {}, el('div', { class: 'oly-small', text: 'Mise (30 lignes)' }), betLabel), plus),
+    el('div', { class: 'oly-bet' }, minus, el('div', {}, el('div', { class: 'oly-small', text: `Mise (${LINES.length} lignes)` }), betLabel), plus),
     spinButton,
     tableButton,
     tableHost,
   );
-  if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: '3 scatters', outcome: 'free3' }, { label: '5 scatters (100 tours)', outcome: 'free5' }, { label: 'Rouleaux pleins', outcome: 'stacks' }])); // TEST-BUTTONS
+  if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: '3 scatters', outcome: 'free3' }, { label: '5 scatters (100 tours)', outcome: 'free5' }, { label: 'Écran rempli de Zeus', outcome: 'flood' }])); // TEST-BUTTONS
   tapToSpin(machine, spinButton);
   root.replaceChildren(topBar('Foudre de l’Olympe', el('span', { class: 'oly-top-right' }, balance, muteButton()), BACK_CASINO), screen);
+  screen.insertAdjacentHTML('afterbegin', OLYMPUS_DEFS);
 
   const currentBet = () => BETS[betIndex];
   const cellAt = (col: number, row: number) => cells[col][row];
@@ -107,7 +126,10 @@ export function renderOlympus(root: HTMLElement): () => void {
     minus.disabled = busy || betIndex === 0;
     plus.disabled = busy || betIndex === BETS.length - 1;
     spinButton.disabled = busy || chips() < currentBet();
-    if (!tableHost.hidden) tableHost.replaceChildren(...paytable(currentBet()));
+    if (!tableHost.hidden) {
+      tableHost.replaceChildren(...paytable(currentBet()));
+      artify(tableHost);
+    }
   }
 
   function setMessage(text: string, extra = ''): void {
@@ -140,7 +162,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     refresh();
 
     const force = CASINO_TEST_BUTTONS ? takeForced<OlympusForce>() : null; // TEST-BUTTONS
-    const result = spinGrid(Math.random, false, force === 'stacks' ? 'free3' : force ?? undefined); // TEST-BUTTONS
+    const result = spinGrid(Math.random, false, force === 'flood' ? 'free3' : force ?? undefined); // TEST-BUTTONS
     await animateReels(result, false);
     if (disposed) return;
 
@@ -171,7 +193,7 @@ export function renderOlympus(root: HTMLElement): () => void {
 
     if (scatters >= MIN_SCATTERS) {
       const startSpins = freeSpinsFor(scatters);
-      const feature = playFreeSpins(Math.random, startSpins, force === 'stacks' ? 2 : 0); // TEST-BUTTONS
+      const feature = playFreeSpins(Math.random, startSpins, force === 'flood' ? 2 : 0); // TEST-BUTTONS
       // The outcome is decided now: pay it now, so a reload or leaving the screen never loses it.
       pay(chipsFor(feature.mult, stake));
       const pending: PendingFeature = { feature, startSpins, stake, next: 0 };
@@ -201,9 +223,11 @@ export function renderOlympus(root: HTMLElement): () => void {
 
   async function animateReels(result: Grid, fast: boolean): Promise<void> {
     cellViews.forEach((v) => (v.className = 'oly-cell oly-rolling'));
+    reels.forEach((reel) => (reel.className = 'oly-reel'));
+    machine.classList.remove('oly-flooded');
     const roll = window.setInterval(() => {
       cellViews.forEach((v) => {
-        if (v.classList.contains('oly-rolling')) v.textContent = randomGlyph();
+        if (v.classList.contains('oly-rolling')) paintCell(v, randomSymbol());
       });
     }, 70);
     timers.add(roll);
@@ -215,7 +239,7 @@ export function renderOlympus(root: HTMLElement): () => void {
       // Anticipation: two temples are up, every remaining reel slows down.
       const tense = scattersShown === MIN_SCATTERS - 1;
       if (tense) {
-        for (let r = 0; r < ROWS; r++) cellAt(c, r).classList.add('oly-tension');
+        for (let cc = c; cc < COLS; cc++) for (let r = 0; r < ROWS; r++) cellAt(cc, r).classList.add('oly-tension');
         setMessage('Encore un temple…', 'oly-tension-text');
       }
       const first = fast ? FREE_REEL_MS : REEL_MS;
@@ -225,8 +249,13 @@ export function renderOlympus(root: HTMLElement): () => void {
       for (let r = 0; r < ROWS; r++) {
         const symbol = result[c][r];
         const v = cellAt(c, r);
-        v.className = `oly-cell oly-landed${symbol === SCATTER ? ' oly-scatter' : ''}${symbol === WILD ? ' oly-wild' : ''}${symbol === ZEUS ? ' oly-zeus' : ''}${stacked ? ` oly-stack oly-stack-${r}` : ''}`;
-        v.textContent = SYMBOLS[symbol].glyph;
+        v.className = `oly-cell oly-landed${symbol === SCATTER ? ' oly-scatter' : ''}${symbol === WILD ? ' oly-wild' : ''}${symbol === ZEUS ? ' oly-zeus' : ''}`;
+        paintCell(v, symbol);
+      }
+      if (stacked) {
+        const zeus = result[c][0] === ZEUS;
+        reels[c].className = `oly-reel oly-reel-full ${zeus ? 'oly-reel-zeus' : 'oly-reel-wild'}`;
+        reels[c].lastElementChild!.innerHTML = zeus ? `<span>⚡</span>${ZEUS_HEAD}<span>ZEUS</span>` : 'FOUDRE';
       }
       if (stacked && !struck) {
         struck = true;
@@ -280,20 +309,19 @@ export function renderOlympus(root: HTMLElement): () => void {
       await animateReels(step.grid, true);
       if (disposed) return;
       spinsValue.textContent = `${step.spinsLeft}`;
-      const stackCount = stackedReels(step.grid).length;
-      if (stackCount >= 3) {
-        shake(machine, stackCount >= 4 ? 3 : 2);
-        playBigWin(1);
-      }
+      const zeusCount = zeusReels(step.grid).length;
+      if (zeusCount >= 4) machine.classList.add('oly-flooded');
+      if (zeusCount >= 3) playBigWin(1);
       const won = chipsFor(step.mult, stake);
-      showLines(step.wins);
+      // A flooded screen pays almost every line: the tall Zeus figures say it better than twenty drawn lines.
+      if (zeusCount < 4) showLines(step.wins);
       if (step.added > 0) {
         playBonusTrigger();
         strike();
         setMessage(`+${step.added} tours gratuits !`, 'oly-big');
         await wait(1400);
       } else if (won > 0) {
-        setMessage(stackCount >= 3 ? `${stackCount} rouleaux pleins : +${won} jetons !` : `+${won} jetons`, 'oly-win-text');
+        setMessage(zeusCount === COLS ? `Zeus partout ! +${won} jetons !` : zeusCount >= 2 ? `${zeusCount} colonnes de Zeus : +${won} jetons !` : `+${won} jetons`, 'oly-win-text');
       } else {
         setMessage('');
       }
@@ -316,6 +344,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     setMessage(`Tours gratuits : ${totalChips} jetons`, 'oly-win-text');
     await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'ZEUS PAIE !' : 'TOURS GRATUITS');
     featureBar.replaceChildren();
+    machine.classList.remove('oly-flooded');
     screen.classList.remove('oly-in-feature');
   }
 
@@ -324,13 +353,15 @@ export function renderOlympus(root: HTMLElement): () => void {
     const overlay = el(
       'div',
       { class: 'oly-intro', role: 'dialog', 'aria-live': 'assertive' },
-      el('div', { class: 'oly-intro-bolt', text: '⚡' }),
+      el('div', { class: 'oly-intro-bolt', text: '🧔' }),
       el('p', { class: 'oly-intro-count', text: `${spins}` }),
       el('p', { class: 'oly-intro-title', text: 'TOURS GRATUITS' }),
-      el('p', { class: 'oly-intro-text', text: 'L’orage se lève : Zeus 👑 et la foudre ⚡ tombent en rouleaux entiers !' }),
+      el('p', { class: 'oly-intro-text', text: 'L’orage se lève : Zeus 🧔 envahit l’écran, colonne après colonne !' }),
       el('p', { class: 'oly-intro-text', text: 'Les temples 🏛️ redonnent des tours, sans limite.' }),
       el('span', { class: 'oly-intro-hint', text: 'Touche pour commencer' }),
     );
+    overlay.insertAdjacentHTML('afterbegin', OLYMPUS_DEFS);
+    artify(overlay);
     document.body.append(overlay);
     burst(overlay, 20, 'confetti');
     return new Promise((resolve) => {
@@ -411,17 +442,45 @@ function loadPending(): PendingFeature | null {
   }
 }
 
-function randomGlyph(): string {
-  return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)].glyph;
+function randomSymbol(): number {
+  return Math.floor(Math.random() * SYMBOLS.length);
+}
+
+function paintCell(cell: HTMLElement, symbol: number): void {
+  if (symbol === ZEUS) cell.innerHTML = ZEUS_HEAD;
+  else if (symbol === SCATTER) cell.innerHTML = TEMPLE;
+  else cell.textContent = SYMBOLS[symbol].glyph;
+}
+
+const INLINE_ART: [string, string][] = [['🧔', ZEUS_HEAD], ['🏛️', TEMPLE], ['🏛', TEMPLE]];
+
+/** Replaces the Zeus and temple emoji in every text under `root` by their inline SVG. */
+function artify(root: HTMLElement): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  while (walker.nextNode()) texts.push(walker.currentNode as Text);
+  for (const text of texts) {
+    const value = text.data;
+    if (!INLINE_ART.some(([g]) => value.includes(g))) continue;
+    const parts = value.split(/(🧔|🏛️|🏛)/u);
+    const nodes = parts.filter((p) => p !== '').map((p) => {
+      const art = INLINE_ART.find(([g]) => g === p);
+      if (!art) return document.createTextNode(p);
+      const span = el('span', { class: 'oly-inline-art' });
+      span.innerHTML = art[1];
+      return span;
+    });
+    text.replaceWith(...nodes);
+  }
 }
 
 function paytable(stake: number): HTMLElement[] {
   const entries = SYMBOLS.slice(0, WILD)
-    .map((s, i) => ({ glyph: s.glyph, name: SYMBOL_NAMES[i], counts: [3, 4, 5], multipliers: s.pays }))
+    .map((s, i) => ({ glyph: s.glyph, name: SYMBOL_NAMES[i], counts: [3, 4, 5, 6], multipliers: s.pays }))
     .reverse();
   const reels = WILD_REELS.map((c) => c + 1).join(', ');
-  const fullReels: [number, number][] = [0, 1, 2].flatMap((r): [number, number][] => [[0, r], [2, r], [3, r]]);
-  const temples: [number, number][] = [[0, 2], [2, 0], [4, 1]];
+  const fullReels: [number, number][] = [0, 1, 2, 3, 4].flatMap((r): [number, number][] => [[0, r], [1, r], [2, r], [4, r]]);
+  const temples: [number, number][] = [[0, 3], [2, 0], [5, 1]];
   return [
     rulesBlock(
       'Comment on gagne',
@@ -430,16 +489,17 @@ function paytable(stake: number): HTMLElement[] {
       'Plusieurs lignes peuvent gagner en même temps : les gains s’additionnent.',
       'Le jeu normal est souvent sec : c’est dans les tours gratuits que tout s’enchaîne.',
     ),
-    el('h3', { class: 'oly-paytable-title', text: 'La foudre ⚡, Zeus 👑 et le temple 🏛️' }),
+    el('h3', { class: 'oly-paytable-title', text: 'La foudre ⚡, Zeus 🧔 et le temple 🏛️' }),
     el('div', { class: 'fx-paylines' },
       shapeDiagram(COLS, ROWS, temples, '🏛️ 3 n’importe où'),
-      shapeDiagram(COLS, ROWS, fullReels, '👑 ⚡ rouleaux pleins (tours gratuits)'),
+      shapeDiagram(COLS, ROWS, fullReels, '🧔 colonnes de Zeus (tours gratuits)'),
     ),
     rulesBlock(
       'Tours gratuits',
       `La foudre ⚡ remplace tous les symboles sauf le temple. Elle tombe sur les rouleaux ${reels}.`,
       `${MIN_SCATTERS} temples ou plus, n’importe où : ${FREE_SPINS_BY_SCATTERS[3]} tours pour 3, ${FREE_SPINS_BY_SCATTERS[4]} pour 4, ${FREE_SPINS_BY_SCATTERS[5]} pour 5.`,
-      'Pendant les tours gratuits, les rouleaux changent : Zeus 👑 et la foudre ⚡ peuvent couvrir un rouleau entier.',
+      'Pendant les tours gratuits, Zeus 🧔 tombe en colonnes entières, souvent plusieurs à la fois, et peut remplir tout l’écran. La foudre ⚡ peut aussi couvrir une colonne.',
+      'Plus il y a de colonnes de Zeus collées depuis la gauche, plus les lignes paient : 6 colonnes = les 20 lignes à 6 Zeus.',
       'Les temples redonnent des tours pendant les tours gratuits (même barème), sans limite.',
     ),
     el('h3', { class: 'oly-paytable-title', text: `Les ${LINES.length} lignes` }),

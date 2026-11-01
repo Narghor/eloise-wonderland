@@ -2,9 +2,9 @@
 
 .luna-screen {
   position: relative;
-  max-width: 420px;
+  max-width: 480px;
   margin: 0 auto;
-  padding: 12px 16px 24px;
+  padding: 16px 16px 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -18,7 +18,7 @@
 .luna-machine {
   position: relative;
   overflow: hidden;
-  padding: 12px 10px 12px;
+  padding: 12px 11px 12px;
   border-radius: 18px;
   border: 3px solid #d9ae4f;
   background:
@@ -97,43 +97,56 @@
 .luna-reels {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   padding: 6px;
   border-radius: 12px;
-  background: linear-gradient(#2b1f6e, #1a1150);
+  background: #0a0626;
   border: 2px solid #b8862f;
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.8);
 }
+/* One continuous reel strip: a single window per column, rows split by thin lines. */
 .luna-reel {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   min-width: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.55), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.55)),
+    linear-gradient(90deg, #22175e 0%, #3b2c8f 50%, #22175e 100%);
+  box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.55);
 }
 .luna-cell {
   position: relative;
   aspect-ratio: 1;
   min-width: 0;
-  border-radius: 9px;
-  background: radial-gradient(circle at 50% 40%, #3b2c8f 0%, #22175e 70%);
-  border: 1px solid rgba(233, 196, 106, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3px;
+  padding: 4px;
   transition: opacity 0.3s, filter 0.3s;
+}
+.luna-cell + .luna-cell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: rgba(233, 196, 106, 0.3);
 }
 .luna-cell svg { width: 100%; height: 100%; display: block; }
 .luna-rolling svg { filter: blur(1.5px); opacity: 0.7; }
 .luna-landed { animation: luna-land 0.25s ease-out; }
 .luna-is-book { background: radial-gradient(circle, #6a3fd0 0%, #2a1260 80%); }
-.luna-tension { box-shadow: 0 0 12px 3px #b9a2ff; }
+.luna-tension { box-shadow: inset 0 0 14px 4px #b9a2ff; }
 .luna-tension-text { color: #6a3fd0; }
-.luna-book-pay { box-shadow: 0 0 14px 4px #ffd36b; animation: luna-glow 1.4s ease-in-out infinite alternate; }
+.luna-book-pay { box-shadow: inset 0 0 14px 4px #ffd36b; animation: luna-glow 1.4s ease-in-out infinite alternate; }
 .luna-sticky {
   background: radial-gradient(circle, #9a6bff 0%, #3a1a80 80%);
-  box-shadow: 0 0 0 2px #ffd36b inset, 0 0 12px 2px rgba(255, 211, 107, 0.6);
+  box-shadow: 0 0 0 2px #ffd36b inset, inset 0 0 12px 2px rgba(255, 211, 107, 0.6);
 }
 .luna-dim { opacity: 0.35; }
 
@@ -142,14 +155,13 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  padding: 0 2px;
 }
 .luna-expand-art {
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 2px solid #ffd36b;
   background:
     radial-gradient(ellipse at 50% 50%, rgba(255, 226, 150, 0.35), transparent 70%),
@@ -291,7 +303,7 @@
 
 @keyframes luna-twinkle { from { opacity: 0.5; } to { opacity: 0.9; } }
 @keyframes luna-land { 0% { transform: translateY(-8%); } 70% { transform: translateY(3%); } 100% { transform: none; } }
-@keyframes luna-glow { from { box-shadow: 0 0 8px 2px #ffd36b; } to { box-shadow: 0 0 16px 5px #ffd36b; } }
+@keyframes luna-glow { from { box-shadow: inset 0 0 8px 2px #ffd36b; } to { box-shadow: inset 0 0 16px 5px #ffd36b; } }
 @keyframes luna-expand { from { transform: scaleY(0.33); opacity: 0.4; } to { transform: scaleY(1); opacity: 1; } }
 @keyframes luna-flip { from { transform: rotateY(90deg); } to { transform: none; } }
 @keyframes luna-fade { from { opacity: 0; } to { opacity: 1; } }

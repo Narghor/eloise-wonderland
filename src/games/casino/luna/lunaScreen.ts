@@ -19,7 +19,7 @@ const REEL_STAGGER = 170;
 const TENSION_MS = 1200;
 const FREE_REEL_MS = 420;
 const FREE_STAGGER = 110;
-const HELP_GLYPHS = ['10', 'J', 'Q', 'K', 'A', '🧪', '🔮', '🦉', '🌙'];
+const HELP_GLYPHS = ['10', 'J', 'Q', 'K', 'A', '🧪', '🔮', '🦉', '👸'];
 
 export function renderLuna(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -180,7 +180,6 @@ export function renderLuna(root: HTMLElement): () => void {
     }
     refresh();
 
-    let offered = won;
     if (triggered) {
       const feature = playFreeSpins(Math.random, force === 'luna' ? LUNA : undefined);
       // Decided now, paid now: a reload or leaving the screen never loses it.
@@ -190,10 +189,10 @@ export function renderLuna(root: HTMLElement): () => void {
       await wait(won > 0 ? 1000 : 400);
       await runFreeSpins(pending, true);
       if (disposed) return;
-      offered = chipsFor(feature.mult, stake);
     }
     busy = false;
-    offerGamble(offered, stake);
+    // The free spins win is banked: only a plain win can be doubled.
+    if (!triggered) offerGamble(won, stake);
     timers.add(window.setTimeout(() => { if (!busy) lights.setMode('idle'); }, 4000));
     refresh();
   }
@@ -362,8 +361,9 @@ export function renderLuna(root: HTMLElement): () => void {
     playBigWin(1);
     for (const reel of reelList) {
       const panel = el('div', { class: 'luna-expand' });
-      panel.style.left = `${(reel / REELS) * 100}%`;
-      panel.style.width = `${100 / REELS}%`;
+      const strip = reels.children[reel] as HTMLElement;
+      panel.style.left = `${strip.offsetLeft - 6}px`;
+      panel.style.width = `${strip.offsetWidth}px`;
       const art = el('div', { class: 'luna-expand-art' });
       setArt(art, special);
       panel.append(art);
@@ -584,25 +584,24 @@ function paytable(stake: number): HTMLElement[] {
   const expand: [number, number][] = [0, 1, 2].flatMap((row) => [[0, row], [2, row], [3, row]] as [number, number][]);
   return [
     rulesBlock(
-      'Comment on gagne',
-      `Il y a ${PAYLINES.length} lignes (dessins ci-dessous), toutes jouées à chaque tirage.`,
-      'Une ligne gagne avec des symboles identiques collés, en partant du rouleau de GAUCHE (2 suffisent pour 🌙, 🦉, 🔮 et 🧪, 3 pour les lettres).',
-      '📖 Le livre remplace n’importe quel symbole sur une ligne.',
-      `📖 Le livre paie aussi n’importe où : 3 = ${BOOK_PAYS[3]} × mise, 4 = ${BOOK_PAYS[4]} × mise, 5 = ${BOOK_PAYS[5]} × mise.`,
-      'Après un gain, tu peux le DOUBLER : devine rouge ou noir. Juste = ×2, faux = tout est perdu. Tu peux encaisser quand tu veux.',
+      'Les tours gratuits : il faut des LIVRES',
+      `📖 ${MIN_BOOKS} livres n’importe où sur l’écran = ${FREE_SPINS} tours gratuits. Seul le livre déclenche les tours gratuits : 3 Eloise ne le font pas, elles paient juste une grosse ligne.`,
+      'Au début des tours, le livre s’ouvre et tire au hasard un symbole spécial (Eloise, hibou, lettre…).',
+      'Pendant les tours, si le symbole spécial tombe sur assez de rouleaux (2 pour 👸 🦉 🔮 🧪, 3 pour les lettres), il remplit ces rouleaux de haut en bas et paie sur les 10 lignes, même si les rouleaux ne se touchent pas.',
+      'Un livre qui tombe pendant les tours reste collé à sa place jusqu’à la fin et sert de joker.',
+      `${MIN_BOOKS} nouveaux livres pendant les tours = +${FREE_SPINS} tours.`,
     ),
-    el('h3', { class: 'luna-paytable-title', text: 'Les tours gratuits' }),
     el('div', { class: 'fx-paylines' },
-      shapeDiagram(REELS, ROWS, books, '📖 3 n’importe où'),
-      shapeDiagram(REELS, ROWS, expand, 'Le symbole spécial se déploie'),
+      shapeDiagram(REELS, ROWS, books, '📖 3 livres, n’importe où'),
+      shapeDiagram(REELS, ROWS, expand, 'Le symbole spécial remplit ses rouleaux'),
     ),
     rulesBlock(
-      'Le livre s’ouvre',
-      `${MIN_BOOKS} livres ou plus = ${FREE_SPINS} tours gratuits. Le livre choisit au hasard un symbole spécial.`,
-      'Pendant les tours, dès que le symbole spécial est sur assez de rouleaux (2 pour 🌙 🦉 🔮 🧪, 3 pour les lettres), il remplit ces rouleaux en entier et paie sur les 10 lignes, même si les rouleaux ne se suivent pas.',
-      'Réaction : un livre qui tombe pendant les tours gratuits reste collé à sa place jusqu’à la fin, comme joker.',
-      `${MIN_BOOKS} nouveaux livres pendant les tours : +${FREE_SPINS} tours.`,
-      `Doubler : ${GAMBLE_MAX_STEPS} fois de suite au plus, et jamais au-delà de ${GAMBLE_CAP_X} × la mise.`,
+      'Les gains normaux',
+      `Il y a ${PAYLINES.length} lignes (dessins plus bas), toutes jouées à chaque tirage.`,
+      'Une ligne gagne avec des symboles identiques à la suite, en partant du rouleau de GAUCHE : 2 suffisent pour 👸 🦉 🔮 🧪, il en faut 3 pour les lettres.',
+      '📖 Le livre remplace n’importe quel symbole sur une ligne.',
+      `📖 Les livres paient aussi où qu’ils soient : 3 = ${BOOK_PAYS[3]} × mise, 4 = ${BOOK_PAYS[4]} × mise, 5 = ${BOOK_PAYS[5]} × mise.`,
+      `Après un gain normal, tu peux le DOUBLER : devine rouge ou noir. Juste = ×2, faux = tout est perdu. Encaisse quand tu veux (${GAMBLE_MAX_STEPS} fois de suite au plus, jamais plus de ${GAMBLE_CAP_X} × la mise). Le gain des tours gratuits, lui, est toujours encaissé.`,
     ),
     el('h3', { class: 'luna-paytable-title', text: `Les ${PAYLINES.length} lignes` }),
     paylineDiagrams(PAYLINES, ROWS),

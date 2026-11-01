@@ -9,7 +9,7 @@ import { todayKey } from '../../daily/daily';
 
 const GAME_ID = 'casino';
 const STARTING_CHIPS = 1000;
-export const DAILY_GIFT = 2500;
+export const DAILY_GIFT = 5000;
 export const CHIPS_PER_COIN = 10;
 const JACKPOT_SEED = 5000;
 

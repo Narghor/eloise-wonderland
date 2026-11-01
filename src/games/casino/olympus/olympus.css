@@ -1,6 +1,7 @@
+/* Foudre de l'Olympe: a giant casino cabinet screen - white marble, gold, a temple framing a deep blue sky. */
 .oly-screen {
   position: relative;
-  max-width: 420px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 12px 16px 24px;
   display: flex;
@@ -10,66 +11,198 @@
 }
 
 .oly-balance { font-weight: 700; color: var(--accent-strong); white-space: nowrap; }
-.oly-title { font-weight: 800; color: #1e4a8a; letter-spacing: 0.04em; }
+.oly-top-right { display: inline-flex; align-items: center; gap: 8px; }
 
+/* ---- cabinet ---- */
 .oly-machine {
-  background: linear-gradient(#1e3c72, #0f1e3d);
-  border: 3px solid #d4af37;
-  border-radius: var(--radius);
-  padding: 10px;
-  box-shadow: var(--shadow);
-  transition: background 0.4s;
+  padding: 10px 8px 10px;
+  border-radius: 20px;
+  border: 3px solid #c9a227;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgb(255 255 255 / 0.9), transparent 55%),
+    linear-gradient(115deg, transparent 40%, rgb(170 160 150 / 0.25) 42%, transparent 46%, transparent 70%, rgb(170 160 150 / 0.2) 72%, transparent 75%),
+    linear-gradient(160deg, #fbfaf6, #e9e4da 60%, #d9d2c4);
+  box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 10px 28px rgb(10 20 60 / 0.35);
+  transition: box-shadow 1.2s ease;
 }
-.oly-in-feature .oly-machine { background: linear-gradient(#4b2a8a, #160b33); }
-
 .oly-feature-bar:not(:empty) { margin-bottom: 8px; }
 
-.oly-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.oly-pediment {
+  position: relative;
+  margin: 0 4px;
+  padding: 18px 0 6px;
+  clip-path: polygon(0 100%, 50% 0, 100% 100%);
+  background: linear-gradient(#fffdf6, #e4dccb);
+  border-bottom: 3px solid #c9a227;
+}
+.oly-pediment span {
+  display: block;
+  font-size: clamp(0.72rem, 3.4vw, 1.05rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #9a7412;
+  text-shadow: 0 1px 0 #fff;
+}
+.oly-stylobate {
+  height: 10px;
+  margin: 0 2px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(#e9e3d6, #c8bfad);
+  border-top: 3px solid #c9a227;
+}
+
+.oly-colonnade { display: grid; grid-template-columns: 14px 1fr 14px; gap: 4px; align-items: stretch; padding-top: 4px; }
+.oly-column {
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(90deg, #f7f4ec 0 3px, #d5cdbb 3px 4px, #fbf9f3 4px 7px),
+    #eee;
+  border-top: 5px solid #c9a227;
+  border-bottom: 5px solid #c9a227;
+  box-shadow: inset 0 0 4px rgb(0 0 0 / 0.15);
+}
+
+/* The sky behind the reels: deep blue with faint lightning bolts. */
+.oly-sky {
+  min-width: 0;
+  padding: 5px;
+  border-radius: 6px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='120'%3E%3Cpath d='M52 6 L34 52 L48 52 L30 110 L64 44 L50 44 L66 6Z' fill='%2389b4ff' fill-opacity='0.13'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 0%, #3f6fd1, #13306f 55%, #0a1a44);
+  box-shadow: inset 0 0 0 2px #c9a227, inset 0 6px 16px rgb(0 0 0 / 0.5);
+}
+
+.oly-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.oly-reel { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
 .oly-cell {
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f4efe1;
-  color: #1e3c72;
-  font-weight: 800;
-  border-radius: 10px;
-  font-size: clamp(18px, 7vw, 30px);
   min-width: 0;
   overflow: hidden;
+  border-radius: 7px;
+  color: #173a86;
+  font-weight: 900;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(18px, 6.4vw, 34px);
+  background: linear-gradient(180deg, #ece7dc 0%, #ffffff 45%, #ddd6c6 100%);
+  box-shadow: inset 0 0 0 1px rgb(201 162 39 / 0.45);
 }
 .oly-rolling { filter: blur(1px); opacity: 0.75; }
 .oly-landed { animation: oly-land 0.2s ease-out; }
-.oly-win { background: #fff3b0; outline: 2px solid #d4af37; }
-.oly-wild { background: radial-gradient(circle, #fff9c4, #ffd54f 55%, #f57f17); }
-.oly-scatter { box-shadow: 0 0 10px 3px #ffd54f; animation: oly-glow 0.8s ease-in-out infinite alternate; }
+.oly-cell.oly-win { background: #fff3b0; outline: 2px solid #d4af37; }
+.oly-cell.oly-wild { background: radial-gradient(circle, #f4f9ff, #9cc6ff 55%, #2f62c8); box-shadow: inset 0 0 0 2px #dbe9ff; }
+.oly-cell.oly-zeus { background: radial-gradient(circle, #fff8dc, #f6d77a 65%, #d9a520); padding: 1px; }
+/* The scatter: deep night-blue tile, gold border, slow golden breathing - unlike any other tile. */
+.oly-cell.oly-scatter {
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+  padding: 2px;
+  background: radial-gradient(circle at 50% 55%, #2d4fa3, #0b1a4a 75%);
+  box-shadow: inset 0 0 0 2px #f2c230, 0 0 8px 2px rgb(255 205 70 / 0.55);
+  animation: oly-glow 1.8s ease-in-out infinite alternate;
+}
+.oly-art { width: 100%; height: 100%; display: block; }
+.oly-inline-art { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: middle; }
+.oly-inline-art .oly-temple-art { background: #0b1a4a; border-radius: 4px; box-shadow: inset 0 0 0 1px #f2c230; }
 .oly-tension { box-shadow: 0 0 12px 4px #64b5f6; animation: oly-shake 0.6s ease-in-out infinite; }
 .oly-tension-text { color: #1565c0; animation: oly-pop 0.5s ease-out; }
 
+/* ---- a full reel: one tall figure instead of five cells ---- */
+.oly-tall { display: none; }
+.oly-reel-full .oly-cell { visibility: hidden; }
+.oly-reel-full .oly-tall {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  animation: oly-land 0.25s ease-out;
+}
+.oly-reel-zeus .oly-tall {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgb(255 255 255 / 0.9), transparent 45%),
+    linear-gradient(180deg, #fff1bd, #f2c14e 55%, #b98510);
+  box-shadow: inset 0 0 0 2px #fff6cf, inset 0 0 0 4px #b98510;
+}
+.oly-reel-wild .oly-tall {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgb(255 255 255 / 0.85), transparent 45%),
+    linear-gradient(180deg, #dcebff, #6f9ff0 55%, #2a4fa8);
+  box-shadow: inset 0 0 0 2px #eef5ff, inset 0 0 0 4px #2a4fa8;
+}
+.oly-reel-wild .oly-tall::before { content: '✦'; font-size: clamp(12px, 4vw, 22px); }
+.oly-reel-zeus .oly-tall > span:first-child { font-size: clamp(12px, 4vw, 22px); }
+.oly-reel-zeus .oly-tall .oly-zeus-art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 96%;
+  height: auto;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 3px rgb(120 80 0 / 0.5));
+}
+.oly-reel-wild .oly-tall::after {
+  content: '⚡';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(34px, 11.5vw, 66px);
+}
+.oly-tall { font-family: Georgia, 'Times New Roman', serif; font-weight: 900; font-size: clamp(8px, 2.4vw, 13px); letter-spacing: 0.08em; }
+.oly-reel-zeus .oly-tall { color: #6b4700; }
+.oly-reel-wild .oly-tall { color: #0d2462; }
+
+/* Four or more Zeus columns: a slow golden glow around the cabinet, no flash. */
+.oly-flooded { box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 0 28px 8px rgb(255 205 80 / 0.75); animation: oly-flood 2.4s ease-in-out infinite alternate; }
+@keyframes oly-flood {
+  from { box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 0 18px 4px rgb(255 205 80 / 0.5); }
+  to { box-shadow: inset 0 0 0 2px #f6dd85, 0 0 0 2px #8a6a12, 0 0 34px 12px rgb(255 215 100 / 0.85); }
+}
+
+/* Free spins: storm sky. */
+.oly-in-feature .oly-sky {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='120'%3E%3Cpath d='M52 6 L34 52 L48 52 L30 110 L64 44 L50 44 L66 6Z' fill='%23ffe08a' fill-opacity='0.14'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 60% 30% at 20% 6%, rgb(170 185 220 / 0.35), transparent 70%),
+    radial-gradient(ellipse at 50% 0%, #2c4a8f, #0d1838 60%, #070d22);
+}
+
+/* ---- texts and controls ---- */
 .oly-message { min-height: 1.4em; font-weight: 700; }
 .oly-big { font-size: 1.15em; color: var(--accent-strong); animation: oly-pop 0.5s ease-out; }
-
+.oly-win-text { color: #b8860b; font-size: 1.1em; }
 .oly-bet { display: flex; align-items: center; justify-content: center; gap: 16px; }
 .oly-bet-step { width: 44px; padding: 10px 0; }
 .oly-bet-value { font-weight: 700; }
 .oly-small { font-size: 0.85em; color: var(--muted); }
-.oly-spin { min-width: 140px; }
-
-.oly-top-right { display: inline-flex; align-items: center; gap: 8px; }
-.oly-win-text { color: #b8860b; font-size: 1.1em; }
+.oly-spin {
+  min-width: 160px; align-self: center;
+  font-size: 1.2rem; font-weight: 900; letter-spacing: 0.06em;
+  background: linear-gradient(#2b5bb5, #142c63); color: #ffe08a; box-shadow: inset 0 0 0 2px #d4af37, 0 4px 0 #0f1e3d;
+}
+.oly-spin:disabled { filter: grayscale(0.5); opacity: 0.6; }
 .oly-paytable { text-align: left; }
 .oly-paytable-title { margin: 14px 0 6px; font-size: 1rem; }
 
 .oly-feature-bar { display: grid; grid-template-columns: 1fr 1.6fr; gap: 6px; }
 .oly-fs-box {
   display: flex; flex-direction: column; align-items: center; min-width: 0;
-  background: rgb(0 0 0 / 0.35); border: 1px solid #d4af37; border-radius: 10px; padding: 4px 2px;
+  background: linear-gradient(#173a86, #0d1f4d); border: 2px solid #c9a227; border-radius: 10px; padding: 4px 2px;
   font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
 }
 .oly-fs-box span { color: #fff3c4; font-weight: 700; }
 .oly-fs-box b { font-size: 1.7rem; line-height: 1.1; color: #fff; text-transform: none; }
-.oly-fs-totalbox b { color: #7dff6a; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.oly-fs-totalbox b { color: #ffe08a; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 .oly-struck { animation: oly-struck 1.2s ease-in-out; }
 @keyframes oly-struck {
@@ -81,7 +214,7 @@
   position: fixed; inset: 0; z-index: 50; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px;
   text-align: center; color: #fff3c4; cursor: pointer;
-  background: radial-gradient(circle at 50% 40%, #4b2a8a, #0f1e3d 70%);
+  background: radial-gradient(circle at 50% 40%, #3f6fd1, #0a1a44 70%);
   animation: oly-intro-in 0.35s ease-out;
 }
 .oly-intro p { margin: 0; }
@@ -90,38 +223,18 @@
 .oly-intro-title { font-size: 2rem; font-weight: 900; letter-spacing: 0.06em; }
 .oly-intro-text { font-weight: 700; max-width: 22em; }
 .oly-intro-hint { margin-top: 20px; font-size: 0.85rem; opacity: 0.6; }
+
 @keyframes oly-land { from { transform: translateY(-20%); } to { transform: none; } }
 @keyframes oly-pop { 0% { transform: scale(0.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
-@keyframes oly-mult-pop { 0% { transform: scale(1); } 30% { transform: scale(1.35); box-shadow: 0 0 24px 8px #ffd54f; } 100% { transform: scale(1); } }
 @keyframes oly-intro-in { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: none; } }
 @keyframes oly-glow-text { from { text-shadow: 0 0 10px #ffd54f; } to { text-shadow: 0 0 40px #fff, 0 0 20px #ffb300; } }
-@keyframes oly-glow { from { box-shadow: 0 0 6px 2px #ffd54f; } to { box-shadow: 0 0 16px 6px #ffb300; } }
+@keyframes oly-glow {
+  from { box-shadow: inset 0 0 0 2px #f2c230, 0 0 5px 1px rgb(255 205 70 / 0.45); transform: scale(1); }
+  to { box-shadow: inset 0 0 0 2px #ffe68a, 0 0 14px 5px rgb(255 205 70 / 0.85); transform: scale(1.04); }
+}
+.oly-intro-bolt .oly-inline-art { width: 9rem; height: 9rem; }
 @keyframes oly-shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
 
-/* Polish aligned on the classic machine: reel window, glossy cells, bold spin button. */
-.oly-machine { border-radius: 22px; box-shadow: inset 0 0 0 2px #f5d77a, 0 8px 24px rgb(0 0 0 / 0.35); }
-.oly-grid { gap: 4px; padding: 6px; border-radius: 12px; background: #0a1430; box-shadow: inset 0 4px 10px rgb(0 0 0 / 0.6); }
-.oly-cell { border-radius: 8px; }
-.oly-cell:not(.oly-wild):not(.oly-win) { background: linear-gradient(180deg, #e9e1c9 0%, #fffaf0 45%, #dcd1b2 100%); }
-.oly-spin {
-  font-size: 1.2rem; font-weight: 900; letter-spacing: 0.06em;
-  background: linear-gradient(#2b5bb5, #142c63); color: #ffe08a; box-shadow: inset 0 0 0 2px #d4af37, 0 4px 0 #0f1e3d;
+@media (prefers-reduced-motion: reduce) {
+  .oly-flooded, .oly-scatter, .oly-tension { animation: none; }
 }
-.oly-spin:disabled { filter: grayscale(0.5); opacity: 0.6; }
-/* Free spins: the storm reel set (dark clouds, cold light) and full-reel stacks drawn as one tall tile. */
-.oly-in-feature .oly-machine {
-  background:
-    radial-gradient(ellipse 60% 30% at 20% 8%, rgb(160 175 210 / 0.35), transparent 70%),
-    radial-gradient(ellipse 55% 28% at 80% 4%, rgb(140 150 190 / 0.3), transparent 70%),
-    linear-gradient(#2c3550, #10131f 70%);
-  border-color: #9fb8ff;
-}
-.oly-in-feature .oly-grid { background: #0b0f1c; box-shadow: inset 0 4px 14px rgb(0 0 0 / 0.7), 0 0 0 1px #6f86c9; }
-.oly-in-feature .oly-cell:not(.oly-wild):not(.oly-win):not(.oly-stack) { background: linear-gradient(180deg, #dfe6f5 0%, #ffffff 45%, #d3dbec 100%); }
-.oly-zeus { color: #7a4b00; }
-.oly-stack { border-radius: 0; box-shadow: inset 2px 0 0 #ffd54f, inset -2px 0 0 #ffd54f; }
-.oly-stack.oly-zeus { background: linear-gradient(180deg, #ffe9a8, #f4b942); }
-.oly-stack.oly-wild { background: linear-gradient(180deg, #d9ecff, #7fb3ff); }
-.oly-stack-0 { border-radius: 10px 10px 0 0; box-shadow: inset 2px 2px 0 #ffd54f, inset -2px 0 0 #ffd54f; }
-.oly-stack-2 { border-radius: 0 0 10px 10px; box-shadow: inset 2px -2px 0 #ffd54f, inset -2px 0 0 #ffd54f; }
-.oly-in-feature .oly-grid:has(.oly-stack) { row-gap: 0; }

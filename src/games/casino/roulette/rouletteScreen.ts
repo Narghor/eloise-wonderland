@@ -4,7 +4,7 @@ import { bet, chips, pay } from '../chips';
 import { WHEEL_ORDER, colorOf, drawNumber, payout, totalStake, type BetId, type Bets } from './rouletteLogic';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const CHIP_VALUES = [1, 5, 25, 100];
+const CHIP_VALUES = [1, 5, 25, 100, 500, 1000];
 const SPIN_MS = 4000;
 const HISTORY_SIZE = 12;
 const SLICE = 360 / 37;
@@ -149,6 +149,8 @@ export function renderRoulette(root: HTMLElement): () => void {
     }
     spinning = true;
     lastBets = new Map(bets);
+    // On a phone the table pushes the wheel off screen: bring it back into view.
+    svg.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const n = drawNumber();
     const index = WHEEL_ORDER.indexOf(n);
     // Wheel turns clockwise, ball counter-clockwise; ball rests at the top, pocket brought under it.
