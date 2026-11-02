@@ -10,7 +10,7 @@ import {
   type WinLinesHandle, type WinPath,
 } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
-import { BET_LEVELS, DIAMOND, JACKPOT_MIN_X, JACKPOT_SHARE, jackpotFor, MACHINE_ID, PAYLINES, REELS, ROWS, STRIPS, SYMBOLS, WILD, spin, type SlotsForce, type SpinResult } from './slotsLogic';
+import { BET_LEVELS, DIAMOND, JACKPOT_MIN_X, JACKPOT_SHARE, jackpotFor, MACHINE_ID, PAY_SCALE, PAYLINES, REELS, ROWS, STRIPS, SYMBOLS, WILD, spin, type SlotsForce, type SpinResult } from './slotsLogic';
 
 const SPIN_MS = 1400;
 const REEL_GAP_MS = 260;
@@ -227,7 +227,7 @@ function paytable(stake: number): HTMLElement[] {
     glyph: s.glyph,
     name: s.name,
     counts: [3, 4, 5],
-    multipliers: s.pays.map((p) => (p * lineBet) / stake),
+    multipliers: s.pays.map((p) => (Math.round(p * PAY_SCALE * lineBet)) / stake),
   }));
   const example = el('div', { class: 'slots-example' },
     el('span', { text: '🍒🍒🍒🍋🔔' }), el('b', { text: ' ✔ 3 cerises' }),

@@ -2,8 +2,8 @@
 // SLOTS MATHS (pure, no DOM)
 // -----------------------------------------------
 // 5 reels x 3 rows, 10 fixed paylines, weighted reel strips.
-// Tuned for fun: ~37% of spins win, base RTP ~94%; the progressive jackpot
-// adds 2% (the fed share) plus the floor below: up to +5% at the 1000 bet, ~99% in total.
+// Tuned for fun: ~37% of spins win. Simulated RTP, jackpot included: 98% at the 10 bet,
+// 100% at 100, 103% at 1000 (the jackpot's floor weighs more at high bets).
 
 export const MACHINE_ID = 'slots-classic';
 export const REELS = 5;
@@ -30,6 +30,9 @@ export interface SymbolInfo {
   /** Pays per line bet for 3, 4, 5 of a kind. */
   pays: [number, number, number];
 }
+
+/** Every line win is paid this much more than the table, to bring the RTP in line with the other machines. */
+export const PAY_SCALE = 1.04;
 
 export const WILD = 7;
 export const DIAMOND = 8;
@@ -128,8 +131,8 @@ function lineWin(grid: number[][], line: number, lineBet: number): LineWin | nul
   const symPay = run >= 3 && target !== undefined ? SYMBOLS[target].pays[run - 3] : 0;
   if (wildPay === 0 && symPay === 0) return null;
   return wildPay >= symPay
-    ? { line, symbol: WILD, count: wildRun, amount: wildPay * lineBet }
-    : { line, symbol: target as number, count: run, amount: symPay * lineBet };
+    ? { line, symbol: WILD, count: wildRun, amount: Math.round(wildPay * PAY_SCALE * lineBet) }
+    : { line, symbol: target as number, count: run, amount: Math.round(symPay * PAY_SCALE * lineBet) };
 }
 
 /** Spins once. `totalBet` must be a multiple of the line count. */
