@@ -45,20 +45,20 @@ export const BOOK = 9;
 export const LUNA = 8;
 
 export const SYMBOLS: LunaSymbol[] = [
-  { key: '10', name: 'Dix', pays: [0, 5, 25, 100], weight: 15 },
-  { key: 'J', name: 'Valet', pays: [0, 5, 25, 100], weight: 15 },
-  { key: 'Q', name: 'Dame', pays: [0, 5, 25, 100], weight: 14 },
-  { key: 'K', name: 'Roi', pays: [0, 5, 40, 150], weight: 11 },
-  { key: 'A', name: 'As', pays: [0, 5, 40, 150], weight: 11 },
+  { key: '10', name: 'Dix', pays: [0, 4, 25, 100], weight: 15 },
+  { key: 'J', name: 'Valet', pays: [0, 4, 25, 100], weight: 15 },
+  { key: 'Q', name: 'Dame', pays: [0, 4, 25, 100], weight: 14 },
+  { key: 'K', name: 'Roi', pays: [0, 4, 40, 150], weight: 11 },
+  { key: 'A', name: 'As', pays: [0, 4, 40, 150], weight: 11 },
   { key: 'potion', name: 'Potion', pays: [5, 30, 100, 750], weight: 6 },
   { key: 'crystal', name: 'Boule de cristal', pays: [5, 30, 100, 750], weight: 6 },
-  { key: 'owl', name: 'Hibou', pays: [5, 40, 400, 2000], weight: 4 },
-  { key: 'luna', name: 'Eloise', pays: [10, 100, 1000, 5000], weight: 2 },
-  { key: 'book', name: 'Livre (joker + bonus)', pays: [0, 0, 0, 0], weight: 2.2 },
+  { key: 'owl', name: 'Hibou', pays: [5, 40, 400, 2000], weight: 3.4 },
+  { key: 'luna', name: 'Eloise', pays: [10, 100, 1000, 5000], weight: 1.6 },
+  { key: 'book', name: 'Livre (joker + bonus)', pays: [0, 0, 0, 0], weight: 2.45 },
 ];
 
 /** Book scatter pays, multiple of the TOTAL bet, by count anywhere (3, 4, 5). */
-export const BOOK_PAYS: Record<number, number> = { 3: 2, 4: 20, 5: 200 };
+export const BOOK_PAYS: Record<number, number> = { 3: 1, 4: 20, 5: 200 };
 
 /** Special-symbol draw (any paying symbol, the Book excluded). Rarer for the premiums. */
 export const SPECIAL_WEIGHTS = [16, 16, 16, 14, 14, 8, 8, 5, 3];
@@ -91,14 +91,17 @@ export interface SpinOutcome {
   mult: number;
 }
 
-const WEIGHT_TOTAL = SYMBOLS.reduce((s, x) => s + x.weight, 0);
+/** The free spins draw fewer books than the base game: there they stick as wilds and retrigger. */
+export const FREE_BOOK_WEIGHT = 1.9;
 
-function drawSymbol(rng: Rng, noBook: boolean): number {
+function drawSymbol(rng: Rng, noBook: boolean, free: boolean): number {
+  const weights = SYMBOLS.map((s, i) => (i === BOOK && free ? FREE_BOOK_WEIGHT : s.weight));
+  const total = weights.reduce((s, w) => s + w, 0);
   for (;;) {
-    let r = rng() * WEIGHT_TOTAL;
+    let r = rng() * total;
     let pick = SYMBOLS.length - 1;
     for (let i = 0; i < SYMBOLS.length; i++) {
-      r -= SYMBOLS[i].weight;
+      r -= weights[i];
       if (r < 0) { pick = i; break; }
     }
     if (!(noBook && pick === BOOK)) return pick;
@@ -106,13 +109,13 @@ function drawSymbol(rng: Rng, noBook: boolean): number {
 }
 
 /** One book per reel at most, like on a real strip. */
-export function randomGrid(rng: Rng): Grid {
+export function randomGrid(rng: Rng, free = false): Grid {
   const grid: Grid = [];
   for (let reel = 0; reel < REELS; reel++) {
     const column: number[] = [];
     let hasBook = false;
     for (let row = 0; row < ROWS; row++) {
-      const s = drawSymbol(rng, hasBook);
+      const s = drawSymbol(rng, hasBook, free);
       if (s === BOOK) hasBook = true;
       column.push(s);
     }
@@ -204,7 +207,7 @@ function pickSpecial(rng: Rng): number {
 }
 
 /** Hard cap on the round length (retriggers included). */
-const MAX_FREE_SPINS = 60;
+const MAX_FREE_SPINS = 100;
 
 export function playFreeSpins(rng: Rng, forcedSpecial?: number): FreeSpinsResult {
   const special = forcedSpecial ?? pickSpecial(rng);
@@ -215,7 +218,7 @@ export function playFreeSpins(rng: Rng, forcedSpecial?: number): FreeSpinsResult
   while (left > 0 && played < MAX_FREE_SPINS) {
     left--;
     played++;
-    const drawn = randomGrid(rng);
+    const drawn = randomGrid(rng, true);
     // Fresh books (not on a sticky cell) count for the retrigger.
     let fresh = 0;
     drawn.forEach((col, reel) => col.forEach((s, row) => { if (s === BOOK && !sticky.has(`${reel},${row}`)) fresh++; }));

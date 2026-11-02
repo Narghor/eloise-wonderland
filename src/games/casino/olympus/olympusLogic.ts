@@ -30,7 +30,7 @@ export const SYMBOLS: SymbolDef[] = [
   { glyph: '🛡️', weight: 14, pays: [0.75, 1.75, 4, 12] },
   { glyph: '🦉', weight: 11, pays: [1, 2.5, 6, 18] },
   { glyph: '🔱', weight: 9, pays: [1.25, 3.5, 10, 25] },
-  { glyph: '🐍', weight: 4, pays: [1.75, 5, 15, 40] },
+  { glyph: '🐍', weight: 4, pays: [1.75, 5, 15, 80] },
   { glyph: '🏛️', weight: 0, pays: [0, 0, 0, 0] },
 ];
 /** Medusa pays her own lines and stands in for every symbol but the temple. */
@@ -39,12 +39,12 @@ export const SCATTER = 9;
 const PAYING = 9;
 
 /** Base game: extra chance per cell, off the first reel, to show Medusa. */
-export const BASE_EXTRA_MEDUSA_CHANCE = 0.034;
+export const BASE_EXTRA_MEDUSA_CHANCE = 0.008;
 /** Chance per cell to show a temple. */
-export const BASE_SCATTER_CHANCE = 0.0112;
+export const BASE_SCATTER_CHANCE = 0.0128;
 export const FREE_SCATTER_CHANCE = 0.03;
 /** Free spins: chance per reel to be a full stack of Medusa. */
-export const FREE_MEDUSA_STACK = 0.31;
+export const FREE_MEDUSA_STACK = 0.285;
 
 export const FREE_SPINS_BY_SCATTERS: Record<number, number> = { 3: 10, 4: 25, 5: 100 };
 export const MIN_SCATTERS = 3;

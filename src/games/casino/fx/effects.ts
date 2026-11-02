@@ -330,6 +330,7 @@ export function showBigWin(host: HTMLElement, amount: number, stake: number, tit
     el('p', { class: 'fx-bigwin-title', text: title ?? TIER_TITLES[tier] }),
     value,
     el('span', { class: 'fx-bigwin-unit', text: 'jetons' }),
+    el('span', { class: 'fx-bigwin-mult', text: `×${stakeMultiple(amount, stake)} la mise` }),
     el('span', { class: 'fx-bigwin-hint', text: 'Touche pour continuer' }),
   );
   host.append(overlay);
@@ -356,6 +357,12 @@ export function showBigWin(host: HTMLElement, amount: number, stake: number, tit
   });
 }
 
+
+/** "12,5" under 10 times the stake, "340" above: how many times the bet a win is worth. */
+export function stakeMultiple(amount: number, stake: number): string {
+  const x = stake > 0 ? amount / stake : 0;
+  return x < 10 ? x.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) : Math.round(x).toLocaleString('fr-FR');
+}
 
 /**
  * Tapping `area` presses `spinButton`, so the player can spam the machine itself.

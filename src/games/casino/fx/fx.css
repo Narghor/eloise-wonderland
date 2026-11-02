@@ -211,6 +211,15 @@
 }
 
 .fx-bigwin-unit { font-weight: 700; opacity: 0.8; }
+.fx-bigwin-mult {
+  margin-top: 10px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.18);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
 .fx-bigwin-hint { margin-top: 24px; font-size: 0.85rem; opacity: 0.6; }
 
 /* ---- paytable diagrams ---- */
