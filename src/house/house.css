@@ -1,0 +1,1444 @@
+.house-main {
+  display: grid;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+/* -----------------------------------------------
+   THE DOLL'S HOUSE
+   ----------------------------------------------- */
+
+.house-scene {
+  display: grid;
+  gap: 8px;
+}
+
+.house-view {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  border-radius: 18px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.house-view::-webkit-scrollbar {
+  display: none;
+}
+
+.house-room {
+  position: relative;
+  flex: 0 0 100%;
+  aspect-ratio: 4 / 3.3;
+  overflow: hidden;
+  scroll-snap-align: start;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-x;
+}
+
+.house-room-wall {
+  position: absolute;
+  inset: 0 0 28% 0;
+}
+
+.house-room-ground {
+  position: absolute;
+  inset: 72% 0 0 0;
+}
+
+.house-room.is-garden .house-room-wall::after {
+  content: '';
+  position: absolute;
+  right: 8%;
+  top: 10%;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ffe36e;
+}
+
+.house-room-name {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.8);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #6b5a72;
+}
+
+.house-window {
+  position: absolute;
+  left: 38%;
+  top: 14%;
+  width: 24%;
+  height: 30%;
+  border: 6px solid #fff;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(#bfe6ff, #e6f6ff);
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.06);
+}
+
+.house-furniture {
+  position: absolute;
+  bottom: 24%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.house-furniture.is-rug,
+.house-furniture.is-pond {
+  bottom: 21%;
+}
+
+.house-sprite,
+.house-body canvas,
+.house-photo-frame canvas,
+.house-dialog-box canvas,
+.house-card-head canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.house-plate {
+  position: absolute;
+  top: -6px;
+  width: 16px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px #e3d9f0;
+}
+
+.house-gifts {
+  position: absolute;
+  right: 6%;
+  bottom: 22%;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  animation: house-bob 1.2s ease-in-out infinite alternate;
+}
+
+.house-gift {
+  width: 22px;
+  height: 20px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, transparent 40%, #ffe36e 40% 60%, transparent 60%), #ff7fae;
+  box-shadow: 0 -5px 0 -2px #ffe36e;
+}
+
+@keyframes house-bob {
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+/* -----------------------------------------------
+   VISITORS
+   ----------------------------------------------- */
+
+.house-actor {
+  position: absolute;
+  bottom: 21%;
+  display: grid;
+  justify-items: center;
+  transform: translateX(-50%);
+  padding: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.house-actor.is-posing {
+  z-index: 2;
+}
+
+.house-name {
+  visibility: hidden;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #6b5a72;
+  text-shadow: 0 0 3px #fff;
+}
+
+.house-actor.is-posing .house-name {
+  visibility: visible;
+}
+
+.house-ring {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 80px;
+  height: 80px;
+  border: 3px solid #ffd23f;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.house-pose-icon {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  opacity: 0;
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #ff7fae;
+  pointer-events: none;
+}
+
+.house-actor.is-posing::after {
+  content: '✦';
+  position: absolute;
+  top: -4px;
+  right: 0;
+  color: #ffbf1f;
+  font-size: 1.2rem;
+  animation: house-twinkle 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes house-twinkle {
+  to {
+    transform: scale(1.4) rotate(20deg);
+  }
+}
+
+.house-heart {
+  position: absolute;
+  top: -6px;
+  color: #ff5d8f;
+  animation: house-rise 0.9s ease-out forwards;
+}
+
+@keyframes house-rise {
+  to {
+    transform: translateY(-24px);
+    opacity: 0;
+  }
+}
+
+.house-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #fff;
+  pointer-events: none;
+  animation: house-flash 0.45s ease-out forwards;
+}
+
+@keyframes house-flash {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.house-toast {
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* -----------------------------------------------
+   PHOTOS
+   ----------------------------------------------- */
+
+.house-photo {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 86px;
+  padding: 5px 5px 4px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgb(80 40 70 / 0.16);
+  text-align: center;
+}
+
+.house-photo small {
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+
+.house-photo-frame {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 54px;
+  border-radius: 4px;
+  background: linear-gradient(#fde8ef 0 70%, #e9c9a3 70%);
+  color: #c9b8d0;
+  font-weight: 900;
+  font-size: 1.4rem;
+}
+
+.house-photo-frame.is-kitchen {
+  background: linear-gradient(#fff6e0 0 70%, #d9b48a 70%);
+}
+
+.house-photo-frame.is-garden {
+  background: linear-gradient(#cdefff 0 65%, #9ed98a 65%);
+}
+
+.house-photo-frame.is-bedroom {
+  background: linear-gradient(#e6e0ff 0 70%, #c9a68a 70%);
+}
+
+.house-photo-frame.is-library {
+  background: linear-gradient(#e7f3e4 0 70%, #b88f6e 70%);
+}
+
+.house-photo.is-empty {
+  box-shadow: none;
+  border: 2px dashed #e3d9f0;
+  background: none;
+}
+
+.house-photo.is-empty .house-photo-frame {
+  background: #faf5fb;
+}
+
+.house-stars {
+  color: #f2b705;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.house-photo.is-flying {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 4;
+  animation: house-fly 1.6s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes house-fly {
+  0% {
+    transform: scale(1.5) rotate(-8deg);
+    opacity: 0;
+  }
+  15% {
+    transform: scale(1.3) rotate(-4deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(40px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* -----------------------------------------------
+   THE HOUSE FRONT (the menu)
+   ----------------------------------------------- */
+
+.house-front {
+  position: relative;
+  padding-top: 44px;
+}
+
+.house-front-roof {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 76%;
+  height: 50px;
+  background: #c25b7a;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.house-front-roof::after {
+  content: '';
+  position: absolute;
+  left: 45%;
+  top: 22px;
+  width: 10%;
+  height: 16px;
+  border-radius: 50% 50% 0 0;
+  background: #ffd6e4;
+}
+
+.house-front-body {
+  display: grid;
+  grid-template-columns: 76% 24%;
+  align-items: end;
+}
+
+.house-front-building {
+  display: grid;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 4px 4px 0 0;
+  background: #b07a4f;
+}
+
+.house-front-floor {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.house-front-outside {
+  display: grid;
+}
+
+.house-front-room {
+  position: relative;
+  height: 84px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  overflow: hidden;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.house-front-room.is-garden {
+  height: 88px;
+  border-radius: 3px 3px 0 0;
+}
+
+.house-front-wall,
+.house-front-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.house-front-wall {
+  inset: 0 0 20% 0;
+}
+
+.house-front-ground {
+  bottom: 0;
+  height: 20%;
+}
+
+.house-front-name {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  max-width: calc(100% - 6px);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.85);
+  font-size: 0.62rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.house-front-who {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9%;
+  display: flex;
+  justify-content: center;
+  gap: 1px;
+}
+
+.house-front-who canvas {
+  image-rendering: pixelated;
+}
+
+.house-front-badges {
+  position: absolute;
+  right: 3px;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.house-front-badge {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 0.7rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  animation: house-bob 0.8s ease-in-out infinite alternate;
+}
+
+.house-front-room.is-locked .house-front-wall,
+.house-front-room.is-locked .house-front-ground {
+  filter: grayscale(0.8) brightness(0.85);
+}
+
+.house-front-lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding-top: 10px;
+  background: rgb(59 42 63 / 0.4);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.house-front-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.house-front-room.is-active {
+  box-shadow: 0 0 0 3px #ffd23f;
+  z-index: 1;
+}
+
+.house-front-room:focus-visible {
+  outline: 3px solid var(--accent-strong);
+}
+
+.house-front-soil {
+  height: 10px;
+  border-radius: 0 0 8px 8px;
+  background: #8b5e4a;
+}
+
+.house-coin {
+  display: inline-block;
+  flex: none;
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff3b0, #f6cd4c 55%, #c99a1c);
+  box-shadow: inset 0 0 0 1.5px #b8860b;
+  vertical-align: -0.12em;
+}
+
+.house-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.house-coin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.house-album-button {
+  position: relative;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.house-album-button.is-active {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.house-album-button.has-news::after {
+  content: '!';
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff5d8f;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 900;
+}
+
+/* -----------------------------------------------
+   ROOM PANELS
+   ----------------------------------------------- */
+
+.house-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.house-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgb(120 60 90 / 0.08);
+}
+
+.house-panel-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.house-guide {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1.5px dashed #f2a516;
+  border-radius: 12px;
+  background: #fffbea;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.house-section {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.house-note,
+.house-pitch {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.house-pitch {
+  color: var(--ink);
+}
+
+.house-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.house-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.house-actions .button.is-on {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.house-sprite,
+.house-food {
+  image-rendering: pixelated;
+}
+
+/* Garden */
+
+.house-plots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.house-plot {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 3px;
+  min-height: 120px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(#fff 0 50%, #d9b394 50%);
+  font: inherit;
+  color: var(--ink);
+  text-align: center;
+}
+
+.house-plot strong {
+  font-size: 0.8rem;
+}
+
+.house-plot small {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.house-plot.is-empty {
+  align-content: center;
+  border: 2px dashed var(--accent);
+  background: linear-gradient(#fff6f9 0 50%, #e6c9ae 50%);
+  cursor: pointer;
+}
+
+.house-plot.is-empty b {
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--accent-strong);
+}
+
+.house-plot.is-empty.is-active {
+  border-style: solid;
+  box-shadow: 0 0 0 3px #ffd23f;
+}
+
+.house-plot.is-ready {
+  cursor: pointer;
+  box-shadow: 0 0 0 3px #8fcf74;
+  animation: house-bob 0.9s ease-in-out infinite alternate;
+}
+
+.house-plot-action {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.house-plot-bar {
+  display: block;
+  width: 75%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.12);
+  overflow: hidden;
+}
+
+.house-plot-bar i {
+  display: block;
+  height: 100%;
+  background: #6dbf5a;
+}
+
+.house-water {
+  padding: 3px 8px;
+  border: none;
+  border-radius: 999px;
+  background: #dcefff;
+  color: #2f5f96;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.house-watered {
+  color: #2f5f96;
+}
+
+/* Vignettes: seeds, grocery, furniture */
+
+.house-seeds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.house-seed {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 3px;
+  padding: 8px 4px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.house-seed span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.house-seed small {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.house-seed:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.house-seed-off {
+  color: var(--accent-strong) !important;
+}
+
+.house-seed.is-rare {
+  border-color: #f2a516;
+  background: linear-gradient(135deg, #fff3c4, #ece6ff);
+}
+
+/* Kitchen */
+
+.house-order {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px dashed #f2a516;
+  border-radius: 14px;
+  background: #fffbea;
+}
+
+.house-order span {
+  display: grid;
+  gap: 2px;
+}
+
+.house-order small {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.house-pot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #4a4a52;
+  color: #fff;
+}
+
+.house-pot-places {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.house-pot-place {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 2px dashed rgb(255 255 255 / 0.35);
+  border-radius: 10px;
+  background: none;
+}
+
+.house-pot-place.is-filled {
+  border: 2px solid rgb(255 255 255 / 0.6);
+  background: rgb(255 255 255 / 0.12);
+  cursor: pointer;
+}
+
+.house-burners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.house-burner {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff1e0;
+  box-shadow: inset 0 -2px 0 #f6923a;
+}
+
+.house-burners small {
+  color: var(--muted);
+}
+
+.house-inventory {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+}
+
+.house-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  max-width: 100%;
+  padding: 0;
+  border: 2px solid #b8e3a4;
+  border-radius: 10px;
+  background: #fbfff8;
+  cursor: pointer;
+}
+
+.house-slot.is-grocery {
+  border-color: #e8c89a;
+  background: #fffaf3;
+}
+
+.house-slot.is-rare {
+  border-color: #f2a516;
+  background: linear-gradient(135deg, #fff3c4, #ffe0f0);
+}
+
+.house-slot:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.house-slot-count {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: var(--ink);
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff;
+}
+
+.house-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.house-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.house-legend .is-garden::before {
+  background: #b8e3a4;
+}
+
+.house-legend .is-grocery::before {
+  background: #e8c89a;
+}
+
+.house-legend .is-rare::before {
+  background: #f2a516;
+}
+
+.house-dish {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.house-dish > span:nth-child(2) {
+  display: grid;
+}
+
+.house-dish small {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.house-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.house-recipes {
+  display: grid;
+  gap: 6px;
+}
+
+.house-recipe {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.84rem;
+}
+
+.house-recipe-foods {
+  display: flex;
+  gap: 2px;
+}
+
+.house-recipe small {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+/* Café */
+
+.house-cafe-sign {
+  display: grid;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #3d2b25;
+  color: #fff4e3;
+}
+
+.house-cafe-awning {
+  height: 22px;
+  background: repeating-linear-gradient(90deg, #f48fb1 0 22px, #fff 22px 44px);
+}
+
+.house-cafe-body {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px;
+  text-align: center;
+}
+
+.house-cafe-name {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.4rem;
+  font-style: italic;
+}
+
+.house-cafe-rep {
+  color: #f6cd4c;
+  font-size: 1.2rem;
+  letter-spacing: 3px;
+}
+
+.house-cafe-body p {
+  max-width: 34ch;
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.house-cafe-open {
+  padding: 12px 28px;
+  font-size: 1.05rem;
+  box-shadow: 0 4px 0 #b84a74;
+}
+
+.tea-look canvas {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Decoration */
+
+.house-decor {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.house-decor-spot {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: 92px;
+  padding: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: #fffaf6;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.house-decor-spot strong {
+  font-size: 0.82rem;
+}
+
+.house-decor-spot small {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.house-decor-spot.is-empty {
+  border: 2px dashed var(--accent);
+}
+
+.house-decor-spot.is-empty b {
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--accent-strong);
+}
+
+.house-decor-spot.is-active {
+  box-shadow: 0 0 0 3px #ffd23f;
+}
+
+/* Album */
+
+.house-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fffaf6;
+  border: 1.5px solid var(--line);
+}
+
+.house-card-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.house-card-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.house-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.house-unknown-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.house-silhouette {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 38px;
+  border-radius: 10px;
+  background: #efe6f3;
+  color: #b9a8c4;
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.house-friendship {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: #f3e6ee;
+  overflow: hidden;
+}
+
+.house-friendship span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ff9ec7, #ff5d8f);
+}
+
+.house-photos,
+.house-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.house-chapter {
+  padding: 5px 10px;
+  border: 2px solid #f3d6e2;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #c2457a;
+  cursor: pointer;
+}
+
+.house-chapter:disabled {
+  color: #b9a8c4;
+  border-color: #efe6f3;
+  cursor: default;
+}
+
+.house-chapter.is-new {
+  background: #ff5d8f;
+  border-color: #ff5d8f;
+  color: #fff;
+  animation: house-bob 0.8s ease-in-out infinite alternate;
+}
+
+.house-gift-line {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #8a6b94;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .house-front-badge,
+  .house-plot.is-ready,
+  .house-chapter.is-new {
+    animation: none;
+  }
+}
+
+
+/* -----------------------------------------------
+   DIALOGS AND MESSAGES
+   ----------------------------------------------- */
+
+.house-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 16px;
+  background: rgb(40 20 40 / 0.35);
+  cursor: pointer;
+}
+
+.house-dialog-box,
+.house-news {
+  width: min(100%, 480px);
+  padding: 16px;
+  border-radius: 18px;
+  background: #fff;
+  animation: house-rise-in 0.3s ease-out;
+}
+
+.house-dialog-box {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.house-dialog-box p {
+  margin: 6px 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.house-dialog-box small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.house-news {
+  display: grid;
+  gap: 8px;
+  align-self: center;
+  cursor: default;
+}
+
+.house-news ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+@keyframes house-rise-in {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+.house-say {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: grid;
+  gap: 6px;
+  width: min(92vw, 440px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.house-say-line {
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: #3b2a3f;
+  color: #fff;
+  font-size: 0.85rem;
+  text-align: center;
+  animation: house-rise-in 0.25s ease-out;
+}
+
+
+.house-photo-frame.is-cafe {
+  background: linear-gradient(#fbe3d0 0 70%, #9a6a48 70%);
+}
+
+.house-photo-frame.is-greenhouse {
+  background: linear-gradient(#e9fbf0 0 70%, #a7cf8f 70%);
+}
+
+/* The vegetable patch in the garden view */
+
+.house-beds {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 3%;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 4%;
+}
+
+.house-bed {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  flex: 0 1 16%;
+  min-width: 48px;
+  height: 76px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.house-bed canvas {
+  margin-bottom: -2px;
+  image-rendering: pixelated;
+}
+
+.house-bed-soil {
+  width: 100%;
+  height: 12px;
+  border-radius: 6px 6px 3px 3px;
+  background: #8b5e4a;
+  box-shadow: inset 0 3px 0 #a8745a;
+}
+
+.house-bed.is-watered .house-bed-soil {
+  background: #6b4636;
+  box-shadow: inset 0 3px 0 #85594a;
+}
+
+.house-bed-plus {
+  margin-bottom: 4px;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: rgb(255 255 255 / 0.85);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+.house-bed.is-ripe canvas {
+  animation: house-bob 0.7s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 4px #fff6a8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .house-bed.is-ripe canvas {
+    animation: none;
+  }
+}
+
+.house-bed-thirst {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -13px;
+  border-radius: 50% 50% 50% 0;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(47 95 150 / 0.35);
+  font-size: 0.85rem;
+  transform: rotate(-45deg);
+  animation: house-thirst 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes house-thirst {
+  to {
+    translate: 0 -4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .house-bed-thirst {
+    animation: none;
+  }
+}
+
+/* Photo timing: the fixed sight, and the ring that closes onto it */
+
+.house-sight {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
+  border: 3px dashed rgb(255 255 255 / 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(59 42 63 / 0.25), inset 0 0 0 2px rgb(59 42 63 / 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.08s, background 0.08s;
+}
+
+.house-actor.is-posing .house-sight {
+  opacity: 1;
+}
+
+.house-sight.is-close {
+  border-style: solid;
+  border-color: #fff3b0;
+  background: rgb(255 243 176 / 0.25);
+}
+
+.house-sight.is-now {
+  border-color: #ffd23f;
+  background: rgb(255 210 63 / 0.4);
+  box-shadow: 0 0 16px 4px rgb(255 210 63 / 0.8);
+  transform: scale(1.08);
+}
+
+.house-ring {
+  box-shadow: 0 0 6px rgb(255 191 31 / 0.7);
+}
+
+.house-ring.is-late {
+  border-color: #b9aec4;
+  box-shadow: none;
+}

@@ -1,7 +1,8 @@
 import './casino.css';
 import { el, topBar } from '../../dom';
 import { loadCompanion } from '../../companion/companionSave';
-import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, loadCasino, pay } from './chips';
+import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, loadCasino, pay, redeemGift, sendGift } from './chips';
+import { decodeGift } from './giftCode';
 import { burst, playBonusTrigger } from './fx';
 import { renderSlots } from './slots/slotsScreen';
 import { renderBonusSlot } from './bonus/bonusScreen';
@@ -125,24 +126,91 @@ function renderLobby(root: HTMLElement): void {
             text: `Chaque jour, ta première visite t’offre ${DAILY_GIFT.toLocaleString('fr-FR')} jetons.`,
           }),
         ),
+        giftSection(root, save.chips, save.sentGifts),
       ),
     ),
   );
 }
 
-/** Grants the daily gift on the first visit of the day and celebrates it with a toast. */
-export function grantDailyGift(): void {
-  const given = claimDailyGift();
-  if (given === 0) return;
+/** Give chips as a code, or cash a friend's code. */
+function giftSection(root: HTMLElement, balance: number, sentGifts: string[]): HTMLElement {
+  const refresh = (): void => {
+    root.replaceChildren();
+    renderLobby(root);
+  };
+
+  const amountInput = el('input', { class: 'casino-input', type: 'number', min: '1', step: '1', inputmode: 'numeric', placeholder: 'Montant' });
+  const send = el('button', { class: 'button button-secondary', type: 'button', text: 'Créer un code' });
+  const sendMessage = el('p', { class: 'casino-note' });
+  send.addEventListener('click', () => {
+    const amount = Math.floor(Number(amountInput.value));
+    if (!(amount > 0)) {
+      sendMessage.textContent = 'Indique combien de jetons donner.';
+      return;
+    }
+    if (amount > balance) {
+      sendMessage.textContent = `Tu n’as que ${balance.toLocaleString('fr-FR')} jetons.`;
+      return;
+    }
+    if (!confirm(`Retirer ${amount.toLocaleString('fr-FR')} jetons de ton solde pour en faire un code ?`)) return;
+    if (sendGift(amount)) refresh();
+  });
+
+  const codeInput = el('input', { class: 'casino-input casino-code-input', type: 'text', autocomplete: 'off', placeholder: 'XXXX-XXXX-XXXX-XXXX' });
+  const redeem = el('button', { class: 'button button-secondary', type: 'button', text: 'Utiliser le code' });
+  const redeemMessage = el('p', { class: 'casino-note' });
+  redeem.addEventListener('click', () => {
+    const result = redeemGift(codeInput.value);
+    if (!result.ok) {
+      redeemMessage.textContent = result.reason === 'used' ? 'Ce code a déjà servi ici.' : 'Ce code n’est pas valide, vérifie-le.';
+      return;
+    }
+    refresh();
+    showGiftToast(`Code accepté : +${result.amount.toLocaleString('fr-FR')} jetons`);
+  });
+
+  const sent = sentGifts.map((code) => {
+    const amount = decodeGift(code)?.amount ?? 0;
+    const copy = el('button', { class: 'casino-sent-code', type: 'button', title: 'Copier' }, el('code', { text: code }), el('span', { text: `${amount.toLocaleString('fr-FR')} jetons · copier` }));
+    copy.addEventListener('click', () => {
+      void navigator.clipboard?.writeText(code).then(() => {
+        copy.lastElementChild!.textContent = 'copié !';
+      });
+    });
+    return copy;
+  });
+
+  return el(
+    'section',
+    { class: 'casino-cashier casino-gifts' },
+    el('h2', { text: 'Partager des jetons' }),
+    el('p', { text: 'Crée un code avec tes jetons et envoie-le à un ami : il le colle ici et les reçoit.' }),
+    el('div', { class: 'casino-gift-row' }, amountInput, send),
+    sendMessage,
+    ...(sent.length > 0 ? [el('p', { class: 'casino-note', text: 'Tes derniers codes :' }), ...sent] : []),
+    el('div', { class: 'casino-gift-row' }, codeInput, redeem),
+    redeemMessage,
+    el('p', { class: 'casino-note', text: 'Chaque code ne sert qu’une fois.' }),
+  );
+}
+
+function showGiftToast(message: string): void {
   const toast = el(
     'div',
     { class: 'casino-gift-toast', role: 'status' },
     el('span', { 'aria-hidden': 'true', text: '🎁' }),
-    el('strong', { text: `Cadeau du jour : +${given.toLocaleString('fr-FR')} jetons` }),
+    el('strong', { text: message }),
   );
   document.body.append(toast);
   burst(toast, 28, 'coins');
   playBonusTrigger();
   window.setTimeout(() => toast.classList.add('is-leaving'), 3500);
   window.setTimeout(() => toast.remove(), 4000);
+}
+
+/** Grants the daily gift on the first visit of the day and celebrates it with a toast. */
+export function grantDailyGift(): void {
+  const given = claimDailyGift();
+  if (given === 0) return;
+  showGiftToast(`Cadeau du jour : +${given.toLocaleString('fr-FR')} jetons`);
 }

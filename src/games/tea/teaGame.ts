@@ -12,10 +12,10 @@ import {
   Service,
   TEAS,
   TEA_TIERS,
-  makeSchedule,
   scoreOf,
   starsFor,
   type AddonId,
+  type Arrival,
   type Order,
   type PastryId,
   type TeaEvent,
@@ -30,6 +30,16 @@ const MAX_STEP = 0.1;
 
 export interface TeaGameActions {
   nextService(): void;
+}
+
+/** The house café: some customers are house characters, served for friendship. */
+export interface TeaCafe {
+  back: BackLink;
+  title: string;
+  portrait(guest: string): HTMLElement;
+  served(guest: string): void;
+  /** Called once at the end: returns the lines to show. The café keeps no salon record. */
+  finish(stars: number): string[];
 }
 
 interface SpotView {
@@ -68,12 +78,13 @@ export class TeaGame {
     root: HTMLElement,
     private readonly save: TeaSave,
     private readonly difficulty: Difficulty,
-    seed: number,
+    schedule: Arrival[],
     private readonly challenge: string | undefined,
     private readonly actions: TeaGameActions,
+    private readonly cafe?: TeaCafe,
   ) {
     const tier = TEA_TIERS[difficulty];
-    this.service = new Service(tier, makeSchedule(tier, seed));
+    this.service = new Service(tier, schedule);
 
     const spots = el('div', { class: `tea-spots is-${tier.spots}` });
     this.service.spots.forEach((_, index) => {
@@ -126,7 +137,7 @@ export class TeaGame {
       el(
         'div',
         { class: 'tea-game' },
-        topBar(`Salon de thé · ${challenge ? 'Défi du jour' : difficultyName(difficulty)}`, helpSlot(TEA_HELP), BACK_TEA),
+        topBar(cafe ? cafe.title : `Salon de thé · ${challenge ? 'Défi du jour' : difficultyName(difficulty)}`, helpSlot(TEA_HELP), cafe?.back ?? BACK_TEA),
         el('div', { class: 'tea-hud' }, this.clock, this.stats),
         this.pauseNote,
         this.board,
@@ -193,6 +204,7 @@ export class TeaGame {
   private feedback(event: TeaEvent): void {
     if (event.type === 'served') {
       buzz(20);
+      if (event.guest) this.cafe?.served(event.guest);
       this.flash(event.spot, 'is-happy', event.tip > 0 ? `+${event.tip} 🪙` : '💖');
     } else if (event.type === 'wrong' || event.type === 'left') {
       buzz([40, 40, 40]);
@@ -234,7 +246,8 @@ export class TeaGame {
       }
       if (view.shown !== customer.id) {
         view.shown = customer.id;
-        view.look.textContent = customer.look;
+        if (customer.guest && this.cafe) view.look.replaceChildren(this.cafe.portrait(customer.guest));
+        else view.look.textContent = customer.look;
         view.bubble.replaceChildren(...orderParts(customer.order));
         view.button.setAttribute('aria-label', `Servir : ${orderText(customer.order)}`);
       }
@@ -270,11 +283,14 @@ export class TeaGame {
     const { served, total, tips } = this.service;
     const stars = starsFor(served, total);
     const score = scoreOf(served, tips);
-    const record = score > this.save.best[this.difficulty];
-    this.save.servicesDone++;
-    if (record) this.save.best[this.difficulty] = score;
-    if (this.challenge && stars > 0) this.save.challenge = undefined;
-    saveTea(this.save);
+    const cafeLines = this.cafe?.finish(stars) ?? [];
+    const record = !this.cafe && score > this.save.best[this.difficulty];
+    if (!this.cafe) {
+      this.save.servicesDone++;
+      if (record) this.save.best[this.difficulty] = score;
+      if (this.challenge && stars > 0) this.save.challenge = undefined;
+      saveTea(this.save);
+    }
 
     const again = el('button', { class: 'button', type: 'button' }, this.challenge && stars === 0 ? 'Retenter le défi' : 'Nouveau service');
     again.addEventListener('click', () => this.actions.nextService());
@@ -287,9 +303,10 @@ export class TeaGame {
         el('strong', { text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
         ` ${served} client${served > 1 ? 's' : ''} servi${served > 1 ? 's' : ''} sur ${total}, ${tips} 🪙 de pourboires.`,
       ),
-      el('p', { class: 'tea-result-line', text: record ? `Score ${score} : nouveau record !` : `Score ${score} · record ${this.save.best[this.difficulty]}` }),
+      ...(this.cafe ? [] : [el('p', { class: 'tea-result-line', text: record ? `Score ${score} : nouveau record !` : `Score ${score} · record ${this.save.best[this.difficulty]}` })]),
+      ...cafeLines.map((line) => el('p', { class: 'tea-result-line', text: line })),
       ...(stars > 0 ? [levelReward(stars, this.difficulty, this.challenge)] : [el('p', { class: 'tea-result-line', text: 'Sers au moins la moitié des clients pour gagner une étoile.' })]),
-      el('div', { class: 'button-row' }, again, el('a', { class: 'button button-secondary', href: '#/salon' }, 'Menu')),
+      el('div', { class: 'button-row' }, again, el('a', { class: 'button button-secondary', href: this.cafe?.back.href ?? '#/salon' }, this.cafe ? this.cafe.back.label : 'Menu')),
     );
     this.result.scrollIntoView({ behavior: 'smooth', block: 'center' });
     buzz(stars > 0 ? [30, 60, 30] : 60);

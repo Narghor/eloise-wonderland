@@ -21,6 +21,7 @@ import { renderVegetables } from './games/vegetables/vegetablesScreen';
 import { renderTea } from './games/tea/teaScreen';
 import { renderMahjong } from './games/mahjong/mahjongScreen';
 import { renderCasino } from './games/casino/casinoScreen';
+import { renderHouse } from './house/houseScreen';
 import { requestPersistentStorage } from './save';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
@@ -49,6 +50,7 @@ const routes: Record<string, Screen> = {
   salon: renderTea,
   mahjong: renderMahjong,
   casino: renderCasino,
+  maison: renderHouse,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

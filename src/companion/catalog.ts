@@ -26,6 +26,8 @@ interface BaseItem {
   price: number;
   /** Not for sale: given once this many daily challenges are done. */
   challenges?: number;
+  /** Not for sale: given by this house character at the end of their story. */
+  house?: string;
 }
 
 /**
@@ -392,6 +394,12 @@ const COLORS: ColorItem[] = [
     bands: ['#f7a6c1', '#f6b26b', '#ffe08a', '#9fdfc8', '#8fb8f0', '#c3a6f0'],
   },
   { id: 'coat-gold', slot: 'color', name: 'Or', price: 0, challenges: 30, color: '#f6cd4c' },
+  { id: 'coat-autumn', slot: 'color', name: 'Automne', price: 0, house: 'Noisette', color: '#c8553d', bands: ['#e8a33d', '#d9772f', '#c8553d', '#8f3b2f'] },
+  { id: 'coat-nebula', slot: 'color', name: 'Nébuleuse', price: 0, house: 'Comète', color: '#5b4ba8', bands: ['#2b2a6b', '#5b4ba8', '#a86bc9', '#f09ad0'] },
+  { id: 'coat-honey', slot: 'color', name: 'Miel doré', price: 0, house: 'Butine', color: '#f6c445', bands: ['#ffe08a', '#f6c445', '#e8a33d', '#c97f1e'] },
+  { id: 'coat-jade', slot: 'color', name: 'Jade', price: 0, house: 'Bambou', color: '#4fa880', bands: ['#cfeedd', '#8fd3b0', '#4fa880', '#2f7a5c'] },
+  { id: 'coat-opal', slot: 'color', name: 'Opale', price: 0, house: 'Opaline', color: '#e2d4ff', bands: ['#fde2f3', '#e2d4ff', '#cdeffd', '#fff4cf'] },
+  { id: 'coat-frost', slot: 'color', name: 'Givre', price: 0, house: 'Givrette', color: '#b9e0f7', bands: ['#ffffff', '#e3f4ff', '#b9e0f7', '#8fc3e8'] },
 ];
 
 // -----------------------------------------------
@@ -555,6 +563,33 @@ const HATS: WornItem[] = [
     pixels: ['...yy...', '..yyyy..', 'yyyyyyyy', '.yyyyyy.', '.yy..yy.'],
     colors: { y: '#ffe36e' },
   },
+  {
+    id: 'hat-star-chef',
+    slot: 'hat',
+    name: 'Toque étoilée',
+    price: 0,
+    house: 'Biscotte',
+    pixels: ['..wwyyww..', '.wwyyyyww.', '.wwwyywww.', '..wwwwww..', '..wwwwww..', '..yyyyyy..'],
+    colors: { w: '#ffffff', y: '#f6cd4c' },
+  },
+  {
+    id: 'hat-lily',
+    slot: 'hat',
+    name: 'Nénuphar',
+    price: 0,
+    house: 'Brindille',
+    pixels: ['...pp...', '..pwwp..', '.gpppggg', 'gggggggg'],
+    colors: { p: '#ff9ec7', w: '#fff0f6', g: '#4fa86a' },
+  },
+  {
+    id: 'hat-bowler',
+    slot: 'hat',
+    name: 'Chapeau melon',
+    price: 0,
+    house: 'Flocon',
+    pixels: ['..kkkk..', '.kkkkkk.', '.kkkkkk.', '.rrrrrr.', 'kkkkkkkk'],
+    colors: { k: '#2b2433', r: '#7a5cb8' },
+  },
 ];
 
 const GLASSES: WornItem[] = [
@@ -699,6 +734,15 @@ const NECKS: WornItem[] = [
     pixels: ['r....r', '.r..r.', '..yy..', '..yy..'],
     colors: { r: '#3d6fa8', y: '#f6cd4c' },
   },
+  {
+    id: 'neck-plums',
+    slot: 'neck',
+    name: 'Collier de mirabelles',
+    price: 0,
+    house: 'Mirabelle',
+    pixels: ['g............g', '.yy.g....g.yy.', '.yy..yyyy..yy.', '......yy......'],
+    colors: { y: '#f6cd4c', g: '#5f9e57' },
+  },
 ];
 
 // -----------------------------------------------
@@ -779,6 +823,26 @@ const BACKGROUNDS: BackgroundItem[] = [
   },
   { id: 'bg-podium', slot: 'background', name: 'Podium', price: 0, challenges: 3, css: 'radial-gradient(circle at 50% 100%, #f6cd4c 0 30%, transparent 31%), linear-gradient(#fff8dc, #ffe9a8)' },
   { id: 'bg-trophies', slot: 'background', name: 'Gloire', price: 0, challenges: 75, css: 'repeating-conic-gradient(from 0deg at 50% 100%, #ffe36e 0 10deg, #fff4bf 10deg 20deg)' },
+  {
+    id: 'bg-library',
+    slot: 'background',
+    name: 'Bibliothèque',
+    price: 0,
+    house: 'Plume',
+    css:
+      'linear-gradient(transparent 0 30%, #8b5e4a 30% 33%, transparent 33% 63%, #8b5e4a 63% 66%, transparent 66%), ' +
+      'repeating-linear-gradient(90deg, #c25b7a 0 7px, #3d6fa8 7px 13px, #e8c56a 13px 19px, #5f9e57 19px 26px), linear-gradient(#f6ead0, #f6ead0)',
+  },
+  {
+    id: 'bg-mist',
+    slot: 'background',
+    name: 'Brume du matin',
+    price: 0,
+    house: 'Brume',
+    css:
+      'radial-gradient(ellipse at 20% 70%, rgb(255 255 255 / 0.9) 0 18%, transparent 40%), radial-gradient(ellipse at 80% 40%, rgb(255 255 255 / 0.8) 0 16%, transparent 38%), ' +
+      'linear-gradient(#c9d3e6, #eef1f8)',
+  },
 ];
 
 export const ITEMS: readonly Item[] = [...SPECIES, ...COLORS, ...HATS, ...GLASSES, ...NECKS, ...BACKGROUNDS];

@@ -903,6 +903,16 @@ a {
   text-decoration: none;
 }
 
+.home-house-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(#fde8ef 0 65%, #9ed98a 65%);
+  font-size: 1.9rem;
+}
+
 .home-companion-text {
   display: grid;
   gap: 4px;

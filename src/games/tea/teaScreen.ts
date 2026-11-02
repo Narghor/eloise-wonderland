@@ -4,14 +4,15 @@ import { difficultyName, difficultyPicker, type Difficulty } from '../../difficu
 import { CHALLENGE_DIFFICULTY } from '../../daily/daily';
 import { navigate } from '../../navigation';
 import { newSeed } from '../../random';
+import { cafeLevel, openCafe } from '../../house/houseCafe';
 import { TeaGame } from './teaGame';
-import { SERVICE_SECONDS, TEA_TIERS, seedFromDay } from './teaLogic';
+import { SERVICE_SECONDS, TEA_TIERS, makeSchedule, seedFromDay } from './teaLogic';
 import { loadTea, saveTea, type TeaSave } from './teaSave';
 
 const PLAY_ROUTE = '#/salon/jouer';
 
 /** Which service `#/salon/jouer` opens: never saved, so a reload goes back to the menu. */
-let pending: { challenge?: string } | null = null;
+let pending: { challenge?: string; cafe?: boolean } | null = null;
 
 const TIER_HINTS = ['2 thés, rien d’autre', 'des suppléments et des gâteaux', '3 suppléments, clients pressés', '4 thés, 4 tables', 'clients très pressés'];
 
@@ -19,10 +20,16 @@ const TIER_HINTS = ['2 thés, rien d’autre', 'des suppléments et des gâteaux
 export function renderTea(root: HTMLElement, params: string[]): () => void {
   const save = loadTea();
   if (params[0] === 'jouer' && pending) {
-    const { challenge } = pending;
+    const { challenge, cafe } = pending;
     pending = null;
+    if (cafe) {
+      const level = cafeLevel();
+      const schedule = makeSchedule(TEA_TIERS[level], newSeed());
+      const game = new TeaGame(root, save, level, schedule, undefined, { nextService: startCafe }, openCafe(schedule));
+      return () => game.dispose();
+    }
     const difficulty: Difficulty = challenge ? CHALLENGE_DIFFICULTY : save.difficulty;
-    const game = new TeaGame(root, save, difficulty, challenge ? seedFromDay(challenge) : newSeed(), challenge, {
+    const game = new TeaGame(root, save, difficulty, makeSchedule(TEA_TIERS[difficulty], challenge ? seedFromDay(challenge) : newSeed()), challenge, {
       nextService: () => startService(challenge && loadTea().challenge === challenge ? challenge : undefined),
     });
     return () => game.dispose();
@@ -34,6 +41,12 @@ export function renderTea(root: HTMLElement, params: string[]): () => void {
 
 function startService(challenge?: string): void {
   pending = { challenge };
+  navigate(PLAY_ROUTE);
+}
+
+/** The same service, opened from the house: its characters come as customers. */
+export function startCafe(): void {
+  pending = { cafe: true };
   navigate(PLAY_ROUTE);
 }
 

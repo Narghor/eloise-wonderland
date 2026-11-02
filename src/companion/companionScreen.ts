@@ -76,7 +76,7 @@ function shopCards(save: CompanionSave, slot: Slot, refresh: () => void, status:
   for (const item of itemsOf(slot)) {
     const owned = isOwned(save, item, challenges);
     const worn = currentId(save.look, slot) === item.id;
-    const price = item.challenges === undefined ? `${item.price} 🪙` : `🏅 ${item.challenges} défis`;
+    const price = item.house ? `🏠 ${item.house}` : item.challenges === undefined ? `${item.price} 🪙` : `🏅 ${item.challenges} défis`;
     const tag = worn ? 'Porté' : owned ? 'À toi' : price;
     const element = card(withItem(save.look, slot, item.id), item.name, tag);
     element.classList.toggle('is-worn', worn);
@@ -107,6 +107,10 @@ function card(look: Look, name: string, tag: string): HTMLButtonElement {
 }
 
 function buy(save: CompanionSave, item: Item, status: HTMLElement): boolean {
+  if (item.house) {
+    status.textContent = `${item.name} ne s'achète pas : deviens ami avec ${item.house} dans ta maison pour l'avoir.`;
+    return false;
+  }
   if (item.challenges !== undefined) {
     status.textContent = `${item.name} ne s'achète pas : réussis ${item.challenges} défis du jour pour l'avoir (${challengesDone()} pour l'instant).`;
     return false;

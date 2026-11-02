@@ -87,6 +87,39 @@
   gap: 8px;
 }
 
+.casino-gift-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.casino-input {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 2px solid var(--line, #e3d9f0);
+  border-radius: 12px;
+  font: inherit;
+  background: #fff;
+}
+
+.casino-code-input {
+  font-family: ui-monospace, monospace;
+  text-transform: uppercase;
+}
+
+.casino-sent-code {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--line, #e3d9f0);
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 .casino-note {
   font-size: 0.8rem;
   color: var(--muted);

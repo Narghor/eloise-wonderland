@@ -1,6 +1,7 @@
 import { readGame, writeGame } from '../../save';
 import { loadCompanion, saveCompanion } from '../../companion/companionSave';
 import { todayKey } from '../../daily/daily';
+import { MAX_GIFT, decodeGift, encodeGift, randomNonce } from './giftCode';
 
 // -----------------------------------------------
 // CASINO CHIPS
@@ -23,12 +24,16 @@ export interface CasinoSave {
   jackpots: Record<string, number>;
   /** Best single win (a spin or a whole bonus) in stakes, per machine id. */
   bestWins: Record<string, number>;
+  /** Nonces of the gift codes this device created or redeemed: each code works once here. */
+  usedGifts: number[];
+  /** Last codes created here, newest first, so a closed page never loses one. */
+  sentGifts: string[];
 }
 
 export function loadCasino(): CasinoSave {
   const raw = readGame(GAME_ID);
   if (typeof raw !== 'object' || raw === null) {
-    return { chips: STARTING_CHIPS, record: STARTING_CHIPS, refilledOn: todayKey(), jackpots: {}, bestWins: {} };
+    return { chips: STARTING_CHIPS, record: STARTING_CHIPS, refilledOn: todayKey(), jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [] };
   }
   const data = raw as Record<string, unknown>;
   const chips = isCount(data.chips) ? data.chips : 0;
@@ -38,6 +43,8 @@ export function loadCasino(): CasinoSave {
     refilledOn: typeof data.refilledOn === 'string' ? data.refilledOn : '',
     jackpots: readAmounts(data.jackpots),
     bestWins: readAmounts(data.bestWins),
+    usedGifts: Array.isArray(data.usedGifts) ? data.usedGifts.filter((nonce): nonce is number => isCount(nonce)) : [],
+    sentGifts: Array.isArray(data.sentGifts) ? data.sentGifts.filter((code): code is string => typeof code === 'string') : [],
   };
 }
 
@@ -102,6 +109,55 @@ export function buyChips(coins: number): boolean {
   saveCompanion(companion);
   pay(coins * CHIPS_PER_COIN);
   return true;
+}
+
+// -----------------------------------------------
+// GIFT CODES
+// -----------------------------------------------
+
+const SENT_GIFTS_KEPT = 5;
+
+/** Takes `amount` chips and returns the code that gives them, or null when the balance is too low. */
+export function sendGift(amount: number): string | null {
+  const save = loadCasino();
+  if (!isCount(amount) || amount === 0 || amount > MAX_GIFT || amount > save.chips) return null;
+  const nonce = randomNonce();
+  const code = encodeGift({ amount, nonce });
+  save.chips -= amount;
+  // The sender's own device must not cash its code back.
+  save.usedGifts.push(nonce);
+  save.sentGifts = [code, ...save.sentGifts].slice(0, SENT_GIFTS_KEPT);
+  saveCasino(save);
+  return code;
+}
+
+export type RedeemResult = { ok: true; amount: number } | { ok: false; reason: 'invalid' | 'used' };
+
+/** A secret word typed in the code field: chips every time. Only its hash is kept here. */
+const SECRET_WORD_HASH = 3752608652;
+const SECRET_WORD_CHIPS = 5000;
+
+function isSecretWord(text: string): boolean {
+  let hash = 2166136261;
+  for (const char of `cheat:${text.trim().toUpperCase()}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return hash >>> 0 === SECRET_WORD_HASH;
+}
+
+export function redeemGift(code: string): RedeemResult {
+  if (isSecretWord(code)) {
+    const save = loadCasino();
+    save.chips += SECRET_WORD_CHIPS;
+    saveCasino(save);
+    return { ok: true, amount: SECRET_WORD_CHIPS };
+  }
+  const gift = decodeGift(code);
+  if (!gift) return { ok: false, reason: 'invalid' };
+  const save = loadCasino();
+  if (save.usedGifts.includes(gift.nonce)) return { ok: false, reason: 'used' };
+  save.usedGifts.push(gift.nonce);
+  save.chips += gift.amount;
+  saveCasino(save);
+  return { ok: true, amount: gift.amount };
 }
 
 // -----------------------------------------------

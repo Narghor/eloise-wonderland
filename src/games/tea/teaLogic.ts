@@ -79,6 +79,8 @@ export interface Arrival {
   at: number;
   order: Order;
   look: string;
+  /** A house character sitting in the café instead of an anonymous customer. */
+  guest?: string;
 }
 
 const LOOKS = ['🐰', '🐱', '🦊', '🐻', '🐼', '🐨', '🐸', '🦉', '🐭', '🦄'];
@@ -124,6 +126,7 @@ export interface Customer {
   id: number;
   order: Order;
   look: string;
+  guest?: string;
   /** Seconds of patience left. */
   patience: number;
 }
@@ -143,7 +146,7 @@ export interface Tray {
 
 export type TeaEvent =
   | { type: 'arrive'; spot: number }
-  | { type: 'served'; spot: number; tip: number }
+  | { type: 'served'; spot: number; tip: number; guest?: string }
   | { type: 'wrong'; spot: number }
   | { type: 'left'; spot: number }
   | { type: 'ready'; tea: TeaId };
@@ -240,7 +243,7 @@ export class Service {
       }
       const spot = this.spots.indexOf(null);
       if (spot < 0) break;
-      this.spots[spot] = { id: this.next, order: arrival.order, look: arrival.look, patience };
+      this.spots[spot] = { id: this.next, order: arrival.order, look: arrival.look, guest: arrival.guest, patience };
       this.next++;
       events.push({ type: 'arrive', spot });
     }
@@ -291,6 +294,6 @@ export class Service {
     const tip = tipFor(customer.patience, this.tier.patience);
     this.served++;
     this.tips += tip;
-    return { type: 'served', spot, tip };
+    return { type: 'served', spot, tip, guest: customer.guest };
   }
 }

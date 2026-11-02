@@ -6,6 +6,7 @@ import { loadGarden } from './creatures/garden';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
 import { loadCasino } from './games/casino/chips';
+import { loadHouse } from './house/houseSave';
 import { grantDailyGift } from './games/casino/casinoScreen';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
@@ -93,6 +94,7 @@ export function renderHome(root: HTMLElement): () => void {
       'main',
       { class: 'home' },
       companionCard(),
+      houseCard(),
       dailyCard(),
       ...resumeRow(),
       ...sections,
@@ -214,6 +216,18 @@ function companionCard(): HTMLElement {
       el('span', { text: 'L’habiller avec tes pièces' }),
     ),
     el('span', { class: 'coin-pill', text: `${companion.coins} 🪙` }),
+  );
+}
+
+function houseCard(): HTMLElement {
+  const house = loadHouse();
+  const visiting = Date.now() < house.visitUntil ? house.visitors.length : 0;
+  const hint = house.visitUntil === 0 ? 'Des visiteurs t’attendent !' : visiting > 0 ? `${visiting} visiteur${visiting > 1 ? 's' : ''} à la maison` : 'De nouveaux visiteurs sont arrivés !';
+  return el(
+    'a',
+    { class: 'home-companion home-house', href: '#/maison' },
+    el('span', { class: 'home-house-icon', 'aria-hidden': 'true', text: '🏠' }),
+    el('span', { class: 'home-companion-text' }, el('strong', { text: 'Ma maison' }), el('span', { text: hint })),
   );
 }
 
