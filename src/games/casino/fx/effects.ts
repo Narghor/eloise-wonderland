@@ -12,6 +12,18 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 }
 
+/** Haptic patterns, in milliseconds of buzz / pause. */
+export const BUZZ = {
+  bonus: [150, 80, 150, 80, 300],
+  retrigger: [120, 60, 120],
+  jackpot: [300, 100, 300, 100, 600],
+};
+
+/** Buzzes the phone where allowed (Android); does nothing elsewhere. */
+export function buzz(pattern: number[]): void {
+  navigator.vibrate?.(pattern);
+}
+
 /** Shakes an element. `strength` 1 (bump) to 3 (earthquake); toned down for reduced motion. */
 export function shake(target: HTMLElement, strength: 1 | 2 | 3 = 2): void {
   const level = prefersReducedMotion() ? 1 : strength;

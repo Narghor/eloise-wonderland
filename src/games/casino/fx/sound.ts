@@ -196,11 +196,11 @@ export function playCoinLand(size: 'small' | 'big' | 'jackpot'): void {
   playBonusTrigger();
 }
 
-/** A fish takes the float: a watery plop, then the reel's quick clicks. */
+/** A fish pulls the float under: a deep "bloop", a smaller one, and a soft splash. Water only. */
 export function playFishBite(): void {
-  noise(0, 0.18, 0.35, 700);
-  tone(520, 0, 0.12, 'sine', 0.22, 140);
-  for (let i = 0; i < 5; i++) tone(2200 - i * 120, 0.16 + i * 0.045, 0.025, 'square', 0.06);
+  tone(700, 0, 0.16, 'sine', 0.35, 160);
+  tone(950, 0.12, 0.1, 'sine', 0.18, 300);
+  noise(0.02, 0.25, 0.18, 450);
 }
 
 /** One step of a tally: each call `step` plays a little higher. */

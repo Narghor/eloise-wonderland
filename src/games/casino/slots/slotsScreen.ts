@@ -9,6 +9,7 @@ import {
   playLose, playReelStop, playSmallWin, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
   type WinLinesHandle, type WinPath,
 } from '../fx';
+import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import { BET_LEVELS, DIAMOND, JACKPOT_MIN_X, JACKPOT_SHARE, jackpotFor, MACHINE_ID, PAY_SCALE, PAYLINES, REELS, ROWS, STRIPS, SYMBOLS, WILD, spin, type SlotsForce, type SpinResult } from './slotsLogic';
 
@@ -159,6 +160,7 @@ export function renderSlots(root: HTMLElement): () => void {
       lines = drawWinLines(reels, cells, [{ cells: PAYLINES[0].map((row, reel) => [reel, row] as [number, number]), path: PAYLINES[0], color: '#3fe0ff' }]);
       lights.setMode('big');
       playBonusTrigger();
+      buzz(BUZZ.jackpot);
       shake(machine, 3);
       const won = winJackpot(MACHINE_ID, jackpotFor(jackpot(MACHINE_ID), stake));
       noteWin(LOBBY_ID, won, stake);

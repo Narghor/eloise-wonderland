@@ -7,6 +7,7 @@ import {
   winPop, igniteCells,
   type WinLinesHandle, type WinPath,
 } from '../fx';
+import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import {
   BET_LEVELS,
@@ -297,6 +298,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     lines?.clear();
     lines = null;
     playBonusTrigger();
+    buzz(BUZZ.bonus);
     lights.setMode('big');
     message.textContent = 'Les portes s’ouvrent !';
     message.className = 'bonus-message bonus-big';
@@ -385,6 +387,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         burst(v, coin.kind === 'jackpot' || (coin.kind === 'value' && coin.mult >= 15) ? 18 : 8, 'coins');
         playCoinLand(coin.kind === 'jackpot' ? 'jackpot' : coin.mult >= 15 ? 'big' : 'small');
         if (coin.kind === 'jackpot') {
+          buzz(BUZZ.jackpot);
           lights.setMode('big');
           shake(machine, 2);
           jackpotBoxes[coin.tier].classList.add('bonus-jp-hit');

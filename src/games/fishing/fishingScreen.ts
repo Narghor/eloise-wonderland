@@ -211,6 +211,7 @@ export function renderFishing(root: HTMLElement): () => void {
   function setPhase(next: Phase, text: string): void {
     phase = next;
     scene.dataset.phase = next;
+    root.classList.toggle('fish-reeling', next === 'reeling');
     status.textContent = text;
   }
 
@@ -310,7 +311,7 @@ export function renderFishing(root: HTMLElement): () => void {
     clearTimers();
     setPhase(
       'reeling',
-      fish.fight ? `Un gros poisson ! ${FIGHT_HINTS[fish.fight]}` : 'Garde la zone verte sur le poisson : appuie pour la pousser à droite, relâche pour qu’elle revienne.',
+      `${fish.fight ? `Un gros poisson ! ${FIGHT_HINTS[fish.fight]} ` : ''}Garde la zone verte sur le poisson : appuie n’importe où (ici en bas, c’est pratique) pour la pousser à droite, relâche pour qu’elle revienne.`,
     );
     const fight = fightOf(fish);
     let trick = 1.8 + Math.random();
@@ -528,11 +529,18 @@ export function renderFishing(root: HTMLElement): () => void {
       if (performance.now() - biteAt <= biteWindow(hooked)) startReel(hooked);
     } else if (phase === 'reeling') holding = true;
   };
+  // While reeling, a press anywhere on the page counts, so the finger can stay off the bar.
+  const downAnywhere = (event: PointerEvent) => {
+    if (phase !== 'reeling' || scene.contains(event.target as Node) || (event.target as Element).closest?.('button, a')) return;
+    event.preventDefault();
+    holding = true;
+  };
   const up = () => {
     holding = false;
     if (phase === 'charging') cast();
   };
   scene.addEventListener('pointerdown', down);
+  window.addEventListener('pointerdown', downAnywhere);
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 
@@ -546,6 +554,8 @@ export function renderFishing(root: HTMLElement): () => void {
   return () => {
     cancelAnimationFrame(frame);
     clearTimers();
+    window.removeEventListener('pointerdown', downAnywhere);
+    root.classList.remove('fish-reeling');
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
     document.querySelectorAll('.fish-dialog').forEach((node) => node.remove());

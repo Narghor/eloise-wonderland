@@ -6,6 +6,7 @@ import {
   playBonusTrigger, playBookOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
 } from '../fx';
+import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import { LUNA_DEFS, OPEN_BOOK, SYMBOL_ART } from './lunaArt';
 import {
@@ -280,6 +281,7 @@ export function renderLuna(root: HTMLElement): () => void {
     lights.setMode('big');
     if (fresh) {
       playBonusTrigger();
+      buzz(BUZZ.bonus);
       clearBoard();
       setMessage('Le livre s’ouvre…', 'luna-big');
       const books = cells.flat().filter((c) => c.classList.contains('luna-is-book'));
@@ -339,6 +341,7 @@ export function renderLuna(root: HTMLElement): () => void {
       }
       if (step.added > 0) {
         playBonusTrigger();
+        buzz(BUZZ.retrigger);
         setMessage('Nouveau chapitre : les livres collés s’envolent.', 'luna-big');
         await stampBanner(reels, `+${step.added}`, 'TOURS GRATUITS');
         // The logic clears the sticky books on a retrigger.

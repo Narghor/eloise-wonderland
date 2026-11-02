@@ -289,7 +289,7 @@
   position: absolute;
   left: 6%;
   right: 6%;
-  bottom: 6%;
+  top: 6%;
   display: grid;
   gap: 6px;
   padding: 10px;
@@ -559,4 +559,10 @@
 @keyframes fish-tug {
   30% { transform: translateX(-8px); }
   70% { transform: translateX(6px); }
+}
+/* While reeling, a press anywhere holds the line: no scrolling, no text selection. */
+.fish-reeling {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }

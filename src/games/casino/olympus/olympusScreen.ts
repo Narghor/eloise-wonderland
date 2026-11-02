@@ -6,6 +6,7 @@ import {
   playBonusTrigger, playLose, playReelStop, playMedusaAwake, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
 } from '../fx';
+import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import {
   BETS,
@@ -295,6 +296,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     lights.setMode('big');
     if (fresh) {
       playBonusTrigger();
+      buzz(BUZZ.bonus);
       playMedusaAwake(0.3);
       clearLines();
       setMessage('Les temples s’illuminent !', 'oly-big');
@@ -331,6 +333,7 @@ export function renderOlympus(root: HTMLElement): () => void {
       if (medusaCount < 4) showLines(step.wins);
       if (step.added > 0) {
         playBonusTrigger();
+        buzz(BUZZ.retrigger);
         strike();
         setMessage('');
         await stampBanner(sky, `+${step.added}`, 'TOURS GRATUITS');
