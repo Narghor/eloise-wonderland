@@ -142,7 +142,7 @@ export type RedeemResult = { ok: true; amount: number } | { ok: false; reason: '
 
 /** A secret word typed in the code field: chips every time. Only its hash is kept here. */
 const SECRET_WORD_HASH = 3752608652;
-const SECRET_WORD_CHIPS = 5000;
+const SECRET_WORD_CHIPS = 10000;
 
 function isSecretWord(text: string): boolean {
   let hash = 2166136261;
