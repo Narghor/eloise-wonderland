@@ -191,10 +191,15 @@ export function touchPlot(ctx: PanelContext, index: number): 'choose' | 'done' {
   return 'done';
 }
 
+/** The empty plot the next seed goes into: the one touched, else the first free one; -1 when none. */
+export function seedTarget(save: HouseSave): number {
+  if (choosingPlot !== null && save.plots[choosingPlot] !== null) choosingPlot = null;
+  return choosingPlot ?? save.plots.findIndex((plot) => plot === null);
+}
+
 function gardenPart(ctx: PanelContext, now: number): HTMLElement[] {
   const { save } = ctx;
-  if (choosingPlot !== null && save.plots[choosingPlot] !== null) choosingPlot = null;
-  const target = choosingPlot ?? save.plots.findIndex((plot) => plot === null);
+  const target = seedTarget(save);
   const free = target >= 0;
   const season = currentSeason(new Date(now));
 
@@ -220,7 +225,7 @@ function gardenPart(ctx: PanelContext, now: number): HTMLElement[] {
   });
 
   const status = free
-    ? `Touche une graine : elle pousse dans la parcelle ${target + 1}, dans le jardin juste au-dessus.`
+    ? 'Touche une graine : elle pousse dans la parcelle marquée « ici » au-dessus. Touche une autre parcelle vide pour changer.'
     : 'Toutes les parcelles sont occupées : récolte tes plantes, ou achète une nouvelle parcelle.';
   const parts: HTMLElement[] = [
     el('p', { class: 'house-garden-status', text: status }),
@@ -307,7 +312,7 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
   else {
     const slots = stocked.map((p) => {
       const left = (save.pantry[p.id] ?? 0) - pot.filter((id) => id === p.id).length;
-      const slot = el('button', { class: `house-slot is-${p.kind}`, type: 'button', title: p.name, 'aria-label': `${p.name}, ${left}` }, foodIcon(p.id, 34), el('span', { class: 'house-slot-count', text: `${left}` }));
+      const slot = el('button', { class: `house-slot is-${p.kind}`, type: 'button', title: p.name, 'aria-label': `${p.name}, ${left}` }, foodIcon(p.id, 30), el('span', { class: 'house-slot-name', text: p.name }), el('span', { class: 'house-slot-count', text: `${left}` }));
       slot.disabled = left <= 0 || pot.length >= level.ingredients;
       slot.addEventListener('click', () => {
         pot.push(p.id);

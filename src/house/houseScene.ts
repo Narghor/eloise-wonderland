@@ -65,6 +65,7 @@ export class HouseScene {
   private readonly mapKeys = new Map<RoomId, string>();
   private beds: HTMLElement[] = [];
   private bedKeys: string[] = [];
+  private seedTarget = -1;
   private mapClock = 0;
   private scrolling = false;
   private scrollTimer = 0;
@@ -147,6 +148,7 @@ export class HouseScene {
     if (id === 'living' && this.save.gifts.length > 0) {
       const gifts = el('button', { class: 'house-gifts', type: 'button', 'aria-label': 'Ouvrir les cadeaux' });
       for (let i = 0; i < Math.min(3, this.save.gifts.length); i++) gifts.append(el('span', { class: 'house-gift' }));
+      gifts.append(el('span', { class: 'house-gifts-label', text: 'Ouvre-moi !' }));
       gifts.addEventListener('click', (event) => {
         event.stopPropagation();
         this.events.openGifts();
@@ -171,6 +173,12 @@ export class HouseScene {
     return el('div', { class: 'house-beds' }, ...this.beds);
   }
 
+  /** Marks the empty bed the next seed goes into; -1 marks none. */
+  markSeedTarget(index: number): void {
+    this.seedTarget = index;
+    this.beds.forEach((bed, i) => bed.classList.toggle('is-target', i === index));
+  }
+
   /** Grows the plants on screen: sprout, leaves, then the ripe food bobbing. */
   private refreshGarden(now: number): void {
     this.save.plots.forEach((plot, index) => {
@@ -189,11 +197,11 @@ export class HouseScene {
         return;
       }
       this.bedKeys[index] = key;
-      bed.className = `house-bed is-${stage}${plot?.watered ? ' is-watered' : ''}`;
+      bed.className = `house-bed is-${stage}${plot?.watered ? ' is-watered' : ''}${index === this.seedTarget ? ' is-target' : ''}`;
       const name = plot ? plant(plot.plant).name : '';
       const thirsty = !!plot && stage !== 'ripe' && !plot.watered;
       bed.setAttribute('aria-label', !plot ? 'Parcelle vide : planter' : stage === 'ripe' ? `Récolter : ${name}` : thirsty ? `Arroser : ${name}` : `${name} en train de pousser`);
-      const sprite = !plot ? el('span', { class: 'house-bed-plus', text: '+' }) : stage === 'ripe' ? foodIcon(plot.plant, 40) : spriteCanvas(GROWTH_ART[stage as 'sprout' | 'leaves'], stage === 'sprout' ? 4 : 4.6);
+      const sprite = !plot ? el('span', { class: 'house-bed-plus' }, el('b', { text: '+' }), el('small', { text: 'ici' })) : stage === 'ripe' ? foodIcon(plot.plant, 40) : spriteCanvas(GROWTH_ART[stage as 'sprout' | 'leaves'], stage === 'sprout' ? 4 : 4.6);
       const time = plot && stage !== 'ripe' ? [el('span', { class: 'house-bed-time', text: timeLeft(plot.readyAt - now) })] : [];
       bed.replaceChildren(...(thirsty ? [el('span', { class: 'house-bed-thirst', text: '💧' })] : []), sprite, el('span', { class: 'house-bed-soil' }), ...time);
     });
@@ -260,8 +268,13 @@ export class HouseScene {
     return badges;
   }
 
-  /** Marks the room shown below the house. */
-  setActive(id: RoomId): void {
+  /** Marks the room shown below the house; null (the album) or a locked room hides the big view. */
+  setActive(id: RoomId | null): void {
+    this.element.classList.toggle('is-view-hidden', id === null || !this.rooms.has(id));
+    if (id === null) {
+      for (const button of this.map.querySelectorAll<HTMLElement>('[data-map]')) button.classList.remove('is-active');
+      return;
+    }
     this.active = id;
     for (const button of this.map.querySelectorAll<HTMLElement>('[data-map]')) button.classList.toggle('is-active', button.dataset.map === id);
     this.scrollToActive();

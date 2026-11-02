@@ -5,9 +5,10 @@ import { loadCompanion, saveCompanion } from '../companion/companionSave';
 import { findItem } from '../companion/catalog';
 import { CASINO_TEST_BUTTONS } from '../games/casino/fx/testMode'; // TEST-BUTTONS
 import { coinIcon } from './houseArt';
-import { CHARACTERS, POSES, ROOMS, ingredient, type Character } from './houseData';
+import { CHARACTERS, POSES, ROOMS, ingredient, type Character, type IngredientId, type PlantId } from './houseData';
+import { foodIcon } from './houseFoodArt';
 import { befriend, chaptersUnlocked, coins, collectCooked, notePhoto, openGifts, refreshVisits, type VisitNews } from './houseLogic';
-import { panel as roomPanel, touchPlot, type PanelContext, type PanelId } from './housePanels';
+import { panel as roomPanel, seedTarget, touchPlot, type PanelContext, type PanelId } from './housePanels';
 import { HouseScene } from './houseScene';
 import { loadHouse, saveHouse } from './houseSave';
 
@@ -47,9 +48,7 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
     },
     openGifts() {
       const { coins: total, ingredients, seeds } = openGifts(save);
-      const rares = [...new Set(ingredients)].map((id) => `un ingrédient rare (${ingredient(id).name.toLowerCase()})`);
-      const rareSeeds = [...new Set(seeds)].map((id) => `une graine rare (${ingredient(id).name.toLowerCase()})`);
-      say(`Tes visiteurs t’ont laissé ${[...(total > 0 ? [`${total} pièces`] : []), ...rares, ...rareSeeds].join(' et ')} !`);
+      showGifts(total, ingredients, seeds);
       ctx.commit(true);
     },
     select: (room) => show(room),
@@ -61,7 +60,7 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
 
   function show(id: PanelId): void {
     shown = id;
-    if (id !== 'album') houseScene.setActive(id);
+    houseScene.setActive(id === 'album' ? null : id);
     history.replaceState(null, '', `#/maison/${id}`);
     renderPanel();
   }
@@ -71,6 +70,7 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
     albumButton.classList.toggle('is-active', shown === 'album');
     albumButton.classList.toggle('has-news', hasUnreadChapter());
     panel.replaceChildren(...roomPanel(ctx, shown, Date.now()));
+    houseScene.markSeedTarget(seedTarget(save));
   }
 
   function hasUnreadChapter(): boolean {
@@ -158,6 +158,27 @@ function showNews(news: VisitNews): void {
     'div',
     { class: 'house-dialog' },
     el('div', { class: 'house-news' }, el('strong', { text: 'Pendant ton absence…' }), el('ul', {}, ...lines.map((line) => el('li', { text: line }))), close),
+  );
+  close.addEventListener('click', () => dialog.remove());
+  document.body.append(dialog);
+}
+
+/** The opened gifts, one line each, kept on screen until closed. */
+function showGifts(total: number, ingredients: IngredientId[], seeds: PlantId[]): void {
+  const count = (ids: string[]) => ids.reduce<Map<string, number>>((m, id) => m.set(id, (m.get(id) ?? 0) + 1), new Map());
+  const row = (icon: HTMLElement, label: string, detail: string) =>
+    el('li', { class: 'house-gift-row' }, icon, el('span', {}, el('b', { text: label }), el('small', { text: detail })));
+  const rows = [
+    ...(total > 0 ? [row(coinIcon(), `${total} pièces`, 'ajoutées à ta bourse')] : []),
+    ...[...count(ingredients)].map(([id, n]) => row(foodIcon(id as IngredientId, 32), `${n > 1 ? `${n} × ` : ''}${ingredient(id as IngredientId).name}`, 'ingrédient rare · dans le garde-manger')),
+    ...[...count(seeds)].map(([id, n]) => row(foodIcon(id as PlantId, 32), `${n > 1 ? `${n} × ` : ''}graine de ${ingredient(id as PlantId).name.toLowerCase()}`, 'graine rare · à planter au jardin')),
+  ];
+  if (rows.length === 0) return;
+  const close = el('button', { class: 'button', type: 'button', text: 'Merci !' });
+  const dialog = el(
+    'div',
+    { class: 'house-dialog', role: 'dialog', 'aria-label': 'Cadeaux reçus' },
+    el('div', { class: 'house-news' }, el('strong', { text: '🎁 Tes visiteurs t’ont laissé…' }), el('ul', { class: 'house-gift-list' }, ...rows), close),
   );
   close.addEventListener('click', () => dialog.remove());
   document.body.append(dialog);
