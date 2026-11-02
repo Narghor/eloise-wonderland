@@ -132,7 +132,7 @@ export function renderFishing(root: HTMLElement): () => void {
       });
       return b;
     };
-    return el('div', { class: 'casino-test-bar' }, el('b', { text: 'TEST' }), label, button('Saut', 'dragon'), button('Disparition', 'lune'), button('À-coups', 'geant'), button('Trouvaille', 'find'), button('Normal', ''));
+    return el('div', { class: 'casino-test-bar' }, el('b', { text: 'TEST' }), label, button('Rare', 'koi'), button('Très rare', 'fleur'), button('Saut', 'dragon'), button('Disparition', 'lune'), button('À-coups', 'geant'), button('Trouvaille', 'find'), button('Normal', ''));
   }
 
   function toggle(which: 'notebook' | 'tank'): void {
@@ -191,7 +191,15 @@ export function renderFishing(root: HTMLElement): () => void {
   }
 
   function paintChallenge(): void {
-    const { challenge: state } = loadFishing();
+    // A goal lowered after progress was made: pay what is already earned.
+    const save = loadFishing();
+    if (save.challenge.day === today && !save.challenge.done && save.challenge.progress >= challenge.goal) {
+      save.challenge.done = true;
+      saveFishing(save);
+      addCoins(challenge.reward);
+      paintCoins();
+    }
+    const { challenge: state } = save;
     const progress = state.day === today ? state.progress : 0;
     const done = state.day === today && state.done;
     challengeLine.textContent = done

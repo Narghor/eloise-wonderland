@@ -73,12 +73,13 @@ export function challengeOf(day: string, season: Season): FishingChallenge {
   const seed = [...day].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const common = FISH.filter((f) => f.rarity <= 2 && !f.times && (!f.season || f.season === season));
   const target = common[seed % common.length];
-  const big = Math.round(target.size[0] + (target.size[1] - target.size[0]) * 0.6);
+  // Sized for about 15-25 catches: a common species is about 1 catch in 11, a rare one 1 in 20.
+  const big = Math.round(target.size[0] + (target.size[1] - target.size[0]) * 0.3);
   const kinds: FishingChallenge[] = [
-    { text: 'Attrape 3 poissons rares ou mieux', goal: 3, reward: 20, counts: (f) => f.rarity >= 3 },
-    { text: `Attrape 5 × ${target.name.toLowerCase()}`, goal: 5, reward: 12, counts: (f) => f.id === target.id },
+    { text: 'Attrape un poisson rare ou mieux', goal: 1, reward: 15, counts: (f) => f.rarity >= 3 },
+    { text: `Attrape 2 × ${target.name.toLowerCase()}`, goal: 2, reward: 12, counts: (f) => f.id === target.id },
     { text: `Attrape un(e) ${target.name.toLowerCase()} d’au moins ${big} cm`, goal: 1, reward: 15, counts: (f, size) => f.id === target.id && size >= big },
-    { text: 'Attrape 12 poissons', goal: 12, reward: 12, counts: () => true },
+    { text: 'Attrape 10 poissons', goal: 10, reward: 10, counts: () => true },
   ];
   return kinds[Math.floor(seed / 7) % kinds.length];
 }
@@ -108,10 +109,10 @@ export interface Fight {
 
 export function fightOf(fish: Fish): Fight {
   const r = fish.rarity - 1;
-  return { speed: 0.2 + r * 0.09, restless: 1.3 - r * 0.15, zone: 0.32 - r * 0.035, gain: 0.3 - r * 0.045, loss: 0.12 + r * 0.04 };
+  return { speed: 0.18 + r * 0.06, restless: 1.4 - r * 0.12, zone: 0.36 - r * 0.025, gain: 0.32 - r * 0.03, loss: 0.1 + r * 0.025 };
 }
 
 /** Milliseconds the player has to strike once the float dives. */
 export function biteWindow(fish: Fish): number {
-  return 900 - fish.rarity * 70;
+  return 1000 - fish.rarity * 50;
 }

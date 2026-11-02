@@ -195,8 +195,15 @@ export class HouseScene {
     this.bedKeys = [];
     this.beds = this.save.plots.map((_, index) => {
       const bed = el('button', { class: 'house-bed', type: 'button' });
-      bed.addEventListener('pointerdown', (event) => event.stopPropagation());
-      bed.addEventListener('click', () => this.events.plot(index));
+      // A visitor posing over the bed wins the tap: the photo, not the plot.
+      let forPhoto = false;
+      bed.addEventListener('pointerdown', (event) => {
+        forPhoto = this.posingNear('garden', event);
+        if (!forPhoto) event.stopPropagation();
+      });
+      bed.addEventListener('click', () => {
+        if (!forPhoto) this.events.plot(index);
+      });
       return bed;
     });
     this.refreshGarden(Date.now());
