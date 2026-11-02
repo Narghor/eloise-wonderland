@@ -388,11 +388,19 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
 
   const ready = DISHES.filter((d) => (save.dishes[d.id] ?? 0) > 0);
   if (ready.length > 0) {
-    parts.push(sectionTitle('Plats prêts'));
+    parts.push(sectionTitle('Plats prêts'), el('p', { class: 'house-note', text: '« Servir » donne le plat à un visiteur présent : il gagne de l’amitié et vient manger à table (une photo à prendre !).' }));
     for (const d of ready) {
       const serveButton = el('button', { class: 'button', type: 'button', text: 'Servir' });
       serveButton.addEventListener('click', () => serveDish(ctx, d.id));
-      parts.push(el('div', { class: 'house-dish' }, el('span', { class: 'house-dot', style: `background:${d.color}` }), el('span', {}, el('strong', { text: `${d.name} ×${save.dishes[d.id]}` }), el('small', { text: `+${dishStars(d)} ♥ à qui le mange` })), serveButton));
+      parts.push(
+        el(
+          'div',
+          { class: 'house-dish' },
+          el('span', { class: 'house-recipe-foods' }, ...d.ingredients.map((p) => foodIcon(p, 22))),
+          el('span', {}, el('strong', { text: `${d.name} ×${save.dishes[d.id]}` }), el('small', { text: `+${dishStars(d)} ♥ à qui le mange` })),
+          serveButton,
+        ),
+      );
     }
   }
   parts.push(...snackPart(ctx));

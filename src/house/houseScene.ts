@@ -2,7 +2,7 @@ import { el } from '../dom';
 import { companionCanvas } from '../companion/companionArt';
 import { loadCompanion } from '../companion/companionSave';
 import { FURNITURE_ART, GROWTH_ART, coinIcon, spriteCanvas } from './houseArt';
-import { FURNITURE, POSES, ROOMS, SPOT_X, plant, type Character, type PoseId, type RoomId } from './houseData';
+import { FURNITURE, POSES, ROOMS, SPOT_X, dish, plant, type Character, type PoseId, type RoomId } from './houseData';
 import { foodIcon } from './houseFoodArt';
 import { MINUTE_MS, availablePoses, character } from './houseLogic';
 import { pairsHome, type Pair, type SearchResult } from './houseFriends';
@@ -81,6 +81,8 @@ export class HouseScene {
   private beds: HTMLElement[] = [];
   private bedKeys: string[] = [];
   private seedTarget = -1;
+  private stove: HTMLElement | null = null;
+  private stoveKey = '';
   private mapClock = 0;
   private scrolling = false;
   private scrollTimer = 0;
@@ -178,6 +180,12 @@ export class HouseScene {
       element.append(gifts);
     }
     if (id === 'garden') element.append(this.gardenBeds());
+    if (id === 'kitchen') {
+      this.stove = el('div', { class: 'house-stove' });
+      this.stoveKey = '';
+      this.refreshStove(Date.now());
+      element.append(this.stove);
+    }
     element.addEventListener('pointerdown', (event) => this.tap(id, event));
     return element;
   }
@@ -193,6 +201,28 @@ export class HouseScene {
     });
     this.refreshGarden(Date.now());
     return el('div', { class: 'house-beds' }, ...this.beds);
+  }
+
+  /** The pots on the stove: steam and time left while cooking, a bell when done. */
+  private refreshStove(now: number): void {
+    if (!this.stove) return;
+    const pots = this.save.cooking.map((c) => ({ dish: dish(c.dish), left: c.readyAt - now }));
+    const ready = Object.values(this.save.dishes).reduce((sum, n) => sum + (n ?? 0), 0);
+    const key = `${pots.map((p) => `${p.dish.id}:${timeLeft(p.left)}`).join(',')}|${ready}`;
+    if (key === this.stoveKey) return;
+    this.stoveKey = key;
+    this.stove.replaceChildren(
+      ...pots.map((p) =>
+        el(
+          'div',
+          { class: `house-pot-cooking${p.left <= 0 ? ' is-done' : ''}`, title: p.dish.name },
+          el('span', { class: 'house-steam', 'aria-hidden': 'true' }),
+          el('span', { class: 'house-pot-body', style: `--dish:${p.dish.color}` }),
+          el('span', { class: 'house-pot-label', text: p.left <= 0 ? 'prêt !' : timeLeft(p.left) }),
+        ),
+      ),
+      ...(ready > 0 ? [el('span', { class: 'house-ready-plates', text: `🍽️ ${ready} prêt${ready > 1 ? 's' : ''}` })] : []),
+    );
   }
 
   /** Marks the empty bed the next seed goes into; -1 marks none. */
@@ -423,6 +453,7 @@ export class HouseScene {
       this.mapClock = time;
       this.refreshMap(Date.now());
       this.refreshGarden(Date.now());
+      this.refreshStove(Date.now());
     }
     this.frame = requestAnimationFrame(this.tick);
   };
@@ -485,7 +516,16 @@ export class HouseScene {
   private choosePose(actor: Actor, time: number): void {
     const available = availablePoses(this.save);
     const busy = new Set(this.actors.filter((a) => a !== actor && (a.pose || a.pending)).map((a) => (a.pending ?? { room: a.room }).room));
-    if (!busy.has('living') && Math.random() < PAIR_CHANCE && this.startPair(actor)) return;
+    const pair = this.pairOf(actor);
+    if (pair && Math.random() < PAIR_CHANCE) {
+      // The friend is busy: wait for it rather than posing alone, so the two fall in step.
+      if (pair.partner.pose || pair.partner.pending || busy.has('living')) {
+        actor.nextPoseAt = time + 1500;
+        return;
+      }
+      this.startPair(actor, pair);
+      return;
+    }
     const options = actor.character!.poses.filter((pose) => {
       const where = available.get(pose);
       return where && !busy.has(where.room) && pose !== 'eat';
@@ -500,19 +540,21 @@ export class HouseScene {
     this.headFor(actor, where.room, actor.pending.x);
   }
 
-  /** Sends this visitor and a friend from its story to pose side by side in the living room. */
-  private startPair(actor: Actor): boolean {
+  /** A friend from this visitor's story who is at home too, if any. */
+  private pairOf(actor: Actor): { pair: Pair; partner: Actor } | null {
     const id = actor.character?.id;
     const pair = pairsHome(this.save).find((p) => id && p.friends.includes(id));
-    if (!pair) return false;
-    const partner = this.actors.find((a) => a.character && a.character.id !== id && pair.friends.includes(a.character.id));
-    if (!partner || partner.pose || partner.pending) return false;
+    const partner = pair && this.actors.find((a) => a.character && a.character.id !== id && pair.friends.includes(a.character.id));
+    return pair && partner ? { pair, partner } : null;
+  }
+
+  /** Sends this visitor and its friend to pose side by side in the living room. */
+  private startPair(actor: Actor, { pair, partner }: { pair: Pair; partner: Actor }): void {
     [actor, partner].forEach((a, i) => {
       a.pair = { pair, partner: i === 0 ? partner : actor };
       a.pending = { pose: 'dance', room: 'living', x: i === 0 ? 0.4 : 0.6 };
       this.headFor(a, 'living', a.pending.x);
     });
-    return true;
   }
 
   private startPose(actor: Actor, time: number): void {

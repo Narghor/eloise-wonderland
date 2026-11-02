@@ -1,7 +1,7 @@
 import './casino.css';
 import { el, topBar } from '../../dom';
 import { loadCompanion } from '../../companion/companionSave';
-import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, loadCasino, pay, redeemGift, sendGift } from './chips';
+import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, hideSentGift, loadCasino, pay, redeemGift, sendGift } from './chips';
 import { decodeGift } from './giftCode';
 import { burst, playBonusTrigger } from './fx';
 import { renderSlots } from './slots/slotsScreen';
@@ -177,7 +177,12 @@ function giftSection(root: HTMLElement, balance: number, sentGifts: string[]): H
         copy.lastElementChild!.textContent = 'copié !';
       });
     });
-    return copy;
+    const hide = el('button', { class: 'casino-hide-code', type: 'button', 'aria-label': 'Masquer ce code', title: 'Masquer', text: '✕' });
+    hide.addEventListener('click', () => {
+      hideSentGift(code);
+      refresh();
+    });
+    return el('div', { class: 'casino-sent-row' }, copy, hide);
   });
 
   return el(

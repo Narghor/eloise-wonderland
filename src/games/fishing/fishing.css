@@ -1,0 +1,562 @@
+.fish-screen {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: 12px 16px 32px;
+}
+
+.fish-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* -----------------------------------------------
+   THE POND, by time of day
+   ----------------------------------------------- */
+
+.fish-scene {
+  --sky-top: #8fd3ff;
+  --sky-bottom: #dff4ff;
+  --water-top: #4fa8d8;
+  --water-bottom: #2a6f9e;
+  --astre: #ffe066;
+  --bank: #7cc26a;
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  max-width: 100%;
+  border-radius: 18px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.fish-scene.is-dawn { --sky-top: #f6b7c9; --sky-bottom: #ffe6c8; --water-top: #8fb8d8; --water-bottom: #5a7fa8; --astre: #ffcf8a; }
+.fish-scene.is-dusk { --sky-top: #e8735a; --sky-bottom: #ffc46b; --water-top: #c27a4a; --water-bottom: #5a3a5a; --astre: #ffd85a; --bank: #6a8a4a; }
+.fish-scene.is-night { --sky-top: #141a3a; --sky-bottom: #2e3a6a; --water-top: #1f3358; --water-bottom: #0e1a30; --astre: #f2f2ff; --bank: #2f4a3a; }
+.fish-scene.is-winter { --bank: #eef4f8; }
+.fish-scene.is-autumn { --bank: #c98a3a; }
+
+.fish-sky {
+  position: absolute;
+  inset: 0 0 42% 0;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom));
+}
+
+.fish-astre {
+  position: absolute;
+  top: 14%;
+  right: 14%;
+  width: 11%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--astre);
+  box-shadow: 0 0 24px var(--astre);
+}
+
+.fish-scene.is-night .fish-sky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1px 1px at 12% 20%, #fff, transparent),
+    radial-gradient(1px 1px at 30% 40%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 52% 18%, #fff, transparent),
+    radial-gradient(1px 1px at 66% 52%, #fff, transparent),
+    radial-gradient(1px 1px at 40% 70%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 22% 62%, #fff, transparent);
+}
+
+.fish-far-bank {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52%;
+  height: 8%;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: var(--bank);
+}
+
+.fish-water {
+  position: absolute;
+  inset: 58% 0 0 0;
+  overflow: hidden;
+  background:
+    linear-gradient(color-mix(in srgb, var(--bank) 55%, var(--water-top)) 0 5%, transparent 14%),
+    linear-gradient(var(--water-top), var(--water-bottom));
+}
+
+/* Wave glints: small and slow near the far bank, larger and faster up front. */
+.fish-water::before,
+.fish-water::after {
+  content: '';
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  background-repeat: repeat;
+  animation: fish-waves linear infinite;
+}
+
+.fish-water::before {
+  top: 4%;
+  height: 40%;
+  background-image:
+    radial-gradient(ellipse 9px 1.5px at 30% 40%, rgb(255 255 255 / 0.35) 60%, transparent),
+    radial-gradient(ellipse 6px 1px at 75% 80%, rgb(255 255 255 / 0.25) 60%, transparent);
+  background-size: 48px 14px;
+  animation-duration: 14s;
+}
+
+.fish-water::after {
+  top: 40%;
+  bottom: 0;
+  background-image:
+    radial-gradient(ellipse 22px 2.5px at 25% 35%, rgb(255 255 255 / 0.3) 60%, transparent),
+    radial-gradient(ellipse 14px 2px at 70% 75%, rgb(255 255 255 / 0.22) 60%, transparent);
+  background-size: 110px 30px;
+  animation-duration: 8s;
+  animation-direction: reverse;
+}
+
+@keyframes fish-waves {
+  to { transform: translateX(110px); }
+}
+
+/* The sun or moon shimmering on the water, under the sky's own. */
+.fish-reflection {
+  position: absolute;
+  top: 58%;
+  right: 15%;
+  width: 9%;
+  height: 34%;
+  background: repeating-linear-gradient(180deg, var(--astre) 0 2px, transparent 2px 7px);
+  filter: blur(0.6px);
+  mask-image: radial-gradient(ellipse 50% 100% at 50% 0%, #000 35%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 50% 100% at 50% 0%, #000 35%, transparent 100%);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: fish-shimmer 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes fish-shimmer {
+  from { transform: scaleX(0.8); opacity: 0.4; }
+  to { transform: scaleX(1.25); opacity: 0.65; }
+}
+
+.fish-scene.is-day .fish-reflection { opacity: 0.3; }
+
+.fish-pier {
+  position: absolute;
+  left: 0;
+  bottom: 24%;
+  width: 26%;
+  height: 7%;
+  background: repeating-linear-gradient(90deg, #a0703e 0 12px, #8a5e32 12px 14px);
+  box-shadow: 0 6px 0 #5e3e1e;
+}
+
+.fish-angler {
+  position: absolute;
+  left: 6%;
+  bottom: 31%;
+  pointer-events: none;
+}
+
+.fish-rod {
+  stroke: #6b4423;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.fish-scene.is-night.is-autumn { --bank: #6a4a24; }
+.fish-scene.is-night.is-winter { --bank: #8a98a8; }
+.fish-scene.is-night.is-summer,
+.fish-scene.is-night.is-spring { --bank: #2f4a3a; }
+
+.fish-line-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.fish-line {
+  stroke: rgb(255 255 255 / 0.8);
+  stroke-width: 0.3;
+}
+
+.fish-scene[data-phase='idle'] .fish-line,
+.fish-scene[data-phase='charging'] .fish-line,
+.fish-scene[data-phase='idle'] .fish-float,
+.fish-scene[data-phase='charging'] .fish-float {
+  visibility: hidden;
+}
+
+.fish-float {
+  position: absolute;
+  width: 14px;
+  height: 18px;
+  translate: -50% -50%;
+  border-radius: 50% 50% 45% 45%;
+  background: linear-gradient(#ff5a6e 0 50%, #fff 50%);
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.25);
+  pointer-events: none;
+  animation: fish-bob 1.6s ease-in-out infinite alternate;
+}
+
+/* Rings spreading on the water around the float. */
+.fish-float::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  width: 26px;
+  height: 8px;
+  translate: -50% -50%;
+  border: 1.5px solid rgb(255 255 255 / 0.7);
+  border-radius: 50%;
+  animation: fish-ring 1.8s ease-out infinite;
+}
+
+.fish-float.is-diving::after,
+.fish-float.is-nibble::after {
+  animation-duration: 0.5s;
+}
+
+@keyframes fish-ring {
+  from { transform: scale(0.4); opacity: 1; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+
+.fish-float.is-landing { animation: fish-land 0.5s ease-out, fish-bob 1.6s 0.5s ease-in-out infinite alternate; }
+.fish-float.is-nibble { animation: fish-nibble 0.35s ease-in-out; }
+.fish-float.is-diving { animation: fish-dive 0.25s ease-in forwards; }
+
+@keyframes fish-bob { to { transform: translateY(3px); } }
+@keyframes fish-land { from { transform: translateY(-60px) scale(0.6); } }
+@keyframes fish-nibble { 50% { transform: translateY(5px); } }
+@keyframes fish-dive { to { transform: translateY(12px); opacity: 0.4; } }
+
+.fish-mark {
+  position: absolute;
+  top: 40%;
+  translate: -50% 0;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 900;
+  text-shadow: 0 0 8px #ff3b5c, 0 2px 0 #b0203a;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.fish-scene[data-phase='bite'] .fish-mark {
+  visibility: visible;
+  animation: fish-pop 0.3s ease-out;
+}
+
+@keyframes fish-pop { from { transform: scale(0.3); } }
+
+.fish-power {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 8%;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.3);
+  box-shadow: inset 0 0 0 2px #fff;
+  visibility: hidden;
+}
+
+.fish-power span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #7fd36b, #ffd23f, #ff6b5a);
+}
+
+.fish-scene[data-phase='charging'] .fish-power { visibility: visible; }
+
+/* -----------------------------------------------
+   REELING
+   ----------------------------------------------- */
+
+.fish-reel {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: 6%;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgb(20 30 50 / 0.75);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.fish-scene[data-phase='reeling'] .fish-reel { visibility: visible; }
+
+.fish-track {
+  position: relative;
+  height: 34px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.15);
+}
+
+.fish-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 10px;
+  background: rgb(127 211 107 / 0.45);
+  box-shadow: inset 0 0 0 2px #7fd36b;
+}
+
+.fish-zone.is-on { background: rgb(127 211 107 / 0.75); }
+
+.fish-target {
+  position: absolute;
+  top: 50%;
+  translate: -50% -50%;
+}
+
+.fish-target canvas { display: block; filter: drop-shadow(0 0 3px #fff); }
+
+.fish-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.fish-progress span {
+  display: block;
+  height: 100%;
+  background: #ffd23f;
+}
+
+/* -----------------------------------------------
+   TEXT, BUTTONS, CATCH
+   ----------------------------------------------- */
+
+.fish-status {
+  min-height: 2.6em;
+  margin: 0;
+  font-weight: 700;
+  text-align: center;
+}
+
+.fish-when {
+  margin: 0;
+  color: var(--muted, #8a7a92);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.fish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.fish-actions .is-on { background: var(--accent-soft, #ffe1ec); }
+
+.fish-art { image-rendering: pixelated; }
+.fish-art.is-glowing { filter: drop-shadow(0 0 6px #fff6a8); }
+
+.fish-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(30 20 40 / 0.55);
+}
+
+.fish-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: min(100%, 340px);
+  padding: 20px 16px 16px;
+  border-radius: 20px;
+  background: #fff;
+  text-align: center;
+  animation: fish-pop 0.35s ease-out;
+}
+
+.fish-card.is-rarity-3 { box-shadow: 0 0 0 4px #7fc4e8; }
+.fish-card.is-rarity-4 { box-shadow: 0 0 0 4px #b07fe8, 0 0 30px #b07fe8; }
+.fish-card.is-rarity-5 { box-shadow: 0 0 0 4px #ffd23f, 0 0 40px #ffd23f; }
+
+.fish-card-name { font-size: 1.4rem; }
+.fish-card-rarity { color: var(--accent-strong, #d9608c); font-weight: 800; }
+.fish-card-note { margin: 0; color: var(--muted, #8a7a92); font-size: 0.9rem; }
+
+.fish-badge {
+  position: absolute;
+  top: -12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #ff7fae;
+  color: #fff;
+  font-weight: 900;
+}
+
+.fish-notebook {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.fish-entry {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 2px solid #e3d9f0;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+}
+
+.fish-entry small { color: var(--muted, #8a7a92); font-size: 0.72rem; }
+.fish-entry.is-unknown { background: #f5f2f8; }
+.fish-entry.is-rarity-3 { border-color: #7fc4e8; }
+.fish-entry.is-rarity-4 { border-color: #b07fe8; }
+.fish-entry.is-rarity-5 { border-color: #ffd23f; background: #fffbe8; }
+
+.fish-tank {
+  position: relative;
+  overflow: hidden;
+  height: 260px;
+  border: 6px solid #cfe7f2;
+  border-radius: 16px;
+  background: linear-gradient(#a8dcf2, #4f9fc8);
+}
+
+.fish-tank-sand {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 14%;
+  background: #e8d4a0;
+}
+
+.fish-swimmer {
+  position: absolute;
+  left: 0;
+  animation: fish-swim linear infinite;
+}
+
+@keyframes fish-swim {
+  0% { left: -10%; transform: scaleX(1); }
+  49% { left: 90%; transform: scaleX(1); }
+  50% { left: 90%; transform: scaleX(-1); }
+  99% { left: -10%; transform: scaleX(-1); }
+  100% { left: -10%; transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fish-float,
+  .fish-float::after,
+  .fish-swimmer,
+  .fish-water::before,
+  .fish-water::after,
+  .fish-reflection {
+    animation: none;
+  }
+}
+
+/* -----------------------------------------------
+   BAITS, STREAK, CHALLENGE, FINDS, FIGHTS
+   ----------------------------------------------- */
+
+.fish-baits {
+  display: grid;
+  gap: 6px;
+}
+
+.fish-bait-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.fish-bait {
+  display: grid;
+  justify-items: center;
+  min-width: 70px;
+  padding: 6px 8px;
+  border: 2px solid #e3d9f0;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fish-bait span { font-size: 1.3rem; }
+.fish-bait small { font-size: 0.7rem; color: var(--muted, #8a7a92); white-space: nowrap; }
+.fish-bait.is-on { border-color: var(--accent-strong, #d9608c); background: var(--accent-soft, #ffe1ec); }
+
+.fish-bait-effect { color: var(--muted, #8a7a92); font-size: 0.8rem; }
+.fish-buy { padding-block: 6px; }
+
+.fish-streak {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.9);
+  color: #e0452e;
+  font-size: 0.8rem;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.fish-streak:empty { display: none; }
+
+.fish-challenge {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #fff7dc;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.fish-challenge.is-done { background: #e6f7df; }
+
+.fish-card-extra { color: var(--accent-strong, #d9608c); font-weight: 800; }
+.fish-card.is-find { box-shadow: 0 0 0 4px #c9a66b; }
+
+.fish-find-icon { font-size: 4rem; line-height: 1.2; }
+.fish-find-icon.is-small { font-size: 2rem; }
+.fish-entry.is-find { border-color: #c9a66b; background: #fbf5ea; }
+
+.fish-target.is-hidden { opacity: 0; }
+
+.is-shaken { animation: fish-shake 0.35s ease-in-out; }
+
+@keyframes fish-shake {
+  25% { translate: -50% calc(-50% - 6px); }
+  75% { translate: -50% calc(-50% + 4px); }
+}
+
+.fish-reel.is-shaken { animation: fish-tug 0.3s ease-in-out; }
+
+@keyframes fish-tug {
+  30% { transform: translateX(-8px); }
+  70% { transform: translateX(6px); }
+}

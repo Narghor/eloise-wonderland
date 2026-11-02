@@ -7,6 +7,8 @@ import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
 import { loadCasino } from './games/casino/chips';
 import { loadHouse } from './house/houseSave';
+import { FISH } from './games/fishing/fishingData';
+import { loadFishing } from './games/fishing/fishingSave';
 import { grantDailyGift } from './games/casino/casinoScreen';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
@@ -48,7 +50,7 @@ const GAMES: Record<ChallengeGame, GameEntry> = {
 const SECTIONS: { title: string; games: ChallengeGame[] }[] = [
   { title: 'Réflexion', games: ['picross', 'potions', 'mahjong', 'box', 'pastry', 'glass', 'bouquet', 'vegetables'] },
   { title: 'Création', games: ['sand', 'bracelets', 'embroidery', 'mosaic', 'beads'] },
-  { title: 'Adresse et rapidité', games: ['bubbles', 'icing', 'tea'] },
+  { title: 'Adresse et rapidité', games: ['bubbles', 'icing'] },
 ];
 
 function readBlock(entry: GameEntry): Record<string, unknown> {
@@ -94,7 +96,7 @@ export function renderHome(root: HTMLElement): () => void {
       'main',
       { class: 'home' },
       companionCard(),
-      houseCard(),
+      houseBlock(),
       casinoCard(),
       dailyCard(),
       ...resumeRow(),
@@ -228,6 +230,26 @@ function houseCard(): HTMLElement {
     { class: 'home-companion home-house', href: '#/maison' },
     el('span', { class: 'home-house-icon', 'aria-hidden': 'true', text: '🏠' }),
     el('span', { class: 'home-companion-text' }, el('strong', { text: 'Ma maison' }), el('span', { text: hint })),
+  );
+}
+
+/** The house, with the games around it attached underneath: the tea room and the pond. */
+function houseBlock(): HTMLElement {
+  const caught = Object.keys(loadFishing().caught).length;
+  const tea = GAMES.tea;
+  const services = doneCount(tea);
+  const annex = (href: string, icon: string, name: string, progress: string) =>
+    el('a', { class: 'home-annex', href }, el('span', { class: 'home-annex-icon', 'aria-hidden': 'true', text: icon }), el('span', { class: 'home-companion-text' }, el('strong', { text: name }), el('span', { text: progress })));
+  return el(
+    'section',
+    { class: 'home-house-block' },
+    houseCard(),
+    el(
+      'div',
+      { class: 'home-annexes' },
+      annex(tea.href, '☕', tea.name, services === 0 ? 'À découvrir' : `${services} ${services === 1 ? tea.unit[0] : tea.unit[1]}`),
+      annex('#/peche', '🎣', 'La pêche', caught === 0 ? 'L’étang du jardin' : `${caught}/${FISH.length} poissons`),
+    ),
   );
 }
 

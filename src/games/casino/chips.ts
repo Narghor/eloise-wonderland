@@ -131,6 +131,13 @@ export function sendGift(amount: number): string | null {
   return code;
 }
 
+/** Removes a code from the "last codes" list; the code itself still works for whoever has it. */
+export function hideSentGift(code: string): void {
+  const save = loadCasino();
+  save.sentGifts = save.sentGifts.filter((c) => c !== code);
+  saveCasino(save);
+}
+
 export type RedeemResult = { ok: true; amount: number } | { ok: false; reason: 'invalid' | 'used' };
 
 /** A secret word typed in the code field: chips every time. Only its hash is kept here. */

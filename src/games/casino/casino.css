@@ -120,6 +120,28 @@
   cursor: pointer;
 }
 
+.casino-sent-row {
+  display: flex;
+  gap: 6px;
+}
+
+.casino-sent-row .casino-sent-code {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.casino-hide-code {
+  flex: none;
+  width: 40px;
+  border: 1px solid var(--line, #e3d9f0);
+  border-radius: 10px;
+  background: none;
+  color: var(--muted, #8a7a92);
+  font: inherit;
+  cursor: pointer;
+}
+
 .casino-note {
   font-size: 0.8rem;
   color: var(--muted);
