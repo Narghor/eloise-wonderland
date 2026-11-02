@@ -23,6 +23,7 @@ import { renderMahjong } from './games/mahjong/mahjongScreen';
 import { renderCasino } from './games/casino/casinoScreen';
 import { renderHouse } from './house/houseScreen';
 import { requestPersistentStorage } from './save';
+import { watchForUpdates } from './update';
 
 /** A screen fills the root and returns what to undo when we leave it. `#/name/a/b` gives params [a, b]. */
 type Screen = (root: HTMLElement, params: string[]) => () => void;
@@ -71,4 +72,5 @@ requestPersistentStorage();
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
+  watchForUpdates();
 }

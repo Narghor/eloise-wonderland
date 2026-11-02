@@ -5,6 +5,7 @@ import { FURNITURE_ART, GROWTH_ART, coinIcon, spriteCanvas } from './houseArt';
 import { FURNITURE, POSES, ROOMS, SPOT_X, plant, type Character, type PoseId, type RoomId } from './houseData';
 import { foodIcon } from './houseFoodArt';
 import { MINUTE_MS, availablePoses, character } from './houseLogic';
+import { pairsHome, type Pair, type SearchResult } from './houseFriends';
 import type { HouseSave } from './houseSave';
 
 // -----------------------------------------------
@@ -21,6 +22,12 @@ const TWO_STARS = 0.13;
 /** Pixels around a posing visitor's centre that still count as touching it. */
 const SNAP_RADIUS = 70;
 const ROOM_CHANGE_CHANCE = 0.25;
+/** Time a visitor waits on its spot, thought bubble up, before posing. */
+const POSE_WARNING_MS = 5000;
+/** Chance that a visitor about to pose calls a friend of its story to pose together instead. */
+const PAIR_CHANCE = 0.4;
+/** Two friends share one ring, so it does not follow either one's rhythm. */
+const PAIR_POSE_MS = 1800;
 
 export interface SceneEvents {
   photo(characterId: string, pose: PoseId, stars: number): void;
@@ -29,6 +36,10 @@ export interface SceneEvents {
   select(room: RoomId): void;
   /** A garden bed was touched in the big view. */
   plot(index: number): void;
+  /** A piece of furniture was searched for a lost thing. */
+  search(room: RoomId, spot: number): SearchResult | null;
+  /** Two friends were photographed together. */
+  pairPhoto(pair: Pair, stars: number): void;
 }
 
 interface Actor {
@@ -47,9 +58,13 @@ interface Actor {
   facing: 1 | -1;
   pending: { pose: PoseId; room: RoomId; x: number } | null;
   pose: PoseId | null;
+  /** When the pose starts once the visitor waits on its spot; 0 while not waiting. */
+  poseAt: number;
   poseStart: number;
   nextPoseAt: number;
   snapped: boolean;
+  /** Posing with a friend: both wait for each other, then pose for one shared photo. */
+  pair: { pair: Pair; partner: Actor } | null;
 }
 
 export class HouseScene {
@@ -139,7 +154,14 @@ export class HouseScene {
     if (id === 'living' || id === 'bedroom' || id === 'library') element.append(el('div', { class: 'house-window' }));
     this.save.placed[id].forEach((piece, spot) => {
       if (!piece) return;
-      const holder = el('div', { class: `house-furniture is-${piece}`, style: `left:${SPOT_X[spot] * 100}%` }, spriteCanvas(FURNITURE_ART[piece]));
+      const holder = el('div', { class: `house-furniture is-${piece}${this.save.lost ? ' is-searchable' : ''}`, style: `left:${SPOT_X[spot] * 100}%` }, spriteCanvas(FURNITURE_ART[piece]));
+      if (this.save.lost) {
+        holder.addEventListener('pointerdown', (event) => {
+          if (this.posingNear(id, event)) return;
+          event.stopPropagation();
+          this.searchBehind(id, spot, holder);
+        });
+      }
       if (piece === 'table') {
         this.save.table.forEach((_, i) => holder.append(el('span', { class: 'house-plate', style: `left:${30 + i * 30}%` })));
       }
@@ -257,7 +279,8 @@ export class HouseScene {
   /** What calls for the player in a room: a pose to shoot, a harvest, a dish, gifts, an order. */
   private badges(id: RoomId, now: number): string[] {
     const badges: string[] = [];
-    if (this.actors.some((a) => a.room === id && a.pose !== null && !a.snapped)) badges.push('✨');
+    const posingHere = (a: Actor) => (a.pose !== null && !a.snapped && a.room === id) || (a.pending !== null && a.pending.room === id);
+    if (this.actors.some(posingHere)) badges.push('✨');
     if (id === 'garden' && this.save.plots.some((plot) => plot && plot.readyAt <= now)) badges.push('🌱');
     if (id === 'garden' && this.save.plots.some((plot) => plot && plot.readyAt > now && !plot.watered)) badges.push('💧');
     if (id === 'kitchen') {
@@ -265,6 +288,7 @@ export class HouseScene {
       if (this.save.order && this.save.visitors.includes(this.save.order.visitor)) badges.push('📋');
     }
     if (id === 'living' && this.save.gifts.length > 0) badges.push('🎁');
+    if (id === 'living' && (this.save.requests.length > 0 || this.save.lost)) badges.push('💬');
     return badges;
   }
 
@@ -307,6 +331,26 @@ export class HouseScene {
   // PHOTO
   // -----------------------------------------------
 
+  private posingNear(room: RoomId, event: PointerEvent): boolean {
+    return this.actors.some((a) => a.room === room && a.pose !== null && !a.snapped && distanceTo(a, event) <= SNAP_RADIUS);
+  }
+
+  /** Wiggles the piece, then says how close the lost thing is. */
+  private searchBehind(room: RoomId, spot: number, holder: HTMLElement): void {
+    holder.classList.remove('is-wiggling');
+    void holder.offsetWidth;
+    holder.classList.add('is-wiggling');
+    const result = this.events.search(room, spot);
+    if (!result) return;
+    if (result === 'found') {
+      const found = el('span', { class: 'house-found', text: '✨' });
+      holder.append(found);
+      window.setTimeout(() => found.remove(), 1400);
+      return;
+    }
+    this.toast(room, result === 'warm' ? '🔥 Tiède ! C’est dans cette pièce…' : '🥶 Froid… pas dans cette pièce.', 1800);
+  }
+
   private tap(room: RoomId, event: PointerEvent): void {
     const posing = this.actors.find((a) => a.room === room && a.pose !== null && !a.snapped);
     if (posing && distanceTo(posing, event) <= SNAP_RADIUS) {
@@ -315,7 +359,11 @@ export class HouseScene {
     }
     const touched = this.actors.find((a) => a.room === room && a.root.contains(event.target as Node));
     if (!touched) return;
-    if (touched.character) this.toast(room, `${touched.character.name} ne fait rien de spécial…`);
+    if (touched.character && touched.poseAt > 0) this.toast(room, `${touched.character.name} se prépare : attends le cercle doré !`);
+    else if (touched.character) {
+      const lines = touched.character.chatter;
+      this.toast(room, `${touched.character.name} : « ${lines[Math.floor(Math.random() * lines.length)]} »`, 3500);
+    }
     else this.heart(touched);
   }
 
@@ -328,6 +376,11 @@ export class HouseScene {
     const flash = el('div', { class: 'house-flash' });
     room.append(flash);
     window.setTimeout(() => flash.remove(), 500);
+    if (actor.pair) {
+      actor.pair.partner.snapped = true;
+      this.events.pairPhoto(actor.pair.pair, stars);
+      return;
+    }
     const card = photoCard(actor.character!, actor.pose!, stars);
     card.classList.add('is-flying');
     room.append(card);
@@ -335,10 +388,11 @@ export class HouseScene {
     this.events.photo(actor.character!.id, actor.pose!, stars);
   }
 
-  private toast(room: RoomId, text: string): void {
+  private toast(room: RoomId, text: string, ms = 1600): void {
+    this.rooms.get(room)?.querySelector('.house-toast')?.remove();
     const note = el('div', { class: 'house-toast', text });
     this.rooms.get(room)?.append(note);
-    window.setTimeout(() => note.remove(), 1600);
+    window.setTimeout(() => note.remove(), ms);
   }
 
   private heart(actor: Actor): void {
@@ -358,7 +412,7 @@ export class HouseScene {
     const icon = el('span', { class: 'house-pose-icon' });
     const name = c ? [el('span', { class: 'house-name', text: c.name })] : [];
     const root = el('div', { class: `house-actor${c ? ' is-visitor' : ''}` }, sight, ring, icon, body, ...name);
-    return { character: c, root, body, ring, sight, icon, room, x, target: x, nextRoom: null, facing: 1, pending: null, pose: null, poseStart: 0, nextPoseAt, snapped: false };
+    return { character: c, root, body, ring, sight, icon, room, x, target: x, nextRoom: null, facing: 1, pending: null, pose: null, poseAt: 0, poseStart: 0, nextPoseAt, snapped: false, pair: null };
   }
 
   private readonly tick = (time: number): void => {
@@ -383,7 +437,18 @@ export class HouseScene {
     const gap = actor.target - actor.x;
     if (Math.abs(gap) < 0.01) {
       if (actor.nextRoom) this.enter(actor, actor.nextRoom);
-      else if (actor.pending && actor.pending.room === actor.room) this.startPose(actor, time);
+      else if (actor.pending && actor.pending.room === actor.room) {
+        // On the spot: a thought bubble first, so the player has time to come from another room.
+        if (actor.poseAt === 0) {
+          actor.icon.textContent = actor.pair ? '💭📸' : `💭${POSES[actor.pending.pose].icon}`;
+          actor.root.classList.add('is-about-to-pose');
+          // A pair waits for both friends to be on their spot, then they pose together.
+          const partner = actor.pair?.partner;
+          if (!partner) actor.poseAt = time + POSE_WARNING_MS;
+          else if (partner.poseAt > 0) actor.poseAt = partner.poseAt = time + POSE_WARNING_MS;
+          else actor.poseAt = Infinity;
+        } else if (time >= actor.poseAt) this.startPose(actor, time);
+      }
       else if (actor.character && !actor.pending && time >= actor.nextPoseAt) this.choosePose(actor, time);
       else if (!actor.pending && Math.random() < dt * 0.35) {
         if (Math.random() < ROOM_CHANGE_CHANCE) this.headFor(actor, this.randomRoom(), 0.15 + Math.random() * 0.7);
@@ -420,6 +485,7 @@ export class HouseScene {
   private choosePose(actor: Actor, time: number): void {
     const available = availablePoses(this.save);
     const busy = new Set(this.actors.filter((a) => a !== actor && (a.pose || a.pending)).map((a) => (a.pending ?? { room: a.room }).room));
+    if (!busy.has('living') && Math.random() < PAIR_CHANCE && this.startPair(actor)) return;
     const options = actor.character!.poses.filter((pose) => {
       const where = available.get(pose);
       return where && !busy.has(where.room) && pose !== 'eat';
@@ -434,17 +500,35 @@ export class HouseScene {
     this.headFor(actor, where.room, actor.pending.x);
   }
 
+  /** Sends this visitor and a friend from its story to pose side by side in the living room. */
+  private startPair(actor: Actor): boolean {
+    const id = actor.character?.id;
+    const pair = pairsHome(this.save).find((p) => id && p.friends.includes(id));
+    if (!pair) return false;
+    const partner = this.actors.find((a) => a.character && a.character.id !== id && pair.friends.includes(a.character.id));
+    if (!partner || partner.pose || partner.pending) return false;
+    [actor, partner].forEach((a, i) => {
+      a.pair = { pair, partner: i === 0 ? partner : actor };
+      a.pending = { pose: 'dance', room: 'living', x: i === 0 ? 0.4 : 0.6 };
+      this.headFor(a, 'living', a.pending.x);
+    });
+    return true;
+  }
+
   private startPose(actor: Actor, time: number): void {
     const pose = actor.pending!.pose;
     actor.pending = null;
+    actor.poseAt = 0;
+    actor.root.classList.remove('is-about-to-pose');
     actor.pose = pose;
     actor.poseStart = time;
     actor.snapped = false;
-    actor.icon.textContent = POSES[pose].icon;
+    actor.icon.textContent = actor.pair ? '♥' : POSES[pose].icon;
     actor.root.classList.add('is-posing');
   }
 
   private endPose(actor: Actor, time: number): void {
+    actor.pair = null;
     actor.root.classList.remove('is-posing');
     actor.pose = null;
     actor.ring.style.cssText = '';
@@ -466,7 +550,7 @@ function timeLeft(ms: number): string {
 }
 
 function poseDuration(actor: Actor): number {
-  return (actor.character?.rhythm ?? 900) * 2;
+  return actor.pair ? PAIR_POSE_MS : (actor.character?.rhythm ?? 900) * 2;
 }
 
 /** `t` runs 0 to 1; every pose peaks at 0.5, when the closing ring meets the visitor. */

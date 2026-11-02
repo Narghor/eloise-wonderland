@@ -51,6 +51,20 @@ import {
   upgradeKitchen,
   water,
 } from './houseLogic';
+import {
+  LOST_REWARD,
+  PAIRS,
+  REQUEST_REWARD,
+  canFulfil,
+  canHaveSnack,
+  fulfil,
+  haveSnack,
+  lostThing,
+  pairsHome,
+  requestText,
+  snackDishes,
+  type SnackReaction,
+} from './houseFriends';
 import { photoCard } from './houseScene';
 import type { HouseSave } from './houseSave';
 
@@ -62,6 +76,8 @@ export interface PanelContext {
   say(text: string): void;
   readChapter(c: Character, chapter: number): void;
   eat(characterId: string): void;
+  /** Shows how each friend liked the snack. */
+  snack(reactions: SnackReaction[], dish: DishId): void;
 }
 
 export type PanelId = RoomId | 'album';
@@ -102,7 +118,7 @@ export function panel(ctx: PanelContext, id: PanelId, now: number): HTMLElement[
   const body =
     id === 'garden' ? gardenPart(ctx, now) : id === 'kitchen' ? kitchenPart(ctx, now) : id === 'cafe' ? cafePart(ctx) : id === 'living' ? livingPart(ctx) : [];
   // The guide comes last: a reminder, never between the player and the actions.
-  return [title, ...body, ...(id === 'garden' ? [] : decorPart(ctx, id)), guide(ROOM_GUIDES[id])];
+  return [title, ...body, ...decorPart(ctx, id), guide(ROOM_GUIDES[id])];
 }
 
 function guide(text: string): HTMLElement {
@@ -139,8 +155,52 @@ function lockedPanel(ctx: PanelContext, id: RoomId): HTMLElement[] {
 
 function livingPart(ctx: PanelContext): HTMLElement[] {
   const count = ctx.save.gifts.length;
-  if (count === 0) return [];
-  return [el('p', { class: 'house-note', text: `🎁 ${count} cadeau${count > 1 ? 'x' : ''} t’attend${count > 1 ? 'ent' : ''} dans le salon : touche-les dans la pièce pour les ouvrir.` })];
+  const parts = friendsPart(ctx);
+  if (count > 0) parts.unshift(el('p', { class: 'house-note', text: `🎁 ${count} cadeau${count > 1 ? 'x' : ''} t’attend${count > 1 ? 'ent' : ''} dans le salon : touche-les dans la pièce pour les ouvrir.` }));
+  return parts;
+}
+
+/** Requests, a lost thing and friends posing together: what the visitors ask of the player. */
+function friendsPart(ctx: PanelContext): HTMLElement[] {
+  const { save } = ctx;
+  const cards: HTMLElement[] = [];
+  const friendCard = (c: Character, title: string, text: string, ...extra: HTMLElement[]) =>
+    el('div', { class: 'house-ask' }, companionCanvas(c.look, 44), el('div', { class: 'house-ask-body' }, el('strong', { text: title }), el('span', { text }), ...extra));
+
+  for (const request of save.requests.filter((r) => save.visitors.includes(r.visitor))) {
+    const c = CHARACTERS.find((x) => x.id === request.visitor)!;
+    const ready = canFulfil(save, request);
+    const button = el('button', { class: 'button', type: 'button', text: request.kind === 'ingredient' ? 'Donner' : 'C’est fait !' });
+    button.disabled = !ready;
+    button.addEventListener('click', () => {
+      const done = fulfil(save, request);
+      if (!done) return;
+      ctx.say(`${c.name} : « Merci, c’est parfait ! » +${REQUEST_REWARD.stars} ♥ et ${REQUEST_REWARD.coins} pièces`);
+      if (done.newChapter) ctx.say(`${c.name} : chapitre ${done.newChapter} débloqué !`);
+      ctx.commit(true);
+    });
+    const hint = request.kind === 'ingredient' ? (ready ? 'Tu en as au garde-manger !' : 'À récolter au jardin.') : ready ? 'C’est posé !' : 'À poser dans la décoration de la pièce.';
+    cards.push(friendCard(c, `💬 ${c.name}`, requestText(request), el('small', { text: `${hint} · +${REQUEST_REWARD.stars} ♥, ${REQUEST_REWARD.coins} pièces` }), button));
+  }
+
+  if (save.lost && save.visitors.includes(save.lost.visitor)) {
+    const c = CHARACTERS.find((x) => x.id === save.lost!.visitor)!;
+    cards.push(
+      friendCard(
+        c,
+        `🔍 ${c.name} a perdu ${lostThing(c.id)} !`,
+        'C’est caché derrière un meuble, quelque part dans la maison. Touche les meubles dans les pièces pour chercher : 🥶 froid = pas dans cette pièce, 🔥 tiède = c’est ici !',
+        el('small', { text: `+${LOST_REWARD.stars} ♥ et ${LOST_REWARD.coins} pièces` }),
+      ),
+    );
+  }
+
+  for (const pair of pairsHome(save)) {
+    const [a, b] = pair.friends.map((id) => CHARACTERS.find((x) => x.id === id)!);
+    cards.push(friendCard(a, `📸 ${a.name} et ${b.name} sont là !`, 'Ils viendront poser ensemble dans le salon : une photo à deux pour l’album.'));
+  }
+
+  return cards.length > 0 ? [sectionTitle('Tes amis'), ...cards] : [];
 }
 
 function cafePart(ctx: PanelContext): HTMLElement[] {
@@ -335,6 +395,7 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
       parts.push(el('div', { class: 'house-dish' }, el('span', { class: 'house-dot', style: `background:${d.color}` }), el('span', {}, el('strong', { text: `${d.name} ×${save.dishes[d.id]}` }), el('small', { text: `+${dishStars(d)} ♥ à qui le mange` })), serveButton));
     }
   }
+  parts.push(...snackPart(ctx));
   if (save.table.length > 0) parts.push(el('p', { class: 'house-note', text: `Sur la table : ${save.table.map((id) => dish(id).name).join(', ')}. Les prochains visiteurs se régaleront.` }));
 
   const toggle = (id: 'grocery' | 'recipes', label: string) => {
@@ -360,6 +421,36 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
   parts.push(tools);
   if (kitchenExtra === 'grocery') parts.push(...groceryPart(ctx));
   if (kitchenExtra === 'recipes') parts.push(recipeBook(save));
+  return parts;
+}
+
+/** One dish for everyone at home, once per visit. */
+function snackPart(ctx: PanelContext): HTMLElement[] {
+  const { save } = ctx;
+  if (!canHaveSnack(save)) return [];
+  const guests = save.visitors.length;
+  const dishes = snackDishes(save);
+  const parts: HTMLElement[] = [
+    sectionTitle('🍰 Goûter'),
+    el('p', { class: 'house-note', text: `Partage un plat avec tes ${guests} amis, une fois par visite : chacun gagne un ♥ de plus, et beaucoup plus si c’est son plat préféré. Il faut ${guests} portions du même plat.` }),
+  ];
+  if (dishes.length === 0) return parts;
+  parts.push(
+    el(
+      'div',
+      { class: 'house-actions' },
+      ...dishes.map((id) => {
+        const button = el('button', { class: 'button', type: 'button', text: `Goûter : ${dish(id).name}` });
+        button.addEventListener('click', () => {
+          const reactions = haveSnack(save, id);
+          if (!reactions) return;
+          ctx.snack(reactions, id);
+          ctx.commit(true);
+        });
+        return button;
+      }),
+    ),
+  );
   return parts;
 }
 
@@ -550,6 +641,7 @@ function albumPanel(ctx: PanelContext): HTMLElement[] {
     el('h2', { class: 'house-panel-title', text: '📖 Album' }),
     ...cards,
   ];
+  parts.push(pairsAlbum(save));
   if (unknown.length > 0) {
     parts.push(
       el(
@@ -562,6 +654,36 @@ function albumPanel(ctx: PanelContext): HTMLElement[] {
   }
   parts.push(guide('Photographie tes visiteurs et sers-leur des plats pour gagner leur amitié (♥). L’amitié débloque leur histoire, puis un cadeau rare pour ton compagnon.'));
   return parts;
+}
+
+/** Friends photographed together: their pair, their stars and their little exchange. */
+function pairsAlbum(save: HouseSave): HTMLElement {
+  const taken = PAIRS.filter((p) => save.duos[p.id]).length;
+  const rows = PAIRS.map((pair) => {
+    const [a, b] = pair.friends.map((id) => CHARACTERS.find((x) => x.id === id)!);
+    const stars = save.duos[pair.id] ?? 0;
+    const bothMet = save.friends[a.id].met && save.friends[b.id].met;
+    if (!stars) {
+      return el(
+        'div',
+        { class: 'house-pair is-empty' },
+        el('span', { class: 'house-silhouette', text: '?' }),
+        el('small', { text: bothMet ? `${a.name} et ${b.name} : quand ils sont là en même temps, ils viennent poser ensemble dans le salon.` : 'Deux amis dont les histoires se croisent…' }),
+      );
+    }
+    return el(
+      'div',
+      { class: 'house-pair' },
+      el('span', { class: 'house-pair-faces' }, companionCanvas(a.look, 40), companionCanvas(b.look, 40)),
+      el(
+        'span',
+        { class: 'house-pair-text' },
+        el('strong', {}, `${a.name} & ${b.name} `, el('span', { class: 'house-stars', text: '★'.repeat(stars) + '☆'.repeat(3 - stars) })),
+        el('small', { text: `« ${pair.lines[0]} » — « ${pair.lines[1]} »` }),
+      ),
+    );
+  });
+  return el('article', { class: 'house-card' }, el('strong', { text: `📸 Photos à deux · ${taken}/${PAIRS.length}` }), ...rows);
 }
 
 function unknownHint(save: HouseSave, c: Character): string {

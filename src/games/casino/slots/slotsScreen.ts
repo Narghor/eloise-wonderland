@@ -74,10 +74,9 @@ export function renderSlots(root: HTMLElement): () => void {
     ),
   );
   if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: 'Gros gain', outcome: 'big' }, { label: 'Méga gain', outcome: 'mega' }, { label: 'Jackpot', outcome: 'jackpot' }])); // TEST-BUTTONS
-  refresh();
-
   let shownPool = 0;
   let poolFrame = 0;
+  refresh();
 
   /** Rolls the jackpot counter up to its new value, so each spin visibly feeds it. */
   function showPool(target: number): void {

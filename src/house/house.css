@@ -169,8 +169,26 @@
   text-shadow: 0 0 3px #fff;
 }
 
-.house-actor.is-posing .house-name {
+.house-actor.is-posing .house-name,
+.house-actor.is-about-to-pose .house-name {
   visibility: visible;
+}
+
+/* Waiting on its spot before posing: the thought bubble */
+.house-actor.is-about-to-pose {
+  z-index: 2;
+}
+
+.house-actor.is-about-to-pose .house-pose-icon {
+  top: -18px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.2);
+  opacity: 1;
+  translate: -50% 0;
+  white-space: nowrap;
+  animation: house-bob 0.6s ease-in-out infinite alternate;
 }
 
 .house-ring {
@@ -250,11 +268,14 @@
   top: 34px;
   z-index: 3;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: 88%;
   padding: 5px 12px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.92);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.95);
   font-size: 0.78rem;
-  white-space: nowrap;
+  text-align: center;
+  text-wrap: balance;
   pointer-events: none;
 }
 
@@ -1568,4 +1589,104 @@
 
 .house-main {
   gap: 10px;
+}
+
+/* -----------------------------------------------
+   FRIENDS: requests, lost things, pair photos
+   ----------------------------------------------- */
+
+.house-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 2px solid #f6cfe0;
+  border-radius: 14px;
+  background: #fff8fb;
+}
+
+.house-ask-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.88rem;
+}
+
+.house-ask-body small {
+  color: #8a6b94;
+}
+
+.house-ask-body .button {
+  justify-self: start;
+  padding-block: 6px;
+}
+
+/* Furniture can be searched while something is lost: a faint sparkle invites a tap. */
+.house-furniture.is-searchable {
+  pointer-events: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 0 3px rgb(255 246 168 / 0.9));
+}
+
+.house-furniture.is-wiggling canvas {
+  animation: house-wiggle 0.45s ease-in-out;
+}
+
+@keyframes house-wiggle {
+  20% { transform: rotate(-8deg) translateY(-4px); }
+  45% { transform: rotate(7deg); }
+  70% { transform: rotate(-4deg); }
+}
+
+.house-found {
+  position: absolute;
+  left: 50%;
+  bottom: 60%;
+  translate: -50% 0;
+  font-size: 2rem;
+  pointer-events: none;
+  animation: house-found 1.4s ease-out forwards;
+}
+
+@keyframes house-found {
+  0% { transform: scale(0.3); opacity: 0; }
+  30% { transform: scale(1.4) translateY(-20px); opacity: 1; }
+  100% { transform: scale(1) translateY(-50px); opacity: 0; }
+}
+
+.house-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.house-pair.is-empty {
+  opacity: 0.75;
+}
+
+.house-pair-faces {
+  display: flex;
+  flex: none;
+}
+
+.house-pair-faces canvas + canvas {
+  margin-left: -10px;
+}
+
+.house-pair-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.house-pair-text small {
+  color: #8a6b94;
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .house-furniture.is-wiggling canvas,
+  .house-found {
+    animation: none;
+  }
 }

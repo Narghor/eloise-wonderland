@@ -930,3 +930,22 @@ a {
 .home-companion .coin-pill {
   margin-left: auto;
 }
+
+/* New version available */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}

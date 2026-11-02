@@ -81,6 +81,28 @@ export interface HouseSave {
   order: Order | null;
   /** Café reputation, 0 to CAFE_LEVELS - 1: its service difficulty. */
   cafeLevel: number;
+  /** What the present visitors asked for, until the visit ends. */
+  requests: FriendRequest[];
+  /** Something a visitor lost behind a piece of furniture, until found or the visit ends. */
+  lost: LostItem | null;
+  /** Best photo stars of each pair of friends posing together, by pair id. */
+  duos: Record<string, number>;
+  /** The visit (its visitUntil) that already had its snack: one per visit. */
+  snackVisit: number;
+}
+
+export interface FriendRequest {
+  visitor: string;
+  kind: 'ingredient' | 'decor';
+  /** An ingredient or a furniture id. */
+  target: string;
+  count: number;
+}
+
+export interface LostItem {
+  visitor: string;
+  room: RoomId;
+  spot: number;
 }
 
 const ROOM_IDS = ROOMS.map((room) => room.id);
@@ -169,6 +191,14 @@ export function loadHouse(): HouseSave {
     visitUntil: typeof data.visitUntil === 'number' ? data.visitUntil : 0,
     order: readOrder(data.order),
     cafeLevel: isCount(data.cafeLevel) ? Math.min(CAFE_LEVELS - 1, data.cafeLevel) : 0,
+    requests: asArray(data.requests).flatMap((value) => {
+      const r = asRecord(value);
+      const known = r.kind === 'ingredient' ? isOneOf(r.target, INGREDIENT_IDS) : r.kind === 'decor' && isOneOf(r.target, FURNITURE_IDS);
+      return typeof r.visitor === 'string' && known && isCount(r.count) ? [{ visitor: r.visitor, kind: r.kind as FriendRequest['kind'], target: r.target as string, count: r.count }] : [];
+    }),
+    lost: readLost(data.lost),
+    duos: Object.fromEntries(Object.entries(asRecord(data.duos)).filter(([, stars]) => isCount(stars) && stars <= 3)) as Record<string, number>,
+    snackVisit: typeof data.snackVisit === 'number' ? data.snackVisit : 0,
     gifts: asArray(data.gifts).flatMap((value) => {
       const gift = asRecord(value);
       if (typeof gift.from !== 'string' || !isCount(gift.coins)) return [];
@@ -180,6 +210,13 @@ export function loadHouse(): HouseSave {
       }];
     }),
   };
+}
+
+function readLost(value: unknown): LostItem | null {
+  const lost = asRecord(value);
+  return typeof lost.visitor === 'string' && isOneOf(lost.room, ROOM_IDS) && isCount(lost.spot) && lost.spot < SPOTS_PER_ROOM
+    ? { visitor: lost.visitor, room: lost.room, spot: lost.spot }
+    : null;
 }
 
 function readOrder(value: unknown): Order | null {

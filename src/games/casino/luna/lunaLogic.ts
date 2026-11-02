@@ -50,15 +50,15 @@ export const SYMBOLS: LunaSymbol[] = [
   { key: 'Q', name: 'Dame', pays: [0, 4, 25, 100], weight: 14 },
   { key: 'K', name: 'Roi', pays: [0, 4, 40, 150], weight: 11 },
   { key: 'A', name: 'As', pays: [0, 4, 40, 150], weight: 11 },
-  { key: 'potion', name: 'Potion', pays: [5, 30, 100, 750], weight: 6 },
-  { key: 'crystal', name: 'Boule de cristal', pays: [5, 30, 100, 750], weight: 6 },
-  { key: 'owl', name: 'Hibou', pays: [5, 40, 400, 2000], weight: 3.4 },
-  { key: 'luna', name: 'Eloise', pays: [10, 100, 1000, 5000], weight: 1.6 },
+  { key: 'potion', name: 'Potion', pays: [5, 30, 100, 860], weight: 6 },
+  { key: 'crystal', name: 'Boule de cristal', pays: [5, 30, 100, 860], weight: 6 },
+  { key: 'owl', name: 'Hibou', pays: [5, 40, 400, 2300], weight: 3.4 },
+  { key: 'luna', name: 'Eloise', pays: [10, 100, 1000, 5750], weight: 1.6 },
   { key: 'book', name: 'Livre (joker + bonus)', pays: [0, 0, 0, 0], weight: 2.45 },
 ];
 
 /** Book scatter pays, multiple of the TOTAL bet, by count anywhere (3, 4, 5). */
-export const BOOK_PAYS: Record<number, number> = { 3: 1, 4: 20, 5: 200 };
+export const BOOK_PAYS: Record<number, number> = { 3: 1, 4: 20, 5: 230 };
 
 /** Special-symbol draw (any paying symbol, the Book excluded). Rarer for the premiums. */
 export const SPECIAL_WEIGHTS = [16, 16, 16, 14, 14, 8, 8, 5, 3];

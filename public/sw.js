@@ -1,6 +1,6 @@
 // Network first, cache as fallback: always up to date online, still playable offline
 // once every file has been loaded at least one time.
-const CACHE = 'mini-jeux-v1';
+const CACHE = 'mini-jeux-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -17,8 +17,10 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
+  // The page itself always asks the server, past the browser cache, so a new version shows at once.
+  const live = request.mode === 'navigate' ? fetch(request.url, { cache: 'no-cache' }) : fetch(request);
   event.respondWith(
-    fetch(request)
+    live
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();

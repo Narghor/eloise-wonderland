@@ -5,9 +5,10 @@ import { loadCompanion, saveCompanion } from '../companion/companionSave';
 import { findItem } from '../companion/catalog';
 import { CASINO_TEST_BUTTONS } from '../games/casino/fx/testMode'; // TEST-BUTTONS
 import { coinIcon } from './houseArt';
-import { CHARACTERS, POSES, ROOMS, ingredient, type Character, type IngredientId, type PlantId } from './houseData';
+import { CHARACTERS, POSES, ROOMS, dish, ingredient, type Character, type DishId, type IngredientId, type PlantId } from './houseData';
 import { foodIcon } from './houseFoodArt';
-import { befriend, chaptersUnlocked, coins, collectCooked, notePhoto, openGifts, refreshVisits, type VisitNews } from './houseLogic';
+import { LOST_REWARD, lostThing, notePairPhoto, search, type SnackReaction } from './houseFriends';
+import { befriend, character, chaptersUnlocked, coins, collectCooked, notePhoto, openGifts, refreshVisits, type VisitNews } from './houseLogic';
 import { panel as roomPanel, seedTarget, touchPlot, type PanelContext, type PanelId } from './housePanels';
 import { HouseScene } from './houseScene';
 import { loadHouse, saveHouse } from './houseSave';
@@ -36,6 +37,7 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
     say,
     readChapter: (c, chapter) => openChapter(c, chapter),
     eat: (id) => houseScene.eat(id),
+    snack: (reactions, dish) => showSnack(reactions, dish),
   };
 
   const houseScene = new HouseScene(save, {
@@ -50,6 +52,25 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
       const { coins: total, ingredients, seeds } = openGifts(save);
       showGifts(total, ingredients, seeds);
       ctx.commit(true);
+    },
+    search(room, spot) {
+      const lost = save.lost;
+      const found = search(save, room, spot);
+      if (!found || !lost) return null;
+      if (found.result === 'found') {
+        const c = character(lost.visitor);
+        say(`Trouvé : ${lostThing(c.id)} ! ${c.name} te remercie : +${LOST_REWARD.stars} ♥ et ${LOST_REWARD.coins} pièces`);
+        if (found.newChapter) say(`${c.name} : chapitre ${found.newChapter} débloqué !`);
+        window.setTimeout(() => ctx.commit(true), 900);
+      }
+      return found.result;
+    },
+    pairPhoto(pair, stars) {
+      const best = notePairPhoto(save, pair, stars).best;
+      const [a, b] = pair.friends.map((id) => character(id).name);
+      say(`📸 ${a} et ${b} : +${stars} ♥ chacun${best ? ' · photo à deux dans l’album !' : ''}`);
+      say(`${a} : « ${pair.lines[0]} » ${b} : « ${pair.lines[1]} »`);
+      ctx.commit();
     },
     select: (room) => show(room),
     plot(index) {
@@ -158,6 +179,31 @@ function showNews(news: VisitNews): void {
     'div',
     { class: 'house-dialog' },
     el('div', { class: 'house-news' }, el('strong', { text: 'Pendant ton absence…' }), el('ul', {}, ...lines.map((line) => el('li', { text: line }))), close),
+  );
+  close.addEventListener('click', () => dialog.remove());
+  document.body.append(dialog);
+}
+
+/** Everyone around the table: each friend's reaction to the snack. */
+function showSnack(reactions: SnackReaction[], dishId: DishId): void {
+  const close = el('button', { class: 'button', type: 'button', text: 'Quel bon moment !' });
+  const dialog = el(
+    'div',
+    { class: 'house-dialog', role: 'dialog', 'aria-label': 'Goûter' },
+    el(
+      'div',
+      { class: 'house-news' },
+      el('strong', { text: `🍰 Goûter : ${dish(dishId).name}` }),
+      el(
+        'ul',
+        { class: 'house-gift-list' },
+        ...reactions.map((r) => {
+          const c = character(r.visitor);
+          return el('li', { class: 'house-gift-row' }, companionCanvas(c.look, 36), el('span', {}, el('b', { text: `${c.name} · +${r.stars} ♥` }), el('small', { text: `« ${r.line} »` })));
+        }),
+      ),
+      close,
+    ),
   );
   close.addEventListener('click', () => dialog.remove());
   document.body.append(dialog);

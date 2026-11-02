@@ -11,7 +11,7 @@ export const ROWS = 3;
 export const CELLS = COLS * ROWS;
 export const JACKPOT_FEED = 0.01;
 /** The Grand pays at least this many bets, topping up the progressive pool. */
-export const GRAND_MIN_BETS = 1000;
+export const GRAND_MIN_BETS = 1150;
 
 export type Rng = () => number;
 /** 'door' opens the bonus; a number forces that jackpot tier in it. */ // TEST-BUTTONS
@@ -149,11 +149,11 @@ export const LAND_CHANCE = 0.04;
 
 export const JACKPOT_NAMES = ['Mini', 'Minor', 'Major', 'Grand'];
 /** Fixed jackpots in multiples of the bet (Grand is the progressive pool). */
-export const JACKPOT_MULTS = [10, 40, 200];
+export const JACKPOT_MULTS = [10, 46, 230];
 const JACKPOT_WEIGHTS = [3, 0.6, 0.1];
 
 export const COIN_VALUES: [number, number][] = [
-  [4, 30], [5, 26], [8, 16], [10, 12], [15, 7], [25, 5], [40, 2],
+  [4, 30], [5, 26], [8, 16], [10, 12], [15, 7], [29, 5], [46, 2],
 ];
 
 export type Coin = { kind: 'value'; mult: number } | { kind: 'jackpot'; tier: number };

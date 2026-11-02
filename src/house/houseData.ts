@@ -1,4 +1,5 @@
 import type { Look } from '../companion/companionSave';
+import { STORIES, type Story } from './houseStories';
 
 // -----------------------------------------------
 // ROOMS
@@ -427,7 +428,8 @@ export interface Character {
   rare?: RareId;
   /** Only visits during this real season. */
   season?: Season;
-  chapters: [string[], string[], string[]];
+  chapters: Story['chapters'];
+  chatter: string[];
 }
 
 const look = (species: string, worn: Partial<Look> = {}): Look => ({
@@ -440,11 +442,11 @@ const look = (species: string, worn: Partial<Look> = {}): Look => ({
   ...worn,
 });
 
-export const CHARACTERS: Character[] = [
+const VISITORS: Omit<Character, keyof Story>[] = [
   {
     id: 'noisette',
     name: 'Noisette',
-    look: look('fox', { neck: 'neck-scarf' }),
+    look: look('fox', { color: 'coat-caramel', hat: 'hat-cap', neck: 'neck-scarf' }),
     tagline: 'Une voyageuse qui ne reste jamais longtemps',
     poses: ['sniff', 'swing', 'stars', 'read', 'sunbathe'],
     favourite: 'pumpkinSoup',
@@ -452,109 +454,44 @@ export const CHARACTERS: Character[] = [
     needs: [],
     gift: 'coat-autumn',
     rare: 'hazelnut',
-    chapters: [
-      [
-        'Oh ! Bonjour… Je ne fais que passer, promis.',
-        'Je voyage depuis longtemps. Dans mon sac, j’ai une carte postale de chaque endroit où j’ai dormi.',
-        'Ici, les fleurs sentent comme chez ma grand-mère. Ça m’a donné envie de rester un peu.',
-      ],
-      [
-        'Tu sais pourquoi je ne reste jamais nulle part ?',
-        'Quand j’étais petite, on déménageait tout le temps. Je n’avais jamais le temps de me faire des amis.',
-        'Alors j’ai décidé que partir, ce serait MON choix. C’est plus facile comme ça.',
-        '… Enfin, je crois.',
-      ],
-      [
-        'J’ai réfléchi, cette nuit, en regardant les étoiles depuis ton jardin.',
-        'Je crois que j’avais peur de m’attacher. Mais ici, je reviens toujours.',
-        'Tiens. C’est la couleur des forêts en octobre, ma saison préférée. Je veux que tu l’aies.',
-        'Ce n’est pas un adieu, hein. C’est un « à demain ».',
-      ],
-    ],
   },
   {
     id: 'biscotte',
     name: 'Biscotte',
-    look: look('bear', { hat: 'hat-chef' }),
+    look: look('bear', { color: 'coat-chocolate', hat: 'hat-chef', neck: 'neck-heart' }),
     tagline: 'Un pâtissier qui a perdu sa boutique',
     poses: ['nap', 'eat', 'taste', 'treat'],
     favourite: 'blackberryTart',
     rhythm: 1000,
     needs: [],
     gift: 'hat-star-chef',
-    chapters: [
-      [
-        'Mmmh… ça sent le gâteau ici, non ? Non ? Ah. Tant pis.',
-        'Je suis pâtissier. Enfin, je l’étais, avant que ma boutique ferme.',
-        'Si un jour tu as une belle cuisine, je t’apprendrai ma tarte aux mûres. Juré.',
-      ],
-      [
-        'Ma boutique s’appelait « Le Petit Four ». Les gens faisaient la queue jusqu’au coin de la rue.',
-        'Et puis j’ai voulu faire des gâteaux de plus en plus compliqués. J’ai oublié de faire des gâteaux qui rendent heureux.',
-        'Ta cuisine me rappelle mes débuts. Juste de la farine, des fruits, et l’envie de faire plaisir.',
-      ],
-      [
-        'J’ai une nouvelle ! Je vais rouvrir une toute petite boutique. Rien de compliqué.',
-        'C’est grâce à toi, tu sais. Tu m’as rappelé pourquoi j’aimais ce métier.',
-        'Voilà ma toque des grands jours. Elle porte bonheur aux cuisiniers. Prends-en soin !',
-      ],
-    ],
   },
   {
     id: 'plume',
     name: 'Plume',
-    look: look('chick', { glasses: 'glasses-round' }),
+    look: look('chick', { color: 'coat-lemon', hat: 'hat-bow', neck: 'neck-tie' }),
     tagline: 'Une poétesse trop timide pour lire ses poèmes',
     poses: ['read', 'study', 'sniff', 'nap', 'sip'],
     favourite: 'bread',
     rhythm: 850,
     needs: [],
     gift: 'bg-library',
-    chapters: [
-      [
-        'Ah ! Pardon, je ne t’avais pas vu… Je lisais.',
-        'J’écris des poèmes. Mais personne ne les a jamais lus. Ils sont dans mon carnet, bien cachés.',
-      ],
-      [
-        'J’ai écrit un poème sur ton jardin. Il parle d’une graine qui a peur de pousser.',
-        'Tu veux l’entendre ? Non, attends… Pas aujourd’hui. Bientôt. Peut-être.',
-      ],
-      [
-        '« Petite graine dans le noir, tu crois que tu n’as rien à voir. Mais un matin, sans prévenir, le monde entier te voit fleurir. »',
-        '… Voilà. Je l’ai lu à voix haute. Pour la première fois.',
-        'Pour te remercier, je t’offre le décor de ma bibliothèque préférée. On y lit en silence, et c’est très bien comme ça.',
-      ],
-    ],
   },
   {
     id: 'mirabelle',
     name: 'Mirabelle',
-    look: look('rabbit', { hat: 'hat-flowers' }),
+    look: look('rabbit', { color: 'coat-peach', hat: 'hat-flowers', neck: 'neck-lei' }),
     tagline: 'Une jardinière qui parle à ses plantes',
     poses: ['sniff', 'splash', 'dance', 'eat', 'tend'],
     favourite: 'carrotSalad',
     rhythm: 800,
     needs: [],
     gift: 'neck-plums',
-    chapters: [
-      [
-        'Bonjour bonjour ! Oh, tes carottes ont l’air en pleine forme. Tu leur parles ?',
-        'Moi, je parle à toutes mes plantes. Elles poussent deux fois plus vite. Bon, c’est pas prouvé.',
-      ],
-      [
-        'Chez moi, il y avait un vieux mirabellier. C’est ma mamie qui l’avait planté le jour de ma naissance.',
-        'Il a été coupé quand on a vendu la maison. Depuis, je cherche un jardin où en planter un nouveau.',
-      ],
-      [
-        'J’ai trouvé une graine de mirabellier ! Et j’ai pensé à toi tout de suite.',
-        'Tu veux bien qu’on la plante ensemble, un jour ? En attendant, voilà un collier de mirabelles. Pour qu’on se souvienne.',
-      ],
-    ],
   },
   {
     id: 'brindille',
     name: 'Brindille',
-    look: look('frog', { hat: 'hat-straw' }),
+    look: look('frog', { color: 'coat-pistachio', hat: 'hat-straw', neck: 'neck-bell' }),
     tagline: 'Une musicienne qui cherche la mélodie parfaite',
     poses: ['music', 'dance', 'splash', 'swing'],
     favourite: 'mintLemonade',
@@ -562,26 +499,11 @@ export const CHARACTERS: Character[] = [
     needs: [],
     gift: 'hat-lily',
     rare: 'mushroom',
-    chapters: [
-      [
-        'Tu entends ça ? Le bruit de l’eau, le vent dans les feuilles… C’est presque une chanson.',
-        'Il lui manque juste une note. Je la cherche depuis des années.',
-      ],
-      [
-        'J’ai joué dans un orchestre, avant. Tout était parfait, réglé, répété cent fois.',
-        'Et je m’ennuyais. La musique, ça doit surprendre, sinon c’est juste du bruit bien rangé.',
-      ],
-      [
-        'JE L’AI TROUVÉE ! La note qui manquait ! C’était le rire de ton compagnon quand il saute dans le bassin !',
-        'Ma chanson est finie. Elle s’appelle « Chez toi ».',
-        'Tiens, mon nénuphar porte-bonheur. Je l’avais sur la tête le jour de mon premier concert.',
-      ],
-    ],
   },
   {
     id: 'flocon',
     name: 'Flocon',
-    look: look('penguin', { neck: 'neck-bowtie' }),
+    look: look('penguin', { hat: 'hat-top', glasses: 'glasses-monocle', neck: 'neck-bowtie' }),
     tagline: 'Un majordome très poli, ancien de grand hôtel',
     poses: ['eat', 'mirror', 'read', 'taste'],
     favourite: 'lemonTart',
@@ -589,78 +511,33 @@ export const CHARACTERS: Character[] = [
     needs: ['bedroom'],
     gift: 'hat-bowler',
     rare: 'frostflower',
-    chapters: [
-      [
-        'Mes hommages. Flocon, pour vous servir. Votre demeure est fort charmante.',
-        'J’ai servi trente ans au Grand Hôtel des Glaces. Je reconnais une maison bien tenue.',
-      ],
-      [
-        'L’hôtel a fermé l’hiver dernier. Trente ans à accueillir des voyageurs, et plus personne à accueillir.',
-        'C’est étrange, de ne plus être utile à personne. Je ne savais pas que ça pouvait faire si froid. Même pour un pingouin.',
-      ],
-      [
-        'Puis-je vous confier une idée ? Votre maison accueille tant de monde… Elle ferait un merveilleux petit hôtel.',
-        'Si un jour vous ouvrez des chambres pour vos amis, je serais honoré de m’en occuper.',
-        'En attendant, acceptez mon chapeau melon. Un hôte digne de ce nom se doit d’être élégant.',
-      ],
-    ],
   },
   {
     id: 'comete',
     name: 'Comète',
-    look: look('dragon', { hat: 'hat-beanie' }),
+    look: look('dragon', { color: 'coat-dusk', hat: 'hat-star', neck: 'neck-bell' }),
     tagline: 'Un petit dragon qui a peur du noir',
     poses: ['stars', 'sleep', 'swing', 'dance'],
     favourite: 'pumpkinCake',
     rhythm: 550,
     needs: ['library'],
     gift: 'coat-nebula',
-    chapters: [
-      [
-        'Chut ! Ne le dis à personne… Mais j’ai peur du noir.',
-        'Un dragon qui a peur du noir. C’est ridicule, hein ? Je ne crache même pas de feu. Juste des étincelles.',
-      ],
-      [
-        'Avec ton télescope, j’ai compris un truc. Le noir, la nuit, il est plein d’étoiles.',
-        'Elles sont là tout le temps, en fait. Même quand on ne les voit pas.',
-      ],
-      [
-        'Cette nuit, j’ai dormi sans veilleuse ! Pour la première fois !',
-        'J’ai regardé le ciel jusqu’à m’endormir. Je n’avais plus peur du tout.',
-        'Tiens : la couleur de la nuit, avec toutes ses étoiles. Comme ça, toi non plus tu n’auras jamais peur du noir.',
-      ],
-    ],
   },
   {
     id: 'brume',
     name: 'Brume',
-    look: look('ghost', { neck: 'neck-pearls' }),
+    look: look('ghost', { color: 'coat-ice', hat: 'hat-halo', neck: 'neck-pearls' }),
     tagline: 'Un fantôme qui a oublié qui il était',
     poses: ['sleep', 'mirror', 'stars', 'music'],
     favourite: 'fruitCharlotte',
     rhythm: 600,
     needs: ['bedroom', 'library'],
     gift: 'bg-mist',
-    chapters: [
-      [
-        'Ooooh… Pardon. Je ne voulais pas te faire peur. Je cherche quelque chose.',
-        'Je ne sais plus quoi. Je ne sais plus qui je suis, d’ailleurs. Juste que j’aime les perles.',
-      ],
-      [
-        'Dans ton miroir, j’ai vu un souvenir. Une grande maison, un piano, et quelqu’un qui riait.',
-        'Je crois que j’habitais une maison comme la tienne. Je crois que j’étais heureux.',
-      ],
-      [
-        'Je me souviens de tout, maintenant. Je m’appelais Brume parce que je suis né un matin de brouillard.',
-        'Je ne cherchais pas quelque chose. Je cherchais un endroit où me sentir chez moi.',
-        'Je l’ai trouvé. Garde ce brouillard du matin, c’est tout ce que j’ai de plus précieux.',
-      ],
-    ],
   },
   {
     id: 'butine',
     name: 'Butine',
-    look: look('cat', { hat: 'hat-flower' }),
+    look: look('cat', { color: 'coat-sorbet', hat: 'hat-flower', glasses: 'glasses-hearts' }),
     tagline: 'Une apicultrice qui parle à ses abeilles',
     poses: ['sniff', 'tend', 'swing', 'taste', 'sip'],
     favourite: 'honeyTart',
@@ -668,85 +545,33 @@ export const CHARACTERS: Character[] = [
     needs: [],
     gift: 'coat-honey',
     rare: 'honey',
-    chapters: [
-      [
-        'Bzz… Pardon, c’est l’habitude. Je parle souvent à mes abeilles.',
-        'Je les ai suivies jusqu’ici : elles adorent ton jardin.',
-        'Si tu leur gardes quelques fleurs, elles te le rendront en miel. Promis.',
-      ],
-      [
-        'Tu sais, au début, j’avais peur des abeilles.',
-        'Une piqûre quand j’étais petite, et je courais dès que j’entendais un bourdonnement.',
-        'Puis une vieille dame m’a appris à les écouter. Elles ne piquent que quand on a peur d’elles.',
-        'Depuis, j’essaie d’écouter tout le monde comme ça.',
-      ],
-      [
-        'Mes abeilles ont fait une ruche près de ta maison. Elles ont décidé que c’était chez elles.',
-        'Moi aussi, un peu, je crois.',
-        'Tiens : c’est la couleur du miel au soleil du matin. Pour toi.',
-      ],
-    ],
   },
   {
     id: 'bambou',
     name: 'Bambou',
-    look: look('panda', { neck: 'neck-bandana' }),
+    look: look('panda', { hat: 'hat-leaf', neck: 'neck-bandana' }),
     tagline: 'Un maître de thé qui ne se presse jamais',
     poses: ['nap', 'sunbathe', 'tend', 'read', 'sip'],
     favourite: 'thymeRisotto',
     rhythm: 950,
     needs: ['greenhouse'],
     gift: 'coat-jade',
-    chapters: [
-      [
-        'Bonjour. Ta serre est magnifique… On y entend presque les feuilles pousser.',
-        'Je cultive du thé, là-haut dans les montagnes. Il faut beaucoup de patience.',
-        'Ta maison est calme. J’aime les endroits calmes.',
-      ],
-      [
-        'Avant, j’étais toujours pressé. Je voulais tout finir, tout de suite.',
-        'Un jour, j’ai laissé infuser mon thé trop longtemps parce que je regardais un nuage. C’était le meilleur thé de ma vie.',
-        'Depuis, je regarde plus souvent les nuages.',
-      ],
-      [
-        'J’ai rapporté des graines de mes montagnes. Elles poussent bien chez toi.',
-        'Je crois que les plantes sentent quand on prend soin d’elles. Les gens aussi.',
-        'Voici la couleur du jade, celle de mes feuilles de thé. Garde-la, et prends ton temps.',
-      ],
-    ],
   },
   {
     id: 'opaline',
     name: 'Opaline',
-    look: look('unicorn', { glasses: 'glasses-stars' }),
+    look: look('unicorn', { color: 'coat-lilac', hat: 'hat-tiara', glasses: 'glasses-stars' }),
     tagline: 'Une magicienne qui n’a jamais osé monter sur scène',
     poses: ['mirror', 'dance', 'music', 'stars'],
     favourite: 'cremeBrulee',
     rhythm: 650,
     needs: ['bedroom'],
     gift: 'coat-opal',
-    chapters: [
-      [
-        'Ta-daaa ! … Bon, d’habitude, il y a des paillettes. Elles sont restées dans ma valise.',
-        'Je suis magicienne. Enfin, j’apprends. Mes tours ratent un peu, parfois.',
-        'Ton miroir est parfait pour répéter. Je peux revenir ?',
-      ],
-      [
-        'Tu veux savoir un secret ? Je n’ai jamais fait un tour devant un vrai public.',
-        'J’ai trop peur que tout le monde voie que je rate.',
-        'Mais ici, quand je rate, personne ne se moque. Alors je recommence. Et parfois, ça marche !',
-      ],
-      [
-        'J’ai fait mon premier spectacle ! Devant tes visiteurs, dans ton salon.',
-        'Le lapin n’est pas sorti du chapeau, mais tout le monde a applaudi quand même.',
-        'Tiens : c’est la couleur des paillettes que j’avais oubliées. Ma vraie magie, c’était d’oser.',
-      ],
-    ],
   },
   {
     id: 'givrette',
     name: 'Givrette',
-    look: look('fox', { color: 'coat-snow', hat: 'hat-beanie' }),
+    look: look('fox', { color: 'coat-snow', hat: 'hat-beanie', neck: 'neck-medal' }),
     tagline: 'Une renarde des neiges qui ne vient qu’en hiver',
     poses: ['nap', 'read', 'stars', 'sniff'],
     favourite: 'mandarinChocolate',
@@ -754,25 +579,10 @@ export const CHARACTERS: Character[] = [
     needs: [],
     season: 'winter',
     gift: 'coat-frost',
-    chapters: [
-      [
-        'Brrr ! Enfin un endroit chaud. Je peux m’asseoir près de toi ?',
-        'Je ne viens qu’en hiver. Le reste de l’année, je dors tout là-haut, sous la neige.',
-        'Ton chocolat chaud sent bon jusqu’à la forêt, tu sais.',
-      ],
-      [
-        'Chaque hiver, je descends voir si les maisons sont encore éclairées.',
-        'Certaines années, il n’y avait plus personne. Juste des fenêtres noires.',
-        'Cette année, il y avait ta lumière. Alors je suis entrée.',
-      ],
-      [
-        'Bientôt le printemps. Il faudra que je reparte.',
-        'Mais maintenant, je sais où revenir. Je compterai les jours.',
-        'Tiens : c’est la couleur du givre au lever du jour. Quand tu la verras, pense à l’hiver prochain.',
-      ],
-    ],
   },
 ];
+
+export const CHARACTERS: Character[] = VISITORS.map((visitor) => ({ ...visitor, ...STORIES[visitor.id] }));
 
 export function character(id: string): Character | undefined {
   return CHARACTERS.find((item) => item.id === id);

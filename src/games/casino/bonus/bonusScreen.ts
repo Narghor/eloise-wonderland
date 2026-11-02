@@ -3,7 +3,7 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot } from '../chips';
 import {
   armSoundUnlock, burst, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
-  playCoinTick, playDoorOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
+  playCoinLand, playDoorOpen, playRespinMiss, playTallyNote, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
   winPop, igniteCells,
   type WinLinesHandle, type WinPath,
 } from '../fx';
@@ -89,8 +89,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     el('div', { class: 'bonus-plaque', text: '🚪 Porte aux Jackpots 🚪' }),
     jackpotsView,
     totalView,
-    reelWindow,
     respinsView,
+    reelWindow,
   );
   const lights = marquee(machine, 10);
   const message = el('div', { class: 'bonus-message', role: 'status', text: '🚪 sur les rouleaux 1, 3 et 5 = bonus !' });
@@ -282,7 +282,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       el('div', { class: 'bonus-celebrate-door', text: '🚪' }),
       el('div', { class: 'bonus-celebrate-text', text: 'BONUS !' }),
       el('div', { class: 'bonus-celebrate-sub', text: 'HOLD & SPIN' }),
-      el('div', { text: `${START_COINS} pièces de départ, ${RESPINS} relances` }),
+      el('div', { text: `Chaque pièce qui tombe = des jetons pour toi !` }),
+      el('div', { text: `${START_COINS} pièces pour commencer. Chaque nouvelle pièce remet ${RESPINS} relances.` }),
       el('div', { text: `Pièces de ${lv.bet * MIN_COIN} à ${lv.bet * MAX_COIN} jetons` }),
       el('div', { class: 'bonus-small-light', text: `Jackpots : ${JACKPOT_NAMES.slice(0, lv.jackpotTier + 1).join(', ')}` }),
     );
@@ -318,24 +319,71 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       v.textContent = '';
     });
     let running = 0;
+    let respinsBefore = RESPINS;
     for (const step of bonus.steps) {
+      if (step !== bonus.steps[0]) {
+        // The respin itself: every empty cell spins, so each landing coin is a surprise.
+        message.textContent = respinsBefore === 1 ? 'Dernière chance…' : 'Relance…';
+        message.className = `bonus-message${respinsBefore === 1 ? ' bonus-tension-text' : ''}`;
+        const empty = cellViews.filter((_, i) => step.cells[i] === null || step.fresh.includes(i));
+        empty.forEach((v) => {
+          v.className = 'bonus-cell bonus-empty bonus-respinning';
+          v.textContent = '?';
+        });
+        lights.setMode('spin');
+        const label = respinsView.querySelector('.bonus-respins-label');
+        if (label) label.textContent = respinsBefore === 1 ? 'Dernière chance…' : 'Ça tourne…';
+        machine.classList.toggle('bonus-last-chance', respinsBefore === 1);
+        await wait(respinsBefore === 1 ? 1500 : 800);
+        machine.classList.remove('bonus-last-chance');
+        if (disposed) return;
+        empty.forEach((v) => {
+          v.className = 'bonus-cell bonus-empty';
+          v.textContent = '';
+        });
+      }
+      const reset = step.fresh.length > 0 && step !== bonus.steps[0];
+      respinsBefore = step.respinsLeft;
       respinsView.replaceChildren(
-        ...Array.from({ length: RESPINS }, (_, k) => el('span', { class: `bonus-dot${k < step.respinsLeft ? ' bonus-dot-on' : ''}` })),
+        el('span', { class: 'bonus-respins-label', text: step.respinsLeft === 0 ? 'Plus de relance' : step.respinsLeft === 1 ? 'Dernière relance !' : `${step.respinsLeft} relances` }),
+        el('span', { class: 'bonus-dots' }, ...Array.from({ length: RESPINS }, (_, k) => el('span', { class: `bonus-dot${k < step.respinsLeft ? ' bonus-dot-on' : ''}` }))),
+      );
+      respinsView.className = `bonus-respins${step.respinsLeft === 1 ? ' is-last' : ''}${reset ? ' is-reset' : ''}`;
+      const filled = step.cells.filter((c) => c !== null).length;
+      const missing = CELLS - filled;
+      const grandOpen = lv.jackpotTier >= 3;
+      respinsView.append(
+        el('span', {
+          class: `bonus-fill${grandOpen && missing <= 3 ? ' is-close' : ''}`,
+          text: grandOpen && missing > 0 && missing <= 3 ? `Plus que ${missing} pour le GRAND !` : `${filled} / ${CELLS}`,
+        }),
       );
       if (step.fresh.length === 0) {
-        lights.setMode('spin');
-        playLose();
+        playRespinMiss();
+        message.textContent = step.respinsLeft === 0 ? 'Plus de relance !' : 'Rien cette fois…';
+      } else if (step !== bonus.steps[0]) {
+        message.textContent = `+${step.fresh.length} pièce${step.fresh.length > 1 ? 's' : ''} ! Relances remises à ${RESPINS}`;
+        message.className = 'bonus-message bonus-big';
       }
       for (const i of step.fresh) {
         const coin = step.cells[i] as Coin;
         const v = cellViews[i];
         const value = coinChips(coin, lv.bet);
-        v.className = `bonus-cell bonus-coin bonus-pop${coin.kind === 'jackpot' ? ' bonus-coin-jp' : ''}`;
-        v.textContent = coin.kind === 'value' ? `${value}` : JACKPOT_NAMES[coin.tier];
+        v.className = `bonus-cell bonus-coin${coin.kind === 'jackpot' ? ' bonus-coin-jp' : ''}`;
+        v.replaceChildren(
+          el('b', { text: coin.kind === 'value' ? compact(value) : JACKPOT_NAMES[coin.tier] }),
+          el('small', { text: coin.kind === 'value' ? 'jetons' : 'jackpot' }),
+        );
         running += value;
         paintTotal(running);
-        playReelStop(i % COLS);
-        playCoinTick();
+        totalView.classList.remove('is-bump');
+        void totalView.offsetWidth;
+        totalView.classList.add('is-bump');
+        const gain = el('span', { class: 'bonus-gain', text: `+${compact(value)}` });
+        v.append(gain);
+        window.setTimeout(() => gain.remove(), 900);
+        burst(v, coin.kind === 'jackpot' || (coin.kind === 'value' && coin.mult >= 15) ? 18 : 8, 'coins');
+        playCoinLand(coin.kind === 'jackpot' ? 'jackpot' : coin.mult >= 15 ? 'big' : 'small');
         if (coin.kind === 'jackpot') {
           lights.setMode('big');
           shake(machine, 2);
@@ -343,7 +391,12 @@ export function renderBonusSlot(root: HTMLElement): () => void {
           await wait(400);
           await showBigWin(document.body, value, lv.bet, `JACKPOT ${JACKPOT_NAMES[coin.tier].toUpperCase()} !`);
         } else {
-          if (coin.mult >= 15) shake(machine, 1);
+          if (coin.mult >= 15) {
+            shake(machine, 2);
+            v.classList.add('bonus-coin-big');
+            message.textContent = coin.mult >= 25 ? 'ÉNORME PIÈCE !' : 'Grosse pièce !';
+            message.className = 'bonus-message bonus-big';
+          }
           await wait(COIN_GAP_MS);
         }
         if (disposed) return;
@@ -352,6 +405,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       await wait(STEP_MS);
     }
 
+    await tally(bonus, lv);
+    if (disposed) return;
     pay(bonus.chips);
     noteWin(LOBBY_ID, bonus.chips, lv.bet);
     refresh();
@@ -383,8 +438,32 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     screen.classList.remove('bonus-in-feature');
   }
 
+  /** The coins light up one by one and pour into the total, each note a little higher. */
+  async function tally(bonus: BonusResult, lv: BetLevel): Promise<void> {
+    const final = bonus.steps[bonus.steps.length - 1].cells;
+    message.textContent = 'On compte !';
+    message.className = 'bonus-message bonus-big';
+    let counted = 0;
+    let note = 0;
+    paintTotal(0);
+    for (let i = 0; i < CELLS; i++) {
+      const coin = final[i];
+      if (!coin) continue;
+      cellViews[i].classList.add('bonus-tallied');
+      counted += coinChips(coin, lv.bet);
+      paintTotal(counted);
+      totalView.classList.remove('is-bump');
+      void totalView.offsetWidth;
+      totalView.classList.add('is-bump');
+      playTallyNote(note++);
+      await wait(150);
+      if (disposed) return;
+    }
+    await wait(300);
+  }
+
   function paintTotal(amount: number): void {
-    totalView.replaceChildren(el('span', { text: 'Bonus' }), el('b', { text: `${amount.toLocaleString('fr-FR')} jetons` }));
+    totalView.replaceChildren(el('span', { text: 'Gains du bonus' }), el('b', { text: `${amount.toLocaleString('fr-FR')} jetons` }));
   }
 
   refresh();
@@ -452,7 +531,7 @@ function rules(lv: BetLevel): HTMLElement[] {
       'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 106, quelle que soit la mise).',
       `Tu commences avec ${START_COINS} pièces et ${RESPINS} relances. Chaque nouvelle pièce reste bloquée et remet les relances à ${RESPINS}.`,
       `Une pièce vaut de ${MIN_COIN} à ${MAX_COIN} × ta mise (de ${MIN_COIN * lv.bet} à ${MAX_COIN * lv.bet} jetons à cette mise).`,
-      'Un bonus rapporte en moyenne environ 65 × ta mise : plus tu mises, plus il paie.',
+      'Un bonus rapporte en moyenne environ 70 × ta mise : plus tu mises, plus il paie.',
     ),
     rulesBlock(
       'Les jackpots',

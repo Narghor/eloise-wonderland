@@ -180,6 +180,27 @@ export function playCoinTick(): void {
   tone(1800 + Math.random() * 600, 0, 0.05, 'sine', 0.1);
 }
 
+/** A coin landing in a Hold & Spin grid: a light chime, a heavy clang for a big one, a fanfare for a jackpot. */
+export function playCoinLand(size: 'small' | 'big' | 'jackpot'): void {
+  if (size === 'small') {
+    tone(C_MAJOR[4] * 2, 0, 0.12, 'sine', 0.14);
+    tone(C_MAJOR[7] * 2, 0.05, 0.16, 'sine', 0.1);
+    return;
+  }
+  if (size === 'big') {
+    tone(140, 0, 0.3, 'triangle', 0.35, 60);
+    noise(0, 0.12, 0.3, 900);
+    [0, 4, 7].forEach((n, i) => tone(C_MAJOR[n] * 2, 0.06 + i * 0.06, 0.25, 'square', 0.1));
+    return;
+  }
+  playBonusTrigger();
+}
+
+/** One step of a tally: each call `step` plays a little higher. */
+export function playTallyNote(step: number): void {
+  tone(C_MAJOR[step % 8] * 2 ** Math.floor(step / 8), 0, 0.12, 'square', 0.08);
+}
+
 /** Rising sweep for a bonus or jackpot trigger. */
 export function playBonusTrigger(): void {
   tone(220, 0, 0.6, 'sawtooth', 0.12, 1760);
@@ -289,6 +310,13 @@ export function playSuspenseHit(): void {
 export function playSuspenseMiss(): void {
   tone(C_MAJOR[4], 0, 0.22, 'triangle', 0.12, C_MAJOR[2]);
   tone(C_MAJOR[2], 0.2, 0.4, 'triangle', 0.1, C_MAJOR[0] / 1.5);
+}
+
+/** An empty respin in a Hold & Spin: a falling two-note "bonk", as loud as the coin sounds. */
+export function playRespinMiss(): void {
+  tone(330, 0, 0.16, 'square', 0.16, 250);
+  tone(220, 0.14, 0.3, 'triangle', 0.3, 140);
+  noise(0.14, 0.08, 0.15, 500);
 }
 
 /** Dull buzz for a losing spin (kept very quiet). */

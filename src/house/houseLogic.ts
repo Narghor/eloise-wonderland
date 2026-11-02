@@ -37,6 +37,7 @@ import {
   type RoomId,
   type StapleId,
 } from './houseData';
+import { rollLost, rollRequests } from './houseFriends';
 import { emptyPlacement, type HouseSave } from './houseSave';
 
 /** One game minute. TEST-BUTTONS: a second, so growing and cooking can be checked quickly. */
@@ -351,6 +352,8 @@ export function refreshVisits(save: HouseSave, now: number, random = Math.random
     save.order = { visitor: visitor.id, dish };
     news.orders.push(` aimerait goûter : ${dishOf(dish).name.toLowerCase()}`);
   }
+  rollRequests(save, now, random);
+  rollLost(save, random);
   for (const c of chosen) {
     news.arrived.push(save.friends[c.id].met ? c.name : `${c.name} (nouveau visiteur !)`);
     save.friends[c.id].met = true;
