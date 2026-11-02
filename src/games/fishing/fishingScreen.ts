@@ -2,7 +2,7 @@ import './fishing.css';
 import { el, topBar } from '../../dom';
 import { companionCanvas } from '../../companion/companionArt';
 import { addCoins, loadCompanion, saveCompanion } from '../../companion/companionSave';
-import { armSoundUnlock, muteButton, playBigWin, playLose, playReelStop, playSmallWin, playSuspenseHit } from '../casino/fx/sound';
+import { armSoundUnlock, muteButton, playBigWin, playFishBite, playLose, playReelStop, playSmallWin } from '../casino/fx/sound';
 import { CASINO_TEST_BUTTONS } from '../casino/fx/testMode'; // TEST-BUTTONS
 import { fishCanvas } from './fishingArt';
 import { BAITS, BAIT_PACK, FIGHT_HINTS, FINDS, FIND_CHANCE, FISH, RARITY_NAMES, SEASON_NAMES, TIME_NAMES, type BaitId, type Find, type Fish } from './fishingData';
@@ -279,7 +279,9 @@ export function renderFishing(root: HTMLElement): () => void {
     hooked = (forcedFish && FISH.find((f) => f.id === forcedFish)) || drawFish(time, season, distance, castBait); // TEST-BUTTONS
     biteAt = performance.now();
     float.className = 'fish-float is-diving';
-    playSuspenseHit();
+    playFishBite();
+    // Phones that allow it (Android) buzz; elsewhere this does nothing.
+    navigator.vibrate?.([120, 60, 120]);
     setPhase('bite', 'ÇA MORD ! Touche vite !');
     later(biteWindow(hooked), () => {
       if (phase === 'bite') miss('Trop tard… il a filé avec l’appât.');

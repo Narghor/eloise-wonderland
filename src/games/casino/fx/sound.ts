@@ -196,6 +196,13 @@ export function playCoinLand(size: 'small' | 'big' | 'jackpot'): void {
   playBonusTrigger();
 }
 
+/** A fish takes the float: a watery plop, then the reel's quick clicks. */
+export function playFishBite(): void {
+  noise(0, 0.18, 0.35, 700);
+  tone(520, 0, 0.12, 'sine', 0.22, 140);
+  for (let i = 0; i < 5; i++) tone(2200 - i * 120, 0.16 + i * 0.045, 0.025, 'square', 0.06);
+}
+
 /** One step of a tally: each call `step` plays a little higher. */
 export function playTallyNote(step: number): void {
   tone(C_MAJOR[step % 8] * 2 ** Math.floor(step / 8), 0, 0.12, 'square', 0.08);
