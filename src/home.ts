@@ -95,10 +95,10 @@ export function renderHome(root: HTMLElement): () => void {
       { class: 'home' },
       companionCard(),
       houseCard(),
+      casinoCard(),
       dailyCard(),
       ...resumeRow(),
       ...sections,
-      casinoCard(),
       savePanel(),
     ),
   );

@@ -76,10 +76,32 @@ export function renderSlots(root: HTMLElement): () => void {
   if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: 'Gros gain', outcome: 'big' }, { label: 'Méga gain', outcome: 'mega' }, { label: 'Jackpot', outcome: 'jackpot' }])); // TEST-BUTTONS
   refresh();
 
+  let shownPool = 0;
+  let poolFrame = 0;
+
+  /** Rolls the jackpot counter up to its new value, so each spin visibly feeds it. */
+  function showPool(target: number): void {
+    cancelAnimationFrame(poolFrame);
+    const from = shownPool || target;
+    if (target > from) {
+      pool.classList.remove('is-growing');
+      void pool.offsetWidth;
+      pool.classList.add('is-growing');
+    }
+    const start = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / 500);
+      shownPool = Math.round(from + (target - from) * k);
+      pool.textContent = `💎 JACKPOT ${shownPool.toLocaleString('fr-FR')} 💎`;
+      if (k < 1) poolFrame = requestAnimationFrame(step);
+    };
+    step(start);
+  }
+
   function refresh(): void {
     const stake = BET_LEVELS[betIndex];
     balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
-    pool.textContent = `💎 JACKPOT ${jackpotFor(jackpot(MACHINE_ID), stake).toLocaleString('fr-FR')} 💎`;
+    showPool(jackpotFor(jackpot(MACHINE_ID), stake));
     betLabel.textContent = `Mise : ${stake}`;
     minus.disabled = spinning || betIndex === 0;
     plus.disabled = spinning || betIndex === BET_LEVELS.length - 1;
@@ -139,7 +161,7 @@ export function renderSlots(root: HTMLElement): () => void {
       lights.setMode('big');
       playBonusTrigger();
       shake(machine, 3);
-      const won = winJackpot(MACHINE_ID, stake * JACKPOT_MIN_X);
+      const won = winJackpot(MACHINE_ID, jackpotFor(jackpot(MACHINE_ID), stake));
       noteWin(LOBBY_ID, won, stake);
       message.textContent = `💎 JACKPOT : ${won.toLocaleString('fr-FR')} jetons ! 💎`;
       message.className = 'slots-message slots-message-big';
@@ -229,6 +251,6 @@ function paytable(stake: number): HTMLElement[] {
     paylineDiagrams(PAYLINES, ROWS),
     el('h3', { class: 'slots-paytable-title', text: `Gains par ligne (mise ${stake})` }),
     payoutTable(entries, stake),
-    rulesBlock('💎 Jackpot progressif', '💎💎💎💎💎 sur la ligne du milieu = tout le jackpot !', `Il vaut au moins ${JACKPOT_MIN_X} fois ta mise. Plus ta mise est haute, plus tu as de chances de le décrocher.`),
+    rulesBlock('💎 Jackpot progressif', '💎💎💎💎💎 sur la ligne du milieu = tout le jackpot !', `Il vaut ${JACKPOT_MIN_X} fois ta mise, plus la cagnotte : ${Math.round(JACKPOT_SHARE * 100)} % de chaque mise la fait grossir. Plus ta mise est haute, plus tu as de chances de le décrocher.`),
   ];
 }

@@ -31,7 +31,7 @@
 .house-room {
   position: relative;
   flex: 0 0 100%;
-  aspect-ratio: 4 / 3.3;
+  aspect-ratio: 16 / 10;
   overflow: hidden;
   scroll-snap-align: start;
   user-select: none;
@@ -357,7 +357,7 @@
 
 .house-front {
   position: relative;
-  padding-top: 44px;
+  padding-top: 28px;
 }
 
 .house-front-roof {
@@ -365,7 +365,7 @@
   top: 0;
   left: 0;
   width: 76%;
-  height: 50px;
+  height: 32px;
   background: #c25b7a;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
@@ -374,9 +374,9 @@
   content: '';
   position: absolute;
   left: 45%;
-  top: 22px;
-  width: 10%;
-  height: 16px;
+  top: 16px;
+  width: 8%;
+  height: 12px;
   border-radius: 50% 50% 0 0;
   background: #ffd6e4;
 }
@@ -407,7 +407,7 @@
 
 .house-front-room {
   position: relative;
-  height: 84px;
+  height: 58px;
   padding: 0;
   border: none;
   border-radius: 3px;
@@ -418,7 +418,7 @@
 }
 
 .house-front-room.is-garden {
-  height: 88px;
+  height: 62px;
   border-radius: 3px 3px 0 0;
 }
 
@@ -446,7 +446,7 @@
   padding: 1px 5px;
   border-radius: 6px;
   background: rgb(255 255 255 / 0.85);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
@@ -470,7 +470,7 @@
 .house-front-badges {
   position: absolute;
   right: 3px;
-  top: 20px;
+  top: 17px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -479,11 +479,11 @@
 .house-front-badge {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: #fff;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
   animation: house-bob 0.8s ease-in-out infinite alternate;
 }
@@ -1441,4 +1441,28 @@
 .house-ring.is-late {
   border-color: #b9aec4;
   box-shadow: none;
+}
+
+.house-garden-status {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.house-bed-time {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.85);
+  font-size: 0.6rem;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.house-main {
+  gap: 10px;
 }

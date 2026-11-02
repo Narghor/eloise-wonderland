@@ -80,7 +80,7 @@ const ROOM_GUIDES: Record<RoomId, string> = {
   living: 'Tes visiteurs se promènent dans la maison. Quand l’un d’eux prend la pose ✨, touche-le quand le cercle doré rejoint le viseur en pointillés : le viseur brille, c’est le moment de la photo.',
   kitchen: 'Mets des aliments dans la marmite puis « Cuisiner ». Un mélange qui ne donne rien ne coûte rien. Sers ensuite tes plats à tes visiteurs : ils gagnent de l’amitié.',
   cafe: 'Un service de thé de 90 secondes : tes amis viennent s’attabler parmi les clients.',
-  garden: 'Touche une parcelle vide pour planter. Les plantes poussent même quand le site est fermé, et un arrosage divise le temps restant par deux.',
+  garden: 'Dans le jardin, touche une parcelle vide pour choisir où planter, une plante 💧 pour l’arroser (elle pousse deux fois plus vite) et une plante mûre pour la récolter. Les plantes poussent même quand le site est fermé.',
   bedroom: 'Une pièce calme : certains visiteurs ne viennent que si elle est ouverte.',
   library: 'Une pièce studieuse : certains visiteurs ne viennent que si elle est ouverte.',
   greenhouse: 'Avec la serre, toutes les graines se sèment au jardin, même hors saison.',
@@ -98,10 +98,11 @@ export function panel(ctx: PanelContext, id: PanelId, now: number): HTMLElement[
   if (id === 'album') return albumPanel(ctx);
   const room = ROOMS.find((r) => r.id === id)!;
   if (!ctx.save.rooms.includes(id)) return lockedPanel(ctx, id);
-  const head = [el('h2', { class: 'house-panel-title', text: `${ROOM_ICONS[id]} ${room.name}` }), guide(ROOM_GUIDES[id])];
+  const title = el('h2', { class: 'house-panel-title', text: `${ROOM_ICONS[id]} ${room.name}` });
   const body =
     id === 'garden' ? gardenPart(ctx, now) : id === 'kitchen' ? kitchenPart(ctx, now) : id === 'cafe' ? cafePart(ctx) : id === 'living' ? livingPart(ctx) : [];
-  return [...head, ...body, ...(id === 'garden' ? [] : decorPart(ctx, id))];
+  // The guide comes last: a reminder, never between the player and the actions.
+  return [title, ...body, ...(id === 'garden' ? [] : decorPart(ctx, id)), guide(ROOM_GUIDES[id])];
 }
 
 function guide(text: string): HTMLElement {
@@ -168,98 +169,65 @@ function cafePart(ctx: PanelContext): HTMLElement[] {
 
 let choosingPlot: number | null = null;
 
-/** A bed touched in the garden view: harvests it when ripe, or opens the seed choice when empty. */
-export function touchPlot(ctx: PanelContext, index: number): void {
+/** A bed touched in the garden view: picks it for the next seed when empty, waters it, or harvests it. */
+export function touchPlot(ctx: PanelContext, index: number): 'choose' | 'done' {
   const plot = ctx.save.plots[index];
-  if (plot === undefined) return;
+  if (plot === undefined) return 'done';
   if (plot === null) {
     choosingPlot = index;
     ctx.commit();
-    return;
+    return 'choose';
   }
   if (!plot.watered && water(ctx.save, index, Date.now())) {
     ctx.say(`${plant(plot.plant).name} arrosée : elle pousse deux fois plus vite !`);
     ctx.commit();
-    return;
+    return 'done';
   }
   const count = harvest(ctx.save, index, Date.now());
   if (count > 0) {
     ctx.say(`+${count} ${plant(plot.plant).name.toLowerCase()} au garde-manger`);
     ctx.commit(true);
   }
+  return 'done';
 }
 
 function gardenPart(ctx: PanelContext, now: number): HTMLElement[] {
   const { save } = ctx;
-  const plots = save.plots.map((plot, index) => {
-    if (!plot) {
-      const button = el('button', { class: `house-plot is-empty${choosingPlot === index ? ' is-active' : ''}`, type: 'button' }, el('b', { text: '+' }), el('small', { text: 'Planter' }));
-      button.addEventListener('click', () => {
-        choosingPlot = choosingPlot === index ? null : index;
-        ctx.commit();
-      });
-      return button;
-    }
-    const info = plant(plot.plant);
-    const left = plot.readyAt - now;
-    if (left <= 0) {
-      const button = el('button', { class: 'house-plot is-ready', type: 'button' }, foodIcon(plot.plant, 40), el('strong', { text: info.name }), el('small', { class: 'house-plot-action', text: 'Récolter' }));
-      button.addEventListener('click', () => {
-        const count = harvest(save, index, Date.now());
-        ctx.say(`+${count} ${info.name.toLowerCase()} au garde-manger`);
-        ctx.commit(true);
-      });
-      return button;
-    }
-    const total = info.growMinutes * MINUTE_MS;
-    const grown = Math.min(1, Math.max(0.05, 1 - left / (plot.watered ? total / 2 : total)));
-    const box = el(
-      'div',
-      { class: 'house-plot' },
-      foodIcon(plot.plant, Math.round(18 + grown * 18)),
-      el('strong', { text: info.name }),
-      el('span', { class: 'house-plot-bar' }, el('i', { style: `width:${Math.round(grown * 100)}%` })),
-      el('small', { text: duration(left) }),
-    );
-    if (plot.watered) box.append(el('small', { class: 'house-watered', text: '💧 arrosée' }));
-    else {
-      const wet = el('button', { class: 'house-water', type: 'button', text: '💧 Arroser' });
-      wet.addEventListener('click', () => {
-        water(save, index, Date.now());
-        ctx.commit();
-      });
-      box.append(wet);
-    }
-    return box;
+  if (choosingPlot !== null && save.plots[choosingPlot] !== null) choosingPlot = null;
+  const target = choosingPlot ?? save.plots.findIndex((plot) => plot === null);
+  const free = target >= 0;
+  const season = currentSeason(new Date(now));
+
+  const seeds = PLANTS.filter((p) => !p.rare || (save.seeds[p.id] ?? 0) > 0).map((p) => {
+    const block = sowBlock(save, p.id, now);
+    const detail =
+      block === 'season'
+        ? el('small', { class: 'house-seed-off', text: `${SEASON_ICONS[p.seasons![0]]} ${SEASON_NAMES[p.seasons![0]]}` })
+        : el('small', {}, ...(p.rare ? [`graine rare ×${save.seeds[p.id]}`] : [price(p.price), ` · ${duration(p.growMinutes * MINUTE_MS)}`]));
+    const button = el('button', { class: `house-seed${p.rare ? ' is-rare' : ''}`, type: 'button' }, foodIcon(p.id, 30), el('span', { text: p.name }), detail);
+    button.disabled = block !== null || !free;
+    button.addEventListener('click', () => {
+      const refusal = sow(save, target, p.id, Date.now());
+      if (refusal) {
+        ctx.say(refusal === 'coins' ? 'Pas assez de pièces.' : 'Pas maintenant : la serre permet de semer hors saison.');
+        return;
+      }
+      choosingPlot = null;
+      ctx.say(`${p.name} plantée !`);
+      ctx.commit(true);
+    });
+    return button;
   });
 
-  const season = currentSeason(new Date(now));
-  const parts: HTMLElement[] = [el('div', { class: 'house-plots' }, ...plots)];
-  if (choosingPlot !== null && save.plots[choosingPlot] === null) {
-    const index = choosingPlot;
-    const seeds = PLANTS.filter((p) => !p.rare || (save.seeds[p.id] ?? 0) > 0).map((p) => {
-      const block = sowBlock(save, p.id, now);
-      const detail =
-        block === 'season'
-          ? el('small', { class: 'house-seed-off', text: `${SEASON_ICONS[p.seasons![0]]} ${SEASON_NAMES[p.seasons![0]]}` })
-          : el('small', {}, ...(p.rare ? [`graine rare ×${save.seeds[p.id]}`] : [price(p.price), ` · ${duration(p.growMinutes * MINUTE_MS)}`]));
-      const button = el('button', { class: `house-seed${p.rare ? ' is-rare' : ''}`, type: 'button' }, foodIcon(p.id, 30), el('span', { text: p.name }), detail);
-      button.disabled = block !== null;
-      button.addEventListener('click', () => {
-        const refusal = sow(save, index, p.id, Date.now());
-        if (refusal) {
-          ctx.say(refusal === 'coins' ? 'Pas assez de pièces.' : 'Pas maintenant : la serre permet de semer hors saison.');
-          return;
-        }
-        choosingPlot = null;
-        ctx.say(`${p.name} plantée !`);
-        ctx.commit(true);
-      });
-      return button;
-    });
-    parts.push(sectionTitle(`Que planter ? · ${SEASON_ICONS[season]} ${SEASON_NAMES[season]}`), el('div', { class: 'house-seeds' }, ...seeds));
-    if (!save.rooms.includes('greenhouse')) parts.push(el('p', { class: 'house-note', text: 'Les graines grisées attendent leur saison. La serre permet de les planter quand même.' }));
-  }
+  const status = free
+    ? `Touche une graine : elle pousse dans la parcelle ${target + 1}, dans le jardin juste au-dessus.`
+    : 'Toutes les parcelles sont occupées : récolte tes plantes, ou achète une nouvelle parcelle.';
+  const parts: HTMLElement[] = [
+    el('p', { class: 'house-garden-status', text: status }),
+    sectionTitle(`Graines · ${SEASON_ICONS[season]} ${SEASON_NAMES[season]}`),
+    el('div', { class: 'house-seeds' }, ...seeds),
+  ];
+  if (!save.rooms.includes('greenhouse')) parts.push(el('p', { class: 'house-note', text: 'Les graines grisées attendent leur saison. La serre permet de les planter quand même.' }));
   const plotCost = plotPrice(save);
   if (plotCost !== null) {
     const more = el('button', { class: 'button button-secondary', type: 'button' }, 'Nouvelle parcelle · ', price(plotCost));
@@ -575,7 +543,6 @@ function albumPanel(ctx: PanelContext): HTMLElement[] {
   });
   const parts: HTMLElement[] = [
     el('h2', { class: 'house-panel-title', text: '📖 Album' }),
-    guide('Photographie tes visiteurs et sers-leur des plats pour gagner leur amitié (♥). L’amitié débloque leur histoire, puis un cadeau rare pour ton compagnon.'),
     ...cards,
   ];
   if (unknown.length > 0) {
@@ -588,6 +555,7 @@ function albumPanel(ctx: PanelContext): HTMLElement[] {
       ),
     );
   }
+  parts.push(guide('Photographie tes visiteurs et sers-leur des plats pour gagner leur amitié (♥). L’amitié débloque leur histoire, puis un cadeau rare pour ton compagnon.'));
   return parts;
 }
 

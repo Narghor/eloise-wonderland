@@ -55,7 +55,7 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
     select: (room) => show(room),
     plot(index) {
       if (shown !== 'garden') show('garden');
-      touchPlot(ctx, index);
+      if (touchPlot(ctx, index) === 'choose') panel.querySelector('.house-seeds')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     },
   });
 
@@ -130,7 +130,7 @@ export function renderHouse(root: HTMLElement, params: string[]): () => void {
       'div',
       { class: 'house' },
       topBar('Ma maison', el('span', { class: 'house-top-right' }, albumButton, coinPill)),
-      el('main', { class: 'house-main' }, houseScene.element, el('p', { class: 'house-hint', text: '✨ Un visiteur prend la pose : touche-le quand le cercle doré rejoint le viseur et qu’il brille.' }), panel, ...testBar),
+      el('main', { class: 'house-main' }, houseScene.element, panel, ...testBar),
     ),
   );
   show(shown);

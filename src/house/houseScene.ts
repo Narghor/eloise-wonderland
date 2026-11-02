@@ -183,14 +183,19 @@ export class HouseScene {
         stage = left <= 0 ? 'ripe' : left > total * 0.5 ? 'sprout' : 'leaves';
       }
       const key = `${plot?.plant ?? ''}|${stage}|${plot?.watered ?? false}`;
-      if (this.bedKeys[index] === key) return;
+      if (this.bedKeys[index] === key) {
+        const time = bed.querySelector('.house-bed-time');
+        if (time && plot) time.textContent = timeLeft(plot.readyAt - now);
+        return;
+      }
       this.bedKeys[index] = key;
       bed.className = `house-bed is-${stage}${plot?.watered ? ' is-watered' : ''}`;
       const name = plot ? plant(plot.plant).name : '';
       const thirsty = !!plot && stage !== 'ripe' && !plot.watered;
       bed.setAttribute('aria-label', !plot ? 'Parcelle vide : planter' : stage === 'ripe' ? `Récolter : ${name}` : thirsty ? `Arroser : ${name}` : `${name} en train de pousser`);
       const sprite = !plot ? el('span', { class: 'house-bed-plus', text: '+' }) : stage === 'ripe' ? foodIcon(plot.plant, 40) : spriteCanvas(GROWTH_ART[stage as 'sprout' | 'leaves'], stage === 'sprout' ? 4 : 4.6);
-      bed.replaceChildren(...(thirsty ? [el('span', { class: 'house-bed-thirst', text: '💧' })] : []), sprite, el('span', { class: 'house-bed-soil' }));
+      const time = plot && stage !== 'ripe' ? [el('span', { class: 'house-bed-time', text: timeLeft(plot.readyAt - now) })] : [];
+      bed.replaceChildren(...(thirsty ? [el('span', { class: 'house-bed-thirst', text: '💧' })] : []), sprite, el('span', { class: 'house-bed-soil' }), ...time);
     });
   }
 
@@ -236,7 +241,7 @@ export class HouseScene {
       const key = `${here.map((a) => a.character?.id ?? 'me').join(',')}|${badges.join('')}`;
       if (this.mapKeys.get(id) === key) continue;
       this.mapKeys.set(id, key);
-      button.querySelector('.house-front-who')!.replaceChildren(...here.slice(0, 3).map((a) => companionCanvas(a.character?.look ?? loadCompanion().look, 22)));
+      button.querySelector('.house-front-who')!.replaceChildren(...here.slice(0, 3).map((a) => companionCanvas(a.character?.look ?? loadCompanion().look, 18)));
       button.querySelector('.house-front-badges')!.replaceChildren(...badges.map((badge) => el('span', { class: 'house-front-badge', text: badge })));
     }
   }
@@ -436,6 +441,15 @@ export class HouseScene {
     actor.body.style.transform = '';
     actor.nextPoseAt = time + POSE_GAP_MS[0] + Math.random() * (POSE_GAP_MS[1] - POSE_GAP_MS[0]);
   }
+}
+
+/** "45 s", "12 min", "1 h 30": short enough to sit under a garden bed. */
+function timeLeft(ms: number): string {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}`;
 }
 
 function poseDuration(actor: Actor): number {
