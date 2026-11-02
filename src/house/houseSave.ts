@@ -1,4 +1,5 @@
 import { readGame, writeGame } from '../save';
+import { FLOORS, WALLPAPERS, WALL_DECOS, WALL_DECO_SPOTS } from './houseStyle';
 import {
   CAFE_LEVELS,
   CHARACTERS,
@@ -89,6 +90,16 @@ export interface HouseSave {
   duos: Record<string, number>;
   /** The visit (its visitUntil) that already had its snack: one per visit. */
   snackVisit: number;
+  /** Wallpaper, floor and wall decorations chosen per room; null keeps the room's own. */
+  style: Record<RoomId, RoomStyle>;
+  /** Wallpapers, floors and wall decorations bought. */
+  ownedStyles: string[];
+}
+
+export interface RoomStyle {
+  wall: string | null;
+  floor: string | null;
+  decos: (string | null)[];
 }
 
 export interface FriendRequest {
@@ -199,6 +210,7 @@ export function loadHouse(): HouseSave {
     lost: readLost(data.lost),
     duos: Object.fromEntries(Object.entries(asRecord(data.duos)).filter(([, stars]) => isCount(stars) && stars <= 3)) as Record<string, number>,
     snackVisit: typeof data.snackVisit === 'number' ? data.snackVisit : 0,
+    ...readStyles(data),
     gifts: asArray(data.gifts).flatMap((value) => {
       const gift = asRecord(value);
       if (typeof gift.from !== 'string' || !isCount(gift.coins)) return [];
@@ -210,6 +222,25 @@ export function loadHouse(): HouseSave {
       }];
     }),
   };
+}
+
+function readStyles(data: Record<string, unknown>): { style: Record<RoomId, RoomStyle>; ownedStyles: string[] } {
+  const known = new Set([...WALLPAPERS, ...FLOORS, ...WALL_DECOS].map((s) => s.id));
+  const ownedStyles = asArray(data.ownedStyles).filter((id): id is string => typeof id === 'string' && known.has(id));
+  const owned = new Set(ownedStyles);
+  const pick = (id: unknown, list: { id: string }[]) => (typeof id === 'string' && owned.has(id) && list.some((s) => s.id === id) ? id : null);
+  const saved = asRecord(data.style);
+  const style = {} as Record<RoomId, RoomStyle>;
+  for (const room of ROOM_IDS) {
+    const entry = asRecord(saved[room]);
+    const decos = asArray(entry.decos);
+    style[room] = {
+      wall: pick(entry.wall, WALLPAPERS),
+      floor: pick(entry.floor, FLOORS),
+      decos: Array.from({ length: WALL_DECO_SPOTS }, (_, i) => pick(decos[i], WALL_DECOS)),
+    };
+  }
+  return { style, ownedStyles };
 }
 
 function readLost(value: unknown): LostItem | null {

@@ -48,6 +48,7 @@ import {
   serve,
   sow,
   sowBlock,
+  spend,
   upgradeKitchen,
   water,
 } from './houseLogic';
@@ -66,6 +67,7 @@ import {
   type SnackReaction,
 } from './houseFriends';
 import { photoCard } from './houseScene';
+import { FLOORS, WALLPAPERS, WALL_DECOS, floor, wallDeco, wallpaper, type Finish } from './houseStyle';
 import type { HouseSave } from './houseSave';
 
 /** What a panel may ask of the screen. */
@@ -118,7 +120,7 @@ export function panel(ctx: PanelContext, id: PanelId, now: number): HTMLElement[
   const body =
     id === 'garden' ? gardenPart(ctx, now) : id === 'kitchen' ? kitchenPart(ctx, now) : id === 'cafe' ? cafePart(ctx) : id === 'living' ? livingPart(ctx) : [];
   // The guide comes last: a reminder, never between the player and the actions.
-  return [title, ...body, ...decorPart(ctx, id), guide(ROOM_GUIDES[id])];
+  return [title, ...body, ...decorPart(ctx, id), ...(id === 'garden' ? [] : stylePart(ctx, id)), guide(ROOM_GUIDES[id])];
 }
 
 function guide(text: string): HTMLElement {
@@ -576,6 +578,106 @@ function decorPart(ctx: PanelContext, room: RoomId): HTMLElement[] {
     remove.addEventListener('click', () => {
       place(save, room, spot, null);
       decorSpot = null;
+      ctx.commit(true);
+    });
+    parts.push(el('div', { class: 'house-seeds' }, ...choices), remove);
+  }
+  return parts;
+}
+
+// -----------------------------------------------
+// ROOM STYLE: wallpaper, floor, wall decorations
+// -----------------------------------------------
+
+let styleOpen: { room: RoomId; part: 'wall' | 'floor' | number } | null = null;
+
+function stylePart(ctx: PanelContext, room: RoomId): HTMLElement[] {
+  const { save } = ctx;
+  const style = save.style[room];
+  const isOpen = (part: 'wall' | 'floor' | number) => styleOpen?.room === room && styleOpen.part === part;
+  const toggle = (part: 'wall' | 'floor' | number) => {
+    styleOpen = isOpen(part) ? null : { room, part };
+    ctx.commit();
+  };
+  /** Buys the item if needed, then applies it; false when coins are missing. */
+  const take = (id: string, price: number, name: string): boolean => {
+    if (save.ownedStyles.includes(id)) return true;
+    if (!confirm(`Acheter « ${name} » pour ${price} pièces ? Tu pourras l’utiliser dans toutes les pièces.`)) return false;
+    if (!spend(price)) {
+      ctx.say('Pas assez de pièces.');
+      return false;
+    }
+    save.ownedStyles.push(id);
+    return true;
+  };
+  const label = (owned: boolean, used: boolean, cost: number) => el('small', {}, ...(used ? ['posé ici'] : owned ? ['à toi'] : [price(cost)]));
+
+  const finishChoices = (part: 'wall' | 'floor', list: Finish[]) => {
+    const current = style[part];
+    const original = el('button', { class: `house-swatch-choice${current === null ? ' is-on' : ''}`, type: 'button' }, el('span', { class: 'house-swatch is-original', text: '↺' }), el('span', { text: 'D’origine' }));
+    original.addEventListener('click', () => {
+      style[part] = null;
+      styleOpen = null;
+      ctx.commit(true);
+    });
+    return el(
+      'div',
+      { class: 'house-seeds' },
+      original,
+      ...list.map((finish) => {
+        const owned = save.ownedStyles.includes(finish.id);
+        const button = el('button', { class: `house-swatch-choice${current === finish.id ? ' is-on' : ''}`, type: 'button' }, el('span', { class: 'house-swatch', style: `background:${finish.css}` }), el('span', { text: finish.name }), label(owned, current === finish.id, finish.price));
+        button.addEventListener('click', () => {
+          if (!take(finish.id, finish.price, finish.name)) return;
+          style[part] = finish.id;
+          styleOpen = null;
+          ctx.commit(true);
+        });
+        return button;
+      }),
+    );
+  };
+
+  const row = (part: 'wall' | 'floor', title: string, finish: Finish | undefined) =>
+    el('button', { class: `house-style-row${isOpen(part) ? ' is-active' : ''}`, type: 'button' }, el('span', { class: 'house-swatch', style: finish ? `background:${finish.css}` : '' }), el('strong', { text: title }), el('small', { text: finish?.name ?? 'D’origine' }));
+  const wallRow = row('wall', 'Papier peint', wallpaper(style.wall));
+  wallRow.addEventListener('click', () => toggle('wall'));
+  const floorRow = row('floor', 'Sol', floor(style.floor));
+  floorRow.addEventListener('click', () => toggle('floor'));
+
+  const decoSpots = style.decos.map((id, spot) => {
+    const deco = wallDeco(id);
+    const button = el(
+      'button',
+      { class: `house-decor-spot${deco ? '' : ' is-empty'}${isOpen(spot) ? ' is-active' : ''}`, type: 'button' },
+      ...(deco ? [spriteCanvas(deco.sprite, 2), el('strong', { text: deco.name })] : [el('b', { text: '+' }), el('small', { text: spot === 0 ? 'Mur de gauche' : 'Mur de droite' })]),
+    );
+    button.addEventListener('click', () => toggle(spot));
+    return button;
+  });
+
+  const parts: HTMLElement[] = [sectionTitle('Murs et sol'), el('div', { class: 'house-style-rows' }, wallRow, floorRow)];
+  if (isOpen('wall')) parts.push(finishChoices('wall', WALLPAPERS));
+  if (isOpen('floor')) parts.push(finishChoices('floor', FLOORS));
+  parts.push(sectionTitle('Décos murales'), el('div', { class: 'house-decor' }, ...decoSpots));
+  const openSpot = typeof styleOpen?.part === 'number' && styleOpen.room === room ? styleOpen.part : null;
+  if (openSpot !== null) {
+    const choices = WALL_DECOS.map((deco) => {
+      const owned = save.ownedStyles.includes(deco.id);
+      const used = style.decos[openSpot] === deco.id;
+      const button = el('button', { class: 'house-seed', type: 'button' }, spriteCanvas(deco.sprite, 2), el('span', { text: deco.name }), label(owned, used, deco.price));
+      button.addEventListener('click', () => {
+        if (!take(deco.id, deco.price, deco.name)) return;
+        style.decos = style.decos.map((d, i) => (i === openSpot ? deco.id : d === deco.id ? null : d));
+        styleOpen = null;
+        ctx.commit(true);
+      });
+      return button;
+    });
+    const remove = el('button', { class: 'button button-secondary', type: 'button', text: 'Laisser le mur vide' });
+    remove.addEventListener('click', () => {
+      style.decos[openSpot] = null;
+      styleOpen = null;
       ctx.commit(true);
     });
     parts.push(el('div', { class: 'house-seeds' }, ...choices), remove);

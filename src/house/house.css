@@ -1769,3 +1769,112 @@
     animation: none;
   }
 }
+/* -----------------------------------------------
+   ROOM STYLE: wallpaper, floor, wall decorations
+   ----------------------------------------------- */
+
+.house-style-rows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.house-style-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 8px;
+  padding: 8px;
+  border: 2px solid #f0dce6;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.house-style-row .house-swatch {
+  grid-row: span 2;
+}
+
+.house-style-row small {
+  color: #8a6b94;
+  font-size: 0.72rem;
+}
+
+.house-style-row.is-active {
+  border-color: #e0457b;
+}
+
+.house-swatch {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: repeating-linear-gradient(45deg, #f4eef7 0 6px, #fff 6px 12px);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.08);
+}
+
+.house-swatch.is-original {
+  font-size: 1.1rem;
+  color: #8a6b94;
+}
+
+.house-swatch-choice {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 2px solid #f0dce6;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.house-swatch-choice .house-swatch {
+  width: 100%;
+  height: 38px;
+}
+
+.house-swatch-choice.is-on {
+  border-color: #e0457b;
+}
+
+.house-wall-deco {
+  position: absolute;
+  top: 16%;
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.house-wall-deco canvas {
+  image-rendering: pixelated;
+}
+
+.house-wall-deco.is-sway canvas {
+  transform-origin: 50% 0;
+  animation: house-sway 2s ease-in-out infinite alternate;
+}
+
+.house-wall-deco.is-twinkle canvas {
+  animation: house-twinkle-glow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes house-sway {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+
+@keyframes house-twinkle-glow {
+  from { filter: drop-shadow(0 0 2px #fff6a8); }
+  to { filter: drop-shadow(0 0 8px #fff6a8) brightness(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .house-wall-deco canvas {
+    animation: none;
+  }
+}

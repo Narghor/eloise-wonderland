@@ -180,19 +180,19 @@ export interface Plant {
 }
 
 export const PLANTS: Plant[] = [
-  { id: 'carrot', name: 'Carotte', price: 2, growMinutes: 5, harvest: 3, color: '#f08a4b' },
-  { id: 'wheat', name: 'Blé', price: 2, growMinutes: 10, harvest: 4, color: '#e8c56a' },
-  { id: 'mint', name: 'Menthe', price: 3, growMinutes: 8, harvest: 3, color: '#5fc58f' },
-  { id: 'basil', name: 'Basilic', price: 3, growMinutes: 12, harvest: 3, color: '#3fa34d' },
-  { id: 'thyme', name: 'Thym', price: 3, growMinutes: 15, harvest: 3, color: '#8fae6b' },
-  { id: 'tomato', name: 'Tomate', price: 4, growMinutes: 20, harvest: 3, color: '#e0475b', seasons: ['spring', 'summer'] },
-  { id: 'strawberry', name: 'Fraise', price: 5, growMinutes: 30, harvest: 3, color: '#ff5d8f', seasons: ['spring', 'summer'] },
-  { id: 'blackberry', name: 'Mûre', price: 5, growMinutes: 45, harvest: 3, color: '#5b3a78', seasons: ['summer', 'autumn'] },
-  { id: 'lemon', name: 'Citron', price: 6, growMinutes: 60, harvest: 2, color: '#ffd23f', seasons: ['winter', 'spring'] },
-  { id: 'pumpkin', name: 'Citrouille', price: 8, growMinutes: 120, harvest: 2, color: '#f6923a', seasons: ['autumn', 'winter'] },
-  { id: 'mandarin', name: 'Mandarine', price: 6, growMinutes: 60, harvest: 3, color: '#ff9f2e', seasons: ['winter'] },
-  { id: 'moonflower', name: 'Fleur de lune', price: 0, growMinutes: 90, harvest: 2, color: '#c9c3ff', rare: true },
-  { id: 'goldenApple', name: 'Pomme dorée', price: 0, growMinutes: 90, harvest: 2, color: '#f2c94c', rare: true },
+  { id: 'carrot', name: 'Carotte', price: 2, growMinutes: 20, harvest: 3, color: '#f08a4b' },
+  { id: 'wheat', name: 'Blé', price: 2, growMinutes: 40, harvest: 4, color: '#e8c56a' },
+  { id: 'mint', name: 'Menthe', price: 3, growMinutes: 32, harvest: 3, color: '#5fc58f' },
+  { id: 'basil', name: 'Basilic', price: 3, growMinutes: 48, harvest: 3, color: '#3fa34d' },
+  { id: 'thyme', name: 'Thym', price: 3, growMinutes: 60, harvest: 3, color: '#8fae6b' },
+  { id: 'tomato', name: 'Tomate', price: 4, growMinutes: 80, harvest: 3, color: '#e0475b', seasons: ['spring', 'summer'] },
+  { id: 'strawberry', name: 'Fraise', price: 5, growMinutes: 120, harvest: 3, color: '#ff5d8f', seasons: ['spring', 'summer'] },
+  { id: 'blackberry', name: 'Mûre', price: 5, growMinutes: 180, harvest: 3, color: '#5b3a78', seasons: ['summer', 'autumn'] },
+  { id: 'lemon', name: 'Citron', price: 6, growMinutes: 240, harvest: 2, color: '#ffd23f', seasons: ['winter', 'spring'] },
+  { id: 'pumpkin', name: 'Citrouille', price: 8, growMinutes: 480, harvest: 2, color: '#f6923a', seasons: ['autumn', 'winter'] },
+  { id: 'mandarin', name: 'Mandarine', price: 6, growMinutes: 240, harvest: 3, color: '#ff9f2e', seasons: ['winter'] },
+  { id: 'moonflower', name: 'Fleur de lune', price: 0, growMinutes: 360, harvest: 2, color: '#c9c3ff', rare: true },
+  { id: 'goldenApple', name: 'Pomme dorée', price: 0, growMinutes: 360, harvest: 2, color: '#f2c94c', rare: true },
 ];
 
 export function plant(id: PlantId): Plant {

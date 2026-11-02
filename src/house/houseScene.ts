@@ -6,6 +6,7 @@ import { FURNITURE, POSES, ROOMS, SPOT_X, dish, plant, type Character, type Pose
 import { foodIcon } from './houseFoodArt';
 import { MINUTE_MS, availablePoses, character } from './houseLogic';
 import { pairsHome, type Pair, type SearchResult } from './houseFriends';
+import { WALL_DECO_X, floor, wallDeco, wallpaper } from './houseStyle';
 import type { HouseSave } from './houseSave';
 
 // -----------------------------------------------
@@ -146,13 +147,18 @@ export class HouseScene {
 
   private roomElement(id: RoomId): HTMLElement {
     const room = ROOMS.find((r) => r.id === id)!;
+    const style = this.save.style[id];
     const element = el(
       'div',
       { class: `house-room is-${id}`, 'data-room': id },
-      el('div', { class: 'house-room-wall', style: `background:${room.wall}` }),
-      el('div', { class: 'house-room-ground', style: `background:${room.ground}` }),
+      el('div', { class: 'house-room-wall', style: `background:${wallpaper(style.wall)?.css ?? room.wall}` }),
+      el('div', { class: 'house-room-ground', style: `background:${floor(style.floor)?.css ?? room.ground}` }),
       el('span', { class: 'house-room-name', text: room.name }),
     );
+    style.decos.forEach((decoId, spot) => {
+      const deco = wallDeco(decoId);
+      if (deco) element.append(el('div', { class: `house-wall-deco${deco.animated ? ` is-${deco.animated}` : ''}`, style: `left:${WALL_DECO_X[spot]}%` }, spriteCanvas(deco.sprite)));
+    });
     if (id === 'living' || id === 'bedroom' || id === 'library') element.append(el('div', { class: 'house-window' }));
     this.save.placed[id].forEach((piece, spot) => {
       if (!piece) return;
@@ -274,8 +280,8 @@ export class HouseScene {
       const button = el(
         'button',
         { class: `house-front-room is-${id}${open ? '' : ' is-locked'}${id === this.active ? ' is-active' : ''}`, type: 'button', 'data-map': id, 'aria-label': info.name },
-        el('span', { class: 'house-front-wall', style: `background:${info.wall}` }),
-        el('span', { class: 'house-front-ground', style: `background:${info.ground}` }),
+        el('span', { class: 'house-front-wall', style: `background:${wallpaper(this.save.style[id].wall)?.css ?? info.wall}` }),
+        el('span', { class: 'house-front-ground', style: `background:${floor(this.save.style[id].floor)?.css ?? info.ground}` }),
         el('span', { class: 'house-front-name', text: info.name }),
         el('span', { class: 'house-front-who' }),
         el('span', { class: 'house-front-badges' }),
