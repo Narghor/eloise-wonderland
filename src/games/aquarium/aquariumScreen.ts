@@ -3,7 +3,7 @@ import { el, topBar } from '../../dom';
 import { loadCompanion, saveCompanion } from '../../companion/companionSave';
 import { armSoundUnlock, muteButton, playChime, playCoinLand, playGulp, playShine, playSmallWin, playSprinkle, playWipe } from '../casino/fx/sound';
 import { fishCanvas } from '../fishing/fishingArt';
-import { FISH, RARITY_NAMES, SEASON_NAMES, TIME_NAMES, type Fish } from '../fishing/fishingData';
+import { FISH, RARITY_NAMES, SEASON_NAMES, TIME_NAMES, type Fish, type Season } from '../fishing/fishingData';
 import { timeOfDay } from '../fishing/fishingLogic';
 import { loadFishing } from '../fishing/fishingSave';
 import { SCALE, sharpCanvas } from '../leaves/leavesArt';
@@ -69,6 +69,8 @@ const STYLE = {
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const SEASON_ICONS: Record<Season, string> = { spring: '🌸', summer: '🌻', autumn: '🍂', winter: '❄️' };
 
 export function renderAquarium(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -749,10 +751,25 @@ export function renderAquarium(root: HTMLElement): () => void {
   // PANELS
   // -----------------------------------------------
 
+  /** The fish's icon; its halo tells the rarity (the glowing fish only shine in the water). */
   const fishIcon = (fish: Fish) => {
     const art = fishCanvas(fish, 2);
-    art.classList.add('aqua-fish-icon');
+    art.classList.remove('is-glowing');
+    art.classList.add('aqua-fish-icon', `is-rarity-${fish.rarity}`);
     return art;
+  };
+
+  /** Little marks after a name: when it bites (dawn, day, night), its season, and ✨ for this tank's theme. */
+  const badges = (fish: Fish) => {
+    const times = fish.times ?? [];
+    const marks = [
+      times.includes('dawn') ? '🌅' : '',
+      times.includes('day') ? '☀️' : '',
+      times.includes('dusk') || times.includes('night') ? '🌙' : '',
+      fish.season ? SEASON_ICONS[fish.season] : '',
+      tank().theme.fish.includes(fish.id) ? '✨' : '',
+    ].join('');
+    return marks ? ` ${marks}` : '';
   };
 
   /** A list row that opens the fish's card when touched anywhere but its button. */
@@ -798,7 +815,7 @@ export function renderAquarium(root: HTMLElement): () => void {
       el(
         'div',
         {},
-        el('strong', { text: save.names[fish.id] ? `${save.names[fish.id]} · ${fish.name}` : fish.name }),
+        el('strong', { text: `${save.names[fish.id] ? `${save.names[fish.id]} · ${fish.name}` : fish.name}${badges(fish)}` }),
         el('span', { text: `Record ${c?.best ?? '?'} cm · attrapé ${c?.count ?? 0} fois` }),
         el('span', { text: `${RARITY_NAMES[fish.rarity]} · ${fish.times ? `se pêche ${fish.times.map((t) => TIME_NAMES[t]).join(', ')}` : 'se pêche à toute heure'}${fish.season ? `, ${SEASON_NAMES[fish.season]}` : ''}` }),
         ...(theme ? [el('span', { text: `Thème : ${theme.theme.name} (${theme.name.toLowerCase()})` })] : []),
@@ -854,7 +871,7 @@ export function renderAquarium(root: HTMLElement): () => void {
         const fish = FISH.find((f) => f.id === id)!;
         const out = el('button', { class: 'aqua-small', type: 'button', text: 'Sortir du bac' });
         out.addEventListener('click', () => release(id));
-        const row = el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${save.names[id] ? `${save.names[id]} · ` : ''}${fish.name}${(caught[id]?.count ?? 0) >= SCHOOL_AT ? ' (banc)' : ''}${save.babies.some((b) => b.fish === id) ? ' 🐣' : ''}` }), out);
+        const row = el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${save.names[id] ? `${save.names[id]} · ` : ''}${fish.name}${badges(fish)}${(caught[id]?.count ?? 0) >= SCHOOL_AT ? ' (banc)' : ''}${save.babies.some((b) => b.fish === id) ? ' 🐣' : ''}` }), out);
         return cardRow(fish, row);
       }),
     );
@@ -869,7 +886,7 @@ export function renderAquarium(root: HTMLElement): () => void {
         const add = el('button', { class: 'aqua-small', type: 'button', text: elsewhere ? 'Déménager ici' : 'Accueillir' });
         add.disabled = full;
         add.addEventListener('click', () => welcome(fish.id));
-        return cardRow(fish, el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${fish.name}${t.theme.fish.includes(fish.id) ? ' ✨' : ''}${elsewhere ? ` · dans ${elsewhere.name.toLowerCase()}` : ''}` }), add));
+        return cardRow(fish, el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${fish.name}${badges(fish)}${elsewhere ? ` · dans ${elsewhere.name.toLowerCase()}` : ''}` }), add));
       }),
     );
     if (candidates.length === 0) guests.replaceChildren(el('p', { class: 'aqua-note', text: 'Va pêcher de nouvelles espèces pour les accueillir ici !' }));

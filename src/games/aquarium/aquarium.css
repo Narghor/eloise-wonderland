@@ -317,6 +317,20 @@
   image-rendering: pixelated;
 }
 
+/* The halo tells the rarity, with the colours of the fishing notebook. */
+.aqua-fish-icon.is-rarity-2 { filter: drop-shadow(0 0 3px #6ab84a); }
+.aqua-fish-icon.is-rarity-3 { filter: drop-shadow(0 0 4px #4fa8e0); }
+.aqua-fish-icon.is-rarity-4 { filter: drop-shadow(0 0 5px #b07fe8); }
+.aqua-fish-icon.is-rarity-5 { filter: drop-shadow(0 0 6px #ffc61a); animation: aqua-legend 1.6s ease-in-out infinite alternate; }
+
+@keyframes aqua-legend {
+  to { filter: drop-shadow(0 0 10px #ffd23f); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aqua-fish-icon.is-rarity-5 { animation: none; }
+}
+
 .aqua-deco-icon {
   width: 48px;
   height: 54px;
