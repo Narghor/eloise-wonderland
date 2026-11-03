@@ -24,7 +24,7 @@ const TWO_STARS = 0.13;
 const SNAP_RADIUS = 70;
 const ROOM_CHANGE_CHANCE = 0.25;
 /** Time a visitor waits on its spot, thought bubble up, before posing. */
-const POSE_WARNING_MS = 5000;
+const POSE_WARNING_MS = 3000;
 /** Chance that a visitor about to pose calls a friend of its story to pose together instead. */
 const PAIR_CHANCE = 0.4;
 /** Two friends share one ring, so it does not follow either one's rhythm. */
