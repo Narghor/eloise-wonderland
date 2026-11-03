@@ -299,6 +299,7 @@ const TIER_TITLES = ['', 'GROS GAIN !', 'ÉNORME GAIN !', 'MÉGA GAIN !'];
 export function countUp(target: HTMLElement, to: number, ms: number, format: (n: number) => string = String, onDone?: () => void): () => void {
   const start = performance.now();
   let lastTick = 0;
+  let lastWrite = -Infinity;
   let done = false;
   let frame = 0;
   const finish = (): void => {
@@ -313,7 +314,11 @@ export function countUp(target: HTMLElement, to: number, ms: number, format: (n:
     const t = Math.max(0, Math.min(1, (now - start) / ms));
     const eased = 1 - Math.pow(1 - t, 2);
     const shown = Math.round(to * eased);
-    target.textContent = format(shown);
+    // 25 writes a second read as a smooth count, and each write re-lays out a big glowing number: a phone lags at 60.
+    if (now - lastWrite >= 40) {
+      target.textContent = format(shown);
+      lastWrite = now;
+    }
     if (now - lastTick > 70) {
       playCoinTick();
       lastTick = now;
@@ -346,6 +351,8 @@ export function showBigWin(host: HTMLElement, amount: number, stake: number, tit
     el('span', { class: 'fx-bigwin-hint', text: 'Touche pour continuer' }),
   );
   host.append(overlay);
+  // What lies behind the veil freezes (fx.css): its bulbs repaint their glow every frame.
+  host.classList.add('fx-bigwin-open');
   playBigWin(tier);
   rain(overlay, 10 + tier * 6, 'coins');
   const confetti = window.setInterval(() => rain(overlay, 6, 'confetti'), 1200);
@@ -358,6 +365,7 @@ export function showBigWin(host: HTMLElement, amount: number, stake: number, tit
       overlay.classList.add('fx-bigwin-out');
       window.setTimeout(() => {
         overlay.remove();
+        if (!host.querySelector(':scope > .fx-bigwin')) host.classList.remove('fx-bigwin-open');
         resolve();
       }, 250);
     };

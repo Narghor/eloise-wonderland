@@ -113,6 +113,7 @@
   z-index: 5;
   font-size: 1.4rem;
   animation: fx-fly 1.1s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  will-change: transform, opacity;
 }
 
 .fx-confetti {
@@ -155,6 +156,10 @@
 
 .fx-bigwin-out { opacity: 0; transition: opacity 0.25s; }
 
+/* Behind the veil everything holds still: the bulbs animate their glow (box-shadow), a repaint each frame on a phone. */
+.fx-bigwin-open > :not(.fx-bigwin),
+.fx-bigwin-open > :not(.fx-bigwin) * { animation-play-state: paused !important; }
+
 @keyframes fx-fade-in { from { opacity: 0; } }
 
 /* A soft halo behind the title that breathes slowly: no rays, no strobing. */
@@ -179,6 +184,7 @@
   z-index: 1;
   font-size: 1.3rem;
   animation: fx-fall var(--dur) linear forwards;
+  will-change: transform;
 }
 
 @keyframes fx-fall {
@@ -201,7 +207,8 @@
 .fx-bigwin-3 .fx-bigwin-title { color: #9ff3ff; text-shadow: 0 0 18px #3fe0ff, 0 0 30px #ff4fa3, 0 4px 0 #0d3a7a; }
 
 @keyframes fx-title { from { transform: scale(0.2) rotate(-10deg); opacity: 0; } }
-@keyframes fx-glow { to { transform: scale(1.04); filter: brightness(1.15); } }
+/* Transform only: a filter on a text with glowing shadows is redrawn every frame. */
+@keyframes fx-glow { to { transform: scale(1.04); } }
 
 .fx-bigwin-amount {
   font-size: clamp(2.4rem, 14vw, 4.4rem);
