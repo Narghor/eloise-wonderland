@@ -3,7 +3,7 @@ import { el, topBar } from '../../../dom';
 import { bet, chips, pay } from '../chips';
 import { Round, Shoe, isBlackjack, totalLabel, type Card, type HandResult } from './blackjackLogic';
 
-const CHIP_VALUES = [10, 25, 50, 100];
+const CHIP_VALUES = [10, 25, 50, 100, 1000];
 const RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
 const SUITS: Record<Card['suit'], string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const OUTCOME_TEXT: Record<HandResult['outcome'], string> = {
