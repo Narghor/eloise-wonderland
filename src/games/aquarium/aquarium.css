@@ -308,6 +308,10 @@
   min-width: 0;
 }
 
+.aqua-row.is-clickable {
+  cursor: pointer;
+}
+
 .aqua-fish-icon {
   width: 48px;
   image-rendering: pixelated;

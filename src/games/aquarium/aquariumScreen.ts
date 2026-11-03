@@ -3,7 +3,7 @@ import { el, topBar } from '../../dom';
 import { loadCompanion, saveCompanion } from '../../companion/companionSave';
 import { armSoundUnlock, muteButton, playChime, playCoinLand, playGulp, playShine, playSmallWin, playSprinkle, playWipe } from '../casino/fx/sound';
 import { fishCanvas } from '../fishing/fishingArt';
-import { FISH, type Fish } from '../fishing/fishingData';
+import { FISH, RARITY_NAMES, SEASON_NAMES, TIME_NAMES, type Fish } from '../fishing/fishingData';
 import { timeOfDay } from '../fishing/fishingLogic';
 import { loadFishing } from '../fishing/fishingSave';
 import { SCALE, sharpCanvas } from '../leaves/leavesArt';
@@ -92,6 +92,8 @@ export function renderAquarium(root: HTMLElement): () => void {
   let nextSurprise = performance.now() + 20000;
   let wiping = false;
   let lastGulp = 0;
+  /** When the glass was just wiped clean: a gleam sweeps across it. */
+  let shineAt = -Infinity;
   let lastWipe = 0;
   // The algae: a layer wiped away with the finger, back every day.
   const [algae, algaeCtx] = sharpCanvas(TW, TH);
@@ -377,6 +379,8 @@ export function renderAquarium(root: HTMLElement): () => void {
       save.cleanDay = today();
       saveAquarium(save);
       playShine();
+      shineAt = performance.now();
+      for (let i = 0; i < 24; i++) sparkles.push({ x: Math.random() * TW, y: Math.random() * FLOOR, t: Math.random() * 0.3 });
       status.textContent = '🧽 La vitre brille ! Tes poissons te voient enfin bien.';
       paint();
     }
@@ -449,6 +453,21 @@ export function renderAquarium(root: HTMLElement): () => void {
     ctx.globalAlpha = 1;
     if (dirty.length > 0) ctx.drawImage(algae, 0, 0, TW, TH);
     ctx.drawImage(glass, 0, 0, TW, TH);
+    // The clean glass gleams: a bright diagonal band crosses it once.
+    const gleam = (t - shineAt) / 1400;
+    if (gleam >= 0 && gleam <= 1) {
+      const x = -80 + gleam * (TW + 240);
+      ctx.save();
+      // Slanted like light on glass: x shifts left as y goes down.
+      ctx.transform(1, 0, -0.4, 1, 0, 0);
+      const band = ctx.createLinearGradient(x - 70, 0, x + 70, 0);
+      band.addColorStop(0, 'rgb(255 255 255 / 0)');
+      band.addColorStop(0.5, 'rgb(255 255 255 / 0.75)');
+      band.addColorStop(1, 'rgb(255 255 255 / 0)');
+      ctx.fillStyle = band;
+      ctx.fillRect(x - 70, 0, 140, TH);
+      ctx.restore();
+    }
     frame = requestAnimationFrame(tick);
   };
 
@@ -536,8 +555,7 @@ export function renderAquarium(root: HTMLElement): () => void {
     }
     const hit = swimmers.find((s) => Math.abs(s.x - at.x) < s.length / 2 + 6 && Math.abs(s.y - at.y) < s.length / 3 + 6);
     if (hit) {
-      selected = hit.fish;
-      paintCard();
+      openCard(hit.fish);
       return;
     }
     // A tap on the glass: the fish come and look.
@@ -737,6 +755,22 @@ export function renderAquarium(root: HTMLElement): () => void {
     return art;
   };
 
+  /** A list row that opens the fish's card when touched anywhere but its button. */
+  function cardRow(fish: Fish, row: HTMLElement): HTMLElement {
+    row.classList.add('is-clickable');
+    row.addEventListener('click', (event) => {
+      if (!(event.target as Element).closest('button')) openCard(fish);
+    });
+    return row;
+  }
+
+  /** Shows a fish's card and brings it into view. */
+  function openCard(fish: Fish): void {
+    selected = fish;
+    paintCard();
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   function paintCard(): void {
     if (!selected) {
       card.replaceChildren();
@@ -746,6 +780,7 @@ export function renderAquarium(root: HTMLElement): () => void {
     const c = caught[fish.id];
     const favorite = FOODS.find((f) => f.id === save.favorites[fish.id]);
     const babies = save.babies.filter((b) => b.fish === fish.id);
+    const theme = TANKS.find((t) => t.theme.fish.includes(fish.id));
     const grown = babies.filter((b) => ageInDays(b.born) >= GROW_DAYS).length;
     // Naming happens in the card itself: the viewer's frame refuses prompt().
     const input = el('input', { class: 'aqua-name-input', type: 'text', maxlength: `${NAME_MAX}`, placeholder: 'Lui donner un nom…', value: save.names[fish.id] ?? '' });
@@ -765,6 +800,8 @@ export function renderAquarium(root: HTMLElement): () => void {
         {},
         el('strong', { text: save.names[fish.id] ? `${save.names[fish.id]} · ${fish.name}` : fish.name }),
         el('span', { text: `Record ${c?.best ?? '?'} cm · attrapé ${c?.count ?? 0} fois` }),
+        el('span', { text: `${RARITY_NAMES[fish.rarity]} · ${fish.times ? `se pêche ${fish.times.map((t) => TIME_NAMES[t]).join(', ')}` : 'se pêche à toute heure'}${fish.season ? `, ${SEASON_NAMES[fish.season]}` : ''}` }),
+        ...(theme ? [el('span', { text: `Thème : ${theme.theme.name} (${theme.name.toLowerCase()})` })] : []),
         el('span', { text: favorite ? `Plat préféré : ${favorite.icon} ${favorite.name}` : 'Plat préféré : ❔ à découvrir' }),
         ...(babies.length > 0 ? [el('span', { text: `🐣 ${babies.length} alevin${babies.length > 1 ? 's' : ''} né${babies.length > 1 ? 's' : ''} ici${grown > 0 ? `, dont ${grown} déjà grand${grown > 1 ? 's' : ''}` : ''}` })] : []),
         el('small', { text: fish.note }),
@@ -818,7 +855,7 @@ export function renderAquarium(root: HTMLElement): () => void {
         const out = el('button', { class: 'aqua-small', type: 'button', text: 'Sortir du bac' });
         out.addEventListener('click', () => release(id));
         const row = el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${save.names[id] ? `${save.names[id]} · ` : ''}${fish.name}${(caught[id]?.count ?? 0) >= SCHOOL_AT ? ' (banc)' : ''}${save.babies.some((b) => b.fish === id) ? ' 🐣' : ''}` }), out);
-        return row;
+        return cardRow(fish, row);
       }),
     );
     if (s.fish.length === 0) residents.replaceChildren(el('p', { class: 'aqua-note', text: 'Personne pour l’instant : accueille un poisson ci-dessous.' }));
@@ -832,7 +869,7 @@ export function renderAquarium(root: HTMLElement): () => void {
         const add = el('button', { class: 'aqua-small', type: 'button', text: elsewhere ? 'Déménager ici' : 'Accueillir' });
         add.disabled = full;
         add.addEventListener('click', () => welcome(fish.id));
-        return el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${fish.name}${t.theme.fish.includes(fish.id) ? ' ✨' : ''}${elsewhere ? ` · dans ${elsewhere.name.toLowerCase()}` : ''}` }), add);
+        return cardRow(fish, el('div', { class: 'aqua-row' }, fishIcon(fish), el('span', { text: `${fish.name}${t.theme.fish.includes(fish.id) ? ' ✨' : ''}${elsewhere ? ` · dans ${elsewhere.name.toLowerCase()}` : ''}` }), add));
       }),
     );
     if (candidates.length === 0) guests.replaceChildren(el('p', { class: 'aqua-note', text: 'Va pêcher de nouvelles espèces pour les accueillir ici !' }));
