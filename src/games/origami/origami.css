@@ -13,6 +13,61 @@
   gap: 6px;
 }
 
+.ori-group {
+  display: grid;
+  gap: 4px;
+}
+
+.ori-group-name {
+  color: var(--muted, #8a7a92);
+  font-weight: 800;
+  text-align: center;
+}
+
+.ori-model.is-done::after {
+  content: ' ✓';
+  color: #5aa84a;
+}
+
+.ori-bonus {
+  color: #d9772b;
+}
+
+.ori-models {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.ori-model {
+  padding: 6px 12px;
+  border: 2px solid #ecdcc6;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ori-model.is-on {
+  border-color: #e8763a;
+  background: #fff3e2;
+}
+
+.ori-model:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ori-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
 .ori-title {
   margin: 0;
   font-size: 1.15rem;

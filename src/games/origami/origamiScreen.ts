@@ -3,7 +3,7 @@ import { el, topBar } from '../../dom';
 import { addCoins, loadCompanion } from '../../companion/companionSave';
 import { armSoundUnlock, muteButton, playFold, playSmallWin } from '../casino/fx/sound';
 import { SCALE, sharpCanvas } from '../leaves/leavesArt';
-import { MODELS, applyFold, creaseFrame, split, turned, type Fold, type Piece, type Point } from './origamiModels';
+import { GROUPS, MODELS, applyFold, creaseFrame, split, turned, type Fold, type Piece, type Point } from './origamiModels';
 import { loadOrigami, saveOrigami } from './origamiSave';
 
 /** The table, in scene units; the sheet sits with its own coordinates shifted by OFFSET. */
@@ -41,7 +41,7 @@ function inside(points: Point[], p: Point): boolean {
 export function renderOrigami(root: HTMLElement): () => void {
   armSoundUnlock();
   const save = loadOrigami();
-  const model = MODELS[0];
+  let model = MODELS[0];
   let pieces: Piece[] = [];
   let step = 0;
   let creases: Fold[] = [];
@@ -52,6 +52,8 @@ export function renderOrigami(root: HTMLElement): () => void {
   let finger: Point | null = null;
   /** The spot of paper the finger grabbed: the corner, or anywhere on the part that folds. */
   let grip: Point = { x: 0, y: 0 };
+  /** Where the finger sits from the spot it holds (zero when it grabbed the flap itself). */
+  let gripOffset: Point = { x: 0, y: 0 };
   /** Folds missed on this model; each one left a crumple on the paper. */
   let mistakes = 0;
   let crumples: Point[] = [];
@@ -65,8 +67,10 @@ export function renderOrigami(root: HTMLElement): () => void {
   ctx.scale(SCALE, SCALE);
   const hint = el('p', { class: 'ori-hint' });
   const steps = el('div', { class: 'ori-steps' });
-  const again = el('button', { class: 'button', type: 'button', text: 'Plier un autre renard' });
+  const again = el('button', { class: 'button button-secondary', type: 'button', text: 'Recommencer' });
   const done = el('div', { class: 'ori-done' });
+  const picker = el('div', { class: 'ori-models' });
+  const title = el('h2', { class: 'ori-title' });
   const table = drawTable();
 
   root.append(
@@ -74,7 +78,8 @@ export function renderOrigami(root: HTMLElement): () => void {
       'main',
       { class: 'ori-screen' },
       topBar('Origami', el('span', { class: 'ori-top-right' }, coinsView, muteButton())),
-      el('h2', { class: 'ori-title', text: `${model.icon} ${model.name}` }),
+      picker,
+      title,
       steps,
       canvas,
       hint,
@@ -93,10 +98,41 @@ export function renderOrigami(root: HTMLElement): () => void {
     paint();
   }
 
+  /** A model opens once the one before it has been folded at least once. */
+  const isOpen = (index: number) => index === 0 || !!save.folded[MODELS[index - 1].id];
+
   function paint(): void {
     coinsView.textContent = `${loadCompanion().coins} 🪙`;
+    title.textContent = `${model.icon} ${model.name}`;
+    picker.replaceChildren(
+      ...GROUPS.map((g) => {
+        const members = MODELS.filter((m) => m.group === g.id);
+        const folded = members.filter((m) => save.folded[m.id]).length;
+        return el(
+          'div',
+          { class: 'ori-group' },
+          el('small', { class: 'ori-group-name', text: `${g.name} · ${folded}/${members.length}` }),
+          el(
+            'div',
+            { class: 'ori-models' },
+            ...members.map((m) => {
+              const i = MODELS.indexOf(m);
+              const open = isOpen(i);
+              const chip = el('button', { class: `ori-model${m === model ? ' is-on' : ''}${save.folded[m.id] ? ' is-done' : ''}`, type: 'button', text: open ? `${m.icon} ${m.name}` : '🔒' });
+              chip.title = open ? `${m.folds.length} plis` : `Plie d’abord : ${MODELS[i - 1].name}`;
+              chip.disabled = !open || dragging;
+              chip.addEventListener('click', () => {
+                model = m;
+                start();
+              });
+              return chip;
+            }),
+          ),
+        );
+      }),
+    );
     steps.replaceChildren(...model.folds.map((_, i) => el('span', { class: `ori-step${i < step ? ' is-done' : i === step ? ' is-on' : ''}` })));
-    hint.textContent = step < model.folds.length ? model.folds[step].hint : `Ton ${model.name.toLowerCase()} est plié !`;
+    hint.textContent = step < model.folds.length ? model.folds[step].hint : 'Pliage terminé !';
   }
 
   // -----------------------------------------------
@@ -135,7 +171,7 @@ export function renderOrigami(root: HTMLElement): () => void {
 
   function drawPiece(points: Point[], front: boolean, light = 1): void {
     polygon(points);
-    ctx.fillStyle = front ? model.color : '#fffaf2';
+    ctx.fillStyle = front ? model.color : (model.back ?? '#fffaf2');
     ctx.fill();
     if (light !== 1) {
       ctx.fillStyle = light < 1 ? `rgb(0 0 0 / ${(1 - light) * 0.35})` : `rgb(255 255 255 / ${(light - 1) * 0.6})`;
@@ -158,6 +194,7 @@ export function renderOrigami(root: HTMLElement): () => void {
     }
     ctx.drawImage(table, 0, 0, W, H);
     const fold = step < model.folds.length ? model.folds[step] : null;
+    if (!fold) drawStrokes(true);
     if (fold && progress > 0) {
       const { normal, distance } = creaseFrame(fold);
       const flap: Piece[] = [];
@@ -218,7 +255,7 @@ export function renderOrigami(root: HTMLElement): () => void {
     ctx.shadowOffsetY = 4;
     for (const p of lying) {
       polygon(p.points);
-      ctx.fillStyle = p.front ? model.color : '#fffaf2';
+      ctx.fillStyle = p.front ? model.color : (model.back ?? '#fffaf2');
       ctx.fill();
     }
     ctx.restore();
@@ -283,14 +320,26 @@ export function renderOrigami(root: HTMLElement): () => void {
     ctx.lineTo(to.x - Math.cos(angle - 0.4) * 10, to.y - Math.sin(angle - 0.4) * 10);
     ctx.lineTo(to.x - Math.cos(angle + 0.4) * 10, to.y - Math.sin(angle + 0.4) * 10);
     ctx.fill();
+    // The spot to grab sits in the middle of the flap: a finger there leaves the corner and its target in sight.
+    const grab = at(flapMiddle(fold));
     const pulse = 0.5 + 0.5 * Math.sin(time / 250);
     ctx.fillStyle = `rgb(255 255 255 / ${0.55 + pulse * 0.3})`;
     ctx.strokeStyle = 'rgb(60 90 160 / 0.9)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(from.x, from.y, 9 + pulse * 3, 0, Math.PI * 2);
+    ctx.arc(grab.x, grab.y, 9 + pulse * 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+  }
+
+  /** The middle of the part this fold turns over. */
+  function flapMiddle(fold: Fold): Point {
+    const { distance } = creaseFrame(fold);
+    const points = pieces.flatMap((piece) => split(piece, distance).moving?.points ?? []);
+    if (points.length === 0) return fold.handle;
+    // Halfway between the crease and the corner, across the flap: far enough from the crease to pull well.
+    const middle = { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
+    return distance(middle) >= MIN_GRIP * 1.5 ? middle : { x: (middle.x + fold.handle.x) / 2, y: (middle.y + fold.handle.y) / 2 };
   }
 
   /** Where the grabbed corner must land: it lights up when the finger is on it. */
@@ -324,7 +373,25 @@ export function renderOrigami(root: HTMLElement): () => void {
     }
   }
 
+  /** The model's finishing strokes; `under` ones go below the paper (a stem), the others on it (whiskers). */
+  function drawStrokes(under: boolean): void {
+    ctx.lineCap = 'round';
+    for (const s of model.strokes ?? []) {
+      if (!!s.under !== under) continue;
+      const a = at(s.from);
+      const b = at(s.to);
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.width;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
+
   function drawFace(): void {
+    drawStrokes(false);
     for (const f of model.face) {
       const p = at(f);
       ctx.fillStyle = f.color;
@@ -385,15 +452,18 @@ export function renderOrigami(root: HTMLElement): () => void {
       return;
     }
     dragging = true;
-    grip = p;
-    finger = p;
+    // The finger pulls the spot it pressed; too close to the crease (or past it) that lever is useless, so it pulls the corner.
+    grip = creaseFrame(fold).distance(p) >= MIN_GRIP ? p : fold.handle;
+    gripOffset = { x: p.x - grip.x, y: p.y - grip.y };
+    finger = grip;
     canvas.setPointerCapture(event.pointerId);
     progress = 0.02;
   });
   canvas.addEventListener('pointermove', (event) => {
     if (!dragging) return;
     const fold = model.folds[step];
-    finger = point(event);
+    const p = point(event);
+    finger = { x: p.x - gripOffset.x, y: p.y - gripOffset.y };
     progress = Math.max(0.02, progressAt(fold, finger));
     // Too far off the arrow's path, the corner slips out of the fingers.
     if (offPath(fold, finger) > SLIP) miss('Le coin a glissé ! Suis bien la flèche.');
@@ -403,8 +473,7 @@ export function renderOrigami(root: HTMLElement): () => void {
     dragging = false;
     const fold = model.folds[step];
     const gap = finger ? gapToTarget(fold, finger) : Infinity;
-    const overshot = finger !== null && travelAt(fold, finger) > 1;
-    finger = null;
+    const overshot = finger !== null && travelAt(fold, finger) > 1;    finger = null;
     if (gap <= ON_TARGET) {
       if (gap <= PERFECT) praise = { text: 'Parfait !', at: performance.now() };
       settling = { from: progress, to: 1, start: performance.now() };
@@ -466,17 +535,33 @@ export function renderOrigami(root: HTMLElement): () => void {
     const first = !save.folded[model.id];
     save.folded[model.id] = (save.folded[model.id] ?? 0) + 1;
     saveOrigami(save);
-    // Each missed fold costs a star: a crumpled fox is still a fox, just worth less.
+    // Each missed fold costs a star: a crumpled model is still a model, just worth less.
     const stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
     const coins = Math.max(1, Math.round((first ? model.coins[0] : model.coins[1]) * STAR_SHARE[stars]));
     addCoins(coins);
     playSmallWin();
+    // The last model of a collection folded for the first time completes it: a bonus.
+    const group = GROUPS.find((g) => g.id === model.group)!;
+    const completed = first && MODELS.filter((m) => m.group === group.id).every((m) => save.folded[m.id]);
+    if (completed) addCoins(group.bonus);
+    const index = MODELS.indexOf(model);
+    const next = MODELS[index + 1];
+    const buttons = [again];
+    if (next) {
+      const go = el('button', { class: 'button', type: 'button', text: `${first ? 'Nouveau modèle débloqué : ' : 'Modèle suivant : '}${next.icon} ${next.name}` });
+      go.addEventListener('click', () => {
+        model = next;
+        start();
+      });
+      buttons.unshift(go);
+    }
     done.replaceChildren(
       el('strong', { class: 'ori-stars', text: '⭐'.repeat(stars) + '☆'.repeat(3 - stars) }),
-      el('strong', { text: `${model.icon} Ton ${model.name.toLowerCase()} est plié ! +${coins} 🪙` }),
+      el('strong', { text: `${model.icon} ${model.name} : pliage réussi ! +${coins} 🪙` }),
       el('span', { text: mistakes === 0 ? 'Aucun faux pli, bravo !' : `${mistakes} faux pli${mistakes > 1 ? 's' : ''} : le papier est un peu froissé.` }),
-      el('span', { text: `Renards pliés : ${save.folded[model.id]}` }),
-      again,
+      ...(completed ? [el('strong', { class: 'ori-bonus', text: `🎉 Collection ${group.name} complète ! +${group.bonus} 🪙` })] : []),
+      el('span', { text: `Plié ${save.folded[model.id]} fois` }),
+      el('span', { class: 'ori-buttons' }, ...buttons),
     );
   }
 
