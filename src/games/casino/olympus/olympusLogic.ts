@@ -50,8 +50,11 @@ export const FREE_SPINS_BY_SCATTERS: Record<number, number> = { 3: 10, 4: 25, 5:
 export const MIN_SCATTERS = 3;
 /** Spins added in the free spins by 3+ temples, however many (the 4 and 5 rows are for the base game). */
 export const FREE_RETRIGGER_SPINS = 10;
+/** Share of the table paid in the base game, and in the free spins (bigger, so a feature is worth the wait). */
+export const PAY_SCALE = 0.68;
+export const FREE_PAY_SCALE = 1.12;
 /** A feature always pays at least this many times the bet (topped up at the end). */
-export const FREE_SPINS_MIN_X = 10;
+export const FREE_SPINS_MIN_X = 30;
 /** Safety cap on the spins of one feature, retriggers included. */
 export const MAX_FREE_SPINS = 500;
 
@@ -140,7 +143,8 @@ export function medusaReels(grid: Grid): number[] {
   return reels;
 }
 
-export function lineWins(grid: Grid): LineWin[] {
+/** `scale`: PAY_SCALE in the base game, FREE_PAY_SCALE in the free spins. */
+export function lineWins(grid: Grid, scale = PAY_SCALE): LineWin[] {
   const wins: LineWin[] = [];
   LINES.forEach((rows, line) => {
     const cells = rows.map((row, col) => grid[col][row]);
@@ -155,7 +159,7 @@ export function lineWins(grid: Grid): LineWin[] {
     const own = medusaRun >= 3 ? SYMBOLS[MEDUSA].pays[medusaRun - 3] : 0;
     const other = count >= 3 && count > medusaRun && symbol !== SCATTER ? SYMBOLS[symbol].pays[count - 3] : 0;
     if (own === 0 && other === 0) return;
-    wins.push(own >= other ? { line, symbol: MEDUSA, count: medusaRun, mult: own } : { line, symbol, count, mult: other });
+    wins.push(own >= other ? { line, symbol: MEDUSA, count: medusaRun, mult: own * scale } : { line, symbol, count, mult: other * scale });
   });
   return wins;
 }
@@ -201,7 +205,7 @@ export function playFreeSpins(rng: Rng, startSpins: number, boostSpins = 0): Fre
   while (left > 0) {
     left--;
     const grid = spinGrid(rng, true, spins.length < boostSpins ? 'flood' : undefined); // TEST-BUTTONS
-    const wins = lineWins(grid);
+    const wins = lineWins(grid, FREE_PAY_SCALE);
     const mult = winMult(wins);
     let added = scatterCount(grid) >= MIN_SCATTERS ? FREE_RETRIGGER_SPINS : 0;
     if (awarded + added > MAX_FREE_SPINS) {

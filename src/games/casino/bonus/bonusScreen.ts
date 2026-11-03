@@ -1,6 +1,6 @@
 import './bonus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, winJackpot } from '../chips';
 import {
   armSoundUnlock, burst, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
   playCoinLand, playDoorOpen, playRespinMiss, playTallyNote, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
@@ -12,13 +12,17 @@ import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTON
 import {
   BET_LEVELS,
   CELLS,
+  BONUS_MIN_X,
   COIN_VALUES,
+  PAY_SCALE,
   COLS,
   DOOR,
   DOOR_REELS,
   GRAND_MIN_BETS,
   JACKPOT_FEED,
+  JACKPOT_GROWTH,
   JACKPOT_MULTS,
+  baseJackpots,
   JACKPOT_NAMES,
   LINES,
   MACHINE_ID,
@@ -126,14 +130,20 @@ export function renderBonusSlot(root: HTMLElement): () => void {
 
   const level = () => BET_LEVELS[levelIndex];
 
+  /** Each bet level grows its own Minor and Major: the extra over the fixed value lives in a pool. */
+  const growingKey = (tier: number, lv: BetLevel) => `${MACHINE_ID}:${JACKPOT_NAMES[tier]}:${lv.bet}`;
+  const jackpotsNow = (lv: BetLevel) => baseJackpots(lv.bet).map((v, tier) => v + (JACKPOT_GROWTH[tier] > 0 ? Math.floor(jackpot(growingKey(tier, lv), 0)) : 0));
+
   function refresh(): void {
     const lv = level();
     balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
     betLabel.textContent = `${lv.bet} jetons`;
     JACKPOT_NAMES.forEach((_, tier) => {
       const locked = tier > lv.jackpotTier;
-      const value = tier < 3 ? JACKPOT_MULTS[tier] * lv.bet : grandPrize(jackpot(MACHINE_ID), lv.bet);
-      jackpotValues[tier].textContent = `${locked ? '🔒' : ''}${compact(value)}`;
+      const value = tier < 3 ? jackpotsNow(lv)[tier] : grandPrize(jackpot(MACHINE_ID), lv.bet);
+      // The growing Minor and Major show every chip they gain, until a full number no longer fits (a million).
+      const shown = JACKPOT_GROWTH[tier] > 0 && value < 1_000_000 ? value.toLocaleString('fr-FR') : compact(value);
+      jackpotValues[tier].textContent = `${locked ? '🔒' : ''}${shown}`;
       jackpotBoxes[tier].classList.toggle('bonus-jp-locked', locked);
       jackpotBoxes[tier].title = locked ? `Débloqué dès la mise ${BET_LEVELS.find((l) => l.jackpotTier >= tier)?.bet}` : '';
     });
@@ -163,6 +173,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     lines?.clear();
     lines = null;
     feedJackpot(MACHINE_ID, lv.bet * JACKPOT_FEED);
+    for (let tier = 1; tier <= Math.min(2, lv.jackpotTier); tier++) feedJackpot(growingKey(tier, lv), lv.bet * JACKPOT_GROWTH[tier], 0);
     busy = true;
     message.textContent = '…';
     message.className = 'bonus-message';
@@ -193,7 +204,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
 
     if (triggered) {
       await wait(won > 0 ? 1200 : 300);
-      await runBonus(playBonus(Math.random, lv, forceTier), lv); // TEST-BUTTONS
+      const values = jackpotsNow(lv);
+      await runBonus(playBonus(Math.random, lv, forceTier, values), lv, values); // TEST-BUTTONS
     }
     busy = false;
     const id = window.setTimeout(() => {
@@ -294,7 +306,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     banner.remove();
   }
 
-  async function runBonus(bonus: BonusResult, lv: BetLevel): Promise<void> {
+  async function runBonus(bonus: BonusResult, lv: BetLevel, values: number[]): Promise<void> {
     lines?.clear();
     lines = null;
     playBonusTrigger();
@@ -370,7 +382,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       for (const i of step.fresh) {
         const coin = step.cells[i] as Coin;
         const v = cellViews[i];
-        const value = coinChips(coin, lv.bet);
+        const value = coinChips(coin, lv.bet, values);
         v.className = `bonus-cell bonus-coin${coin.kind === 'jackpot' ? ' bonus-coin-jp' : ''}`;
         v.replaceChildren(
           el('b', { text: coin.kind === 'value' ? compact(value) : JACKPOT_NAMES[coin.tier] }),
@@ -408,9 +420,19 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       await wait(STEP_MS);
     }
 
-    await tally(bonus, lv);
+    await tally(bonus, lv, values);
     if (disposed) return;
+    if (bonus.topUp > 0) {
+      message.textContent = `Minimum garanti : +${bonus.topUp.toLocaleString('fr-FR')} jetons`;
+      message.className = 'bonus-message bonus-big';
+      paintTotal(bonus.chips);
+      await wait(1600);
+      if (disposed) return;
+    }
     pay(bonus.chips);
+    // A Minor or Major that paid starts growing again from its fixed value.
+    const hitTiers = new Set(bonus.steps[bonus.steps.length - 1].cells.flatMap((c) => (c?.kind === 'jackpot' && JACKPOT_GROWTH[c.tier] > 0 ? [c.tier] : [])));
+    hitTiers.forEach((tier) => resetJackpot(growingKey(tier, lv), 0));
     noteWin(LOBBY_ID, bonus.chips, lv.bet);
     refresh();
     lights.setMode('big');
@@ -442,7 +464,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   }
 
   /** The coins light up one by one and pour into the total, each note a little higher. */
-  async function tally(bonus: BonusResult, lv: BetLevel): Promise<void> {
+  async function tally(bonus: BonusResult, lv: BetLevel, values: number[]): Promise<void> {
     const final = bonus.steps[bonus.steps.length - 1].cells;
     message.textContent = 'On compte !';
     message.className = 'bonus-message bonus-big';
@@ -453,7 +475,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       const coin = final[i];
       if (!coin) continue;
       cellViews[i].classList.add('bonus-tallied');
-      counted += coinChips(coin, lv.bet);
+      counted += coinChips(coin, lv.bet, values);
       paintTotal(counted);
       totalView.classList.remove('is-bump');
       void totalView.offsetWidth;
@@ -513,7 +535,7 @@ function rules(lv: BetLevel): HTMLElement[] {
     glyph: s.glyph,
     name: SYMBOL_NAMES[s.id] ?? s.id,
     counts: [3, 4, 5],
-    multipliers: [...s.pays],
+    multipliers: s.pays.map((p) => p * PAY_SCALE),
   }));
   const jackpotRows = BET_LEVELS.map((l) =>
     el('tr', { class: l === lv ? 'bonus-row-on' : '' }, el('td', { text: `${l.bet}` }), el('td', { text: JACKPOT_NAMES.slice(0, l.jackpotTier + 1).join(', ') })),
@@ -534,11 +556,11 @@ function rules(lv: BetLevel): HTMLElement[] {
       'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 106, quelle que soit la mise).',
       `Tu commences avec ${START_COINS} pièces et ${RESPINS} relances. Chaque nouvelle pièce reste bloquée et remet les relances à ${RESPINS}.`,
       `Une pièce vaut de ${MIN_COIN} à ${MAX_COIN} × ta mise (de ${MIN_COIN * lv.bet} à ${MAX_COIN * lv.bet} jetons à cette mise).`,
-      'Un bonus rapporte en moyenne environ 70 × ta mise : plus tu mises, plus il paie.',
+      `Un bonus rapporte toujours au moins ${BONUS_MIN_X} × ta mise, souvent bien plus : plus tu mises, plus il paie.`,
     ),
     rulesBlock(
       'Les jackpots',
-      `Mini = ${JACKPOT_MULTS[0]} × la mise, Minor = ${JACKPOT_MULTS[1]} ×, Major = ${JACKPOT_MULTS[2]} ×.`,
+      `Mini = ${JACKPOT_MULTS[0]} × la mise. Minor part de ${JACKPOT_MULTS[1]} × et Major de ${JACKPOT_MULTS[2]} × : chaque lancer à ta mise les fait grimper, jusqu’à ce que tu les décroches.`,
       `GRAND : remplir les ${CELLS} cases. C’est le jackpot progressif (1 % de chaque mise le fait monter), au moins ${GRAND_MIN_BETS} × la mise.`,
       'Les grosses mises débloquent les gros jackpots :',
     ),

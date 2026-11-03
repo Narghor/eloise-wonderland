@@ -434,40 +434,9 @@
 .fish-entry.is-rarity-4 { border-color: #b07fe8; }
 .fish-entry.is-rarity-5 { border-color: #ffd23f; background: #fffbe8; }
 
-.fish-tank {
-  position: relative;
-  overflow: hidden;
-  height: 260px;
-  border: 6px solid #cfe7f2;
-  border-radius: 16px;
-  background: linear-gradient(#a8dcf2, #4f9fc8);
-}
-
-.fish-tank-sand {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 14%;
-  background: #e8d4a0;
-}
-
-.fish-swimmer {
-  position: absolute;
-  left: 0;
-  animation: fish-swim linear infinite;
-}
-
-@keyframes fish-swim {
-  0% { left: -10%; transform: scaleX(1); }
-  49% { left: 90%; transform: scaleX(1); }
-  50% { left: 90%; transform: scaleX(-1); }
-  99% { left: -10%; transform: scaleX(-1); }
-  100% { left: -10%; transform: scaleX(1); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .fish-float,
   .fish-float::after,
-  .fish-swimmer,
   .fish-water::before,
   .fish-water::after,
   .fish-reflection {

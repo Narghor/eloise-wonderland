@@ -10,7 +10,7 @@ import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import { LUNA_DEFS, OPEN_BOOK, SYMBOL_ART } from './lunaArt';
 import {
-  BETS, BOOK, BOOK_PAYS, FREE_SPINS, GAMBLE_CAP_X, GAMBLE_MAX_STEPS, LUNA, MIN_BOOKS, PAYLINES, RETRIGGER_BOOKS, RETRIGGER_SPINS, REELS, ROWS, SYMBOLS,
+  BETS, BOOK, BOOK_PAYS, FREE_SPINS, GAMBLE_CAP_X, GAMBLE_MAX_STEPS, LUNA, FREE_SPINS_MIN_X, MIN_BOOKS, PAYLINES, PAY_SCALE, RETRIGGER_BOOKS, RETRIGGER_SPINS, REELS, ROWS, SYMBOLS,
   baseSpin, canGamble, chipsFor, playFreeSpins, type FreeSpinsResult, type Grid, type LineWin, type LunaForce,
 } from './lunaLogic';
 
@@ -364,6 +364,14 @@ export function renderLuna(root: HTMLElement): () => void {
     savePending(null);
     cells.flat().forEach((c) => c.classList.remove('luna-sticky'));
     const totalChips = chipsFor(feature.mult, stake);
+    // Sessions saved before the floor existed have no topUp field.
+    if ((feature.topUp ?? 0) > 0 && totalChips > total) {
+      setMessage(`Minimum garanti : +${totalChips - total} jetons`, 'luna-win-text');
+      const from = total;
+      countUp(totalValue, totalChips - total, 800, (n) => `${from + n}`);
+      await wait(1600);
+      if (disposed) return;
+    }
     noteWin(LOBBY_ID, totalChips, stake);
     refresh();
     setMessage(`Tours gratuits : ${totalChips} jetons`, 'luna-win-text');
@@ -612,7 +620,7 @@ function paytable(stake: number): HTMLElement[] {
   const entries = SYMBOLS.slice(0, BOOK)
     .map((s, i) => {
       const counts = s.pays[0] > 0 ? [2, 3, 4, 5] : [3, 4, 5];
-      return { glyph: HELP_GLYPHS[i], name: s.name, counts, multipliers: counts.map((c) => s.pays[c - 2] / PAYLINES.length) };
+      return { glyph: HELP_GLYPHS[i], name: s.name, counts, multipliers: counts.map((c) => (s.pays[c - 2] * PAY_SCALE) / PAYLINES.length) };
     })
     .reverse();
   const books: [number, number][] = [[0, 1], [2, 0], [4, 2]];
@@ -624,6 +632,7 @@ function paytable(stake: number): HTMLElement[] {
       'Au début des tours, le livre s’ouvre et tire au hasard un symbole spécial (Eloise, hibou, lettre…).',
       'Pendant les tours, si le symbole spécial tombe sur assez de rouleaux (2 pour 👸 🦉 🔮 🧪, 3 pour les lettres), il remplit ces rouleaux de haut en bas et paie sur les 10 lignes, même si les rouleaux ne se touchent pas.',
       'Un livre qui tombe pendant les tours reste collé à sa place jusqu’à la fin du chapitre et sert de joker.',
+      `Les gains des tours gratuits sont plus gros que d’habitude, et les tours paient toujours au moins ${FREE_SPINS_MIN_X} fois ta mise.`,
       `${RETRIGGER_BOOKS} nouveaux livres sur un même tour = +${RETRIGGER_SPINS} tours, et un nouveau chapitre : les livres collés s’envolent. Ça peut arriver plusieurs fois !`,
     ),
     el('div', { class: 'fx-paylines' },

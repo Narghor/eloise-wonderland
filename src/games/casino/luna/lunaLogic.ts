@@ -57,6 +57,10 @@ export const SYMBOLS: LunaSymbol[] = [
   { key: 'book', name: 'Livre (joker + bonus)', pays: [0, 0, 0, 0], weight: 2.45 },
 ];
 
+/** Share of the table paid in the base game, and in the free spins (bigger, so a feature is worth the wait). */
+export const PAY_SCALE = 0.815;
+export const FREE_PAY_SCALE = 1.26;
+
 /** Book scatter pays, multiple of the TOTAL bet, by count anywhere (3, 4, 5). */
 export const BOOK_PAYS: Record<number, number> = { 3: 1, 4: 20, 5: 230 };
 
@@ -128,7 +132,8 @@ export function countBooks(grid: Grid): number {
   return grid.reduce((n, col) => n + col.filter((s) => s === BOOK).length, 0);
 }
 
-export function lineWins(grid: Grid): LineWin[] {
+/** `scale`: PAY_SCALE in the base game, FREE_PAY_SCALE in the free spins. */
+export function lineWins(grid: Grid, scale = PAY_SCALE): LineWin[] {
   const wins: LineWin[] = [];
   PAYLINES.forEach((path, line) => {
     const cells = path.map((row, reel) => grid[reel][row]);
@@ -137,7 +142,7 @@ export function lineWins(grid: Grid): LineWin[] {
     let count = 0;
     while (count < REELS && (cells[count] === symbol || cells[count] === BOOK)) count++;
     const pay = count >= 2 ? SYMBOLS[symbol].pays[count - 2] : 0;
-    if (pay > 0) wins.push({ line, symbol, count, mult: pay / PAYLINES.length });
+    if (pay > 0) wins.push({ line, symbol, count, mult: (pay * scale) / PAYLINES.length });
   });
   return wins;
 }
@@ -148,7 +153,7 @@ export function expandWin(grid: Grid, special: number): ExpandWin | null {
   for (let reel = 0; reel < REELS; reel++) if (grid[reel].includes(special)) reels.push(reel);
   const pay = reels.length >= 2 ? SYMBOLS[special].pays[reels.length - 2] : 0;
   if (pay === 0) return null;
-  return { symbol: special, reels, mult: pay };
+  return { symbol: special, reels, mult: pay * FREE_PAY_SCALE };
 }
 
 function evaluate(grid: Grid, special: number | null, linesGrid: Grid = grid): SpinOutcome {
@@ -193,8 +198,14 @@ export interface FreeSpin {
 export interface FreeSpinsResult {
   special: number;
   spins: FreeSpin[];
+  /** Total in multiples of the bet, the top-up included. */
   mult: number;
+  /** Added at the end to reach FREE_SPINS_MIN_X (0 when the spins paid enough). */
+  topUp: number;
 }
+
+/** A free spins round always pays at least this many times the bet. */
+export const FREE_SPINS_MIN_X = 30;
 
 function pickSpecial(rng: Rng): number {
   const total = SPECIAL_WEIGHTS.reduce((a, b) => a + b, 0);
@@ -227,7 +238,7 @@ export function playFreeSpins(rng: Rng, forcedSpecial?: number): FreeSpinsResult
       drawn[reel][row] = BOOK;
     }
     drawn.forEach((col, reel) => col.forEach((s, row) => { if (s === BOOK) sticky.add(`${reel},${row}`); }));
-    const wins = lineWins(drawn);
+    const wins = lineWins(drawn, FREE_PAY_SCALE);
     const expand = expandWin(drawn, special);
     const added = fresh >= RETRIGGER_BOOKS ? RETRIGGER_SPINS : 0;
     left += added;
@@ -236,7 +247,9 @@ export function playFreeSpins(rng: Rng, forcedSpecial?: number): FreeSpinsResult
     // A retrigger opens a new chapter: the sticky books are cleared, or long rounds would end covered in wilds.
     if (added > 0) sticky.clear();
   }
-  return { special, spins, mult: spins.reduce((s, x) => s + x.mult, 0) };
+  const total = spins.reduce((s, x) => s + x.mult, 0);
+  const topUp = Math.max(0, FREE_SPINS_MIN_X - total);
+  return { special, spins, mult: total + topUp, topUp };
 }
 
 export function chipsFor(mult: number, stake: number): number {

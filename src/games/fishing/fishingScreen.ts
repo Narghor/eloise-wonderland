@@ -100,10 +100,9 @@ export function renderFishing(root: HTMLElement): () => void {
   const challengeLine = el('p', { class: 'fish-challenge' });
   const host = el('div', { class: 'fish-host' });
   const notebookButton = el('button', { class: 'button button-secondary', type: 'button' });
-  const tankButton = el('button', { class: 'button button-secondary', type: 'button', text: '🐠 Aquarium' });
-  let open: 'notebook' | 'tank' | null = null;
-  notebookButton.addEventListener('click', () => toggle('notebook'));
-  tankButton.addEventListener('click', () => toggle('tank'));
+  const tankButton = el('a', { class: 'button button-secondary', href: '#/aquarium', text: '🐠 Aquarium' });
+  let open = false;
+  notebookButton.addEventListener('click', toggleNotebook);
 
   root.append(
     topBar('La pêche', el('span', { class: 'fish-top-right' }, coinsView, muteButton())),
@@ -135,11 +134,10 @@ export function renderFishing(root: HTMLElement): () => void {
     return el('div', { class: 'casino-test-bar' }, el('b', { text: 'TEST' }), label, button('Rare', 'koi'), button('Très rare', 'fleur'), button('Saut', 'dragon'), button('Disparition', 'lune'), button('À-coups', 'geant'), button('Trouvaille', 'find'), button('Normal', ''));
   }
 
-  function toggle(which: 'notebook' | 'tank'): void {
-    open = open === which ? null : which;
-    host.replaceChildren(...(open === 'notebook' ? [notebook()] : open === 'tank' ? [tank()] : []));
-    notebookButton.classList.toggle('is-on', open === 'notebook');
-    tankButton.classList.toggle('is-on', open === 'tank');
+  function toggleNotebook(): void {
+    open = !open;
+    host.replaceChildren(...(open ? [notebook()] : []));
+    notebookButton.classList.toggle('is-on', open);
   }
 
   // -----------------------------------------------
@@ -477,7 +475,7 @@ export function renderFishing(root: HTMLElement): () => void {
     );
     close.addEventListener('click', () => {
       dialog.remove();
-      if (open) host.replaceChildren(open === 'notebook' ? notebook() : tank());
+      if (open) host.replaceChildren(notebook());
       idle();
     });
     document.body.append(dialog);
@@ -508,20 +506,6 @@ export function renderFishing(root: HTMLElement): () => void {
           el('small', { text: `${RARITY_NAMES[fish.rarity]} · ×${entry.count} · record ${entry.best} cm` }),
         );
       }),
-    );
-  }
-
-  function tank(): HTMLElement {
-    const caught = FISH.filter((fish) => loadFishing().caught[fish.id]);
-    if (caught.length === 0) return el('p', { class: 'fish-status', text: 'L’aquarium est vide : chaque nouvelle espèce attrapée viendra y nager.' });
-    return el(
-      'section',
-      { class: 'fish-tank' },
-      ...caught.map((fish, i) => {
-        const swimmer = el('div', { class: 'fish-swimmer', style: `top:${8 + ((i * 37) % 76)}%;animation-duration:${9 + ((i * 13) % 9)}s;animation-delay:-${(i * 2.3) % 9}s` }, fishCanvas(fish, 3));
-        return swimmer;
-      }),
-      el('div', { class: 'fish-tank-sand' }),
     );
   }
 

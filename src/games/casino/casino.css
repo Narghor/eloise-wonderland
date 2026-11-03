@@ -6,6 +6,9 @@
 
 .game-card-icon.is-casino {
   display: grid;
+  /* One centred cell the size of the 5x5 pixel icons (5 x 9px + 4 x 2px). */
+  grid-template-columns: 53px;
+  grid-template-rows: 53px;
   place-items: center;
   background: linear-gradient(135deg, #2b1840, #5a2a5e);
   font-size: 1.6rem;

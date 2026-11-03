@@ -2,8 +2,7 @@
 // SLOTS MATHS (pure, no DOM)
 // -----------------------------------------------
 // 5 reels x 3 rows, 10 fixed paylines, weighted reel strips.
-// Tuned for fun: ~37% of spins win. Simulated RTP, jackpot included: 98% at the 10 bet,
-// 100% at 100, 103% at 1000 (the jackpot's floor weighs more at high bets).
+// Tuned for fun: ~37% of spins win. Simulated RTP, jackpot included: 98.5-99.5% at every bet.
 
 export const MACHINE_ID = 'slots-classic';
 export const REELS = 5;
@@ -11,10 +10,8 @@ export const ROWS = 3;
 export const BET_LEVELS = [10, 20, 50, 100, 200, 500, 1000];
 export const MAX_BET = 1000;
 export const JACKPOT_SHARE = 0.02;
-/** Jackpot chance per chip bet: 1 in 50 000 at a 200 bet. Linear, so the seed's RTP share is the same at every bet. */
-export const JACKPOT_ODDS_PER_CHIP = 1 / 10_000_000;
-/** Ceiling of the per-spin jackpot chance (reached at the 1000 bet). */
-export const JACKPOT_ODDS_CAP = 1 / 10_000;
+/** Jackpot chance per spin, the same at every bet so the jackpot's share of the RTP does not grow with the bet. */
+export const JACKPOT_ODDS = 1 / 20_000;
 /** The jackpot pays at least this many times the bet, so it still matters at a high bet. */
 export const JACKPOT_MIN_X = 300;
 
@@ -32,7 +29,7 @@ export interface SymbolInfo {
 }
 
 /** Every line win is paid this much more than the table, to bring the RTP in line with the other machines. */
-export const PAY_SCALE = 1.04;
+export const PAY_SCALE = 1.01;
 
 export const WILD = 7;
 export const DIAMOND = 8;
@@ -138,7 +135,7 @@ function lineWin(grid: number[][], line: number, lineBet: number): LineWin | nul
 /** Spins once. `totalBet` must be a multiple of the line count. */
 export function spin(totalBet: number, rng: Rng = Math.random, force?: SlotsForce): SpinResult { // TEST-BUTTONS
   const lineBet = totalBet / PAYLINES.length;
-  if (force === 'jackpot' || rng() < Math.min(JACKPOT_ODDS_CAP, JACKPOT_ODDS_PER_CHIP * totalBet)) { // TEST-BUTTONS
+  if (force === 'jackpot' || rng() < JACKPOT_ODDS) { // TEST-BUTTONS
     const grid = STRIPS.map((strip, r) => [strip[r % strip.length], DIAMOND, strip[(r + 5) % strip.length]]);
     return { grid, stops: [0, 0, 0, 0, 0], wins: [{ line: 0, symbol: DIAMOND, count: 5, amount: 0 }], total: 0, jackpot: true };
   }

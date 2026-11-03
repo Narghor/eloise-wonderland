@@ -11,6 +11,7 @@ import { FISH } from './games/fishing/fishingData';
 import { loadFishing } from './games/fishing/fishingSave';
 import { ZONES } from './games/leaves/leavesData';
 import { loadLeaves } from './games/leaves/leavesSave';
+import { loadAquarium } from './games/aquarium/aquariumSave';
 import { grantDailyGift } from './games/casino/casinoScreen';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
@@ -239,6 +240,7 @@ function houseCard(): HTMLElement {
 function houseBlock(): HTMLElement {
   const caught = Object.keys(loadFishing().caught).length;
   const cleanedZones = Object.values(loadLeaves().zones).filter((z) => z.cleared > 0).length;
+  const residents = Object.values(loadAquarium().tanks).reduce((n, t) => n + t.fish.length, 0);
   const tea = GAMES.tea;
   const services = doneCount(tea);
   const annex = (href: string, icon: string, name: string, progress: string) =>
@@ -253,6 +255,7 @@ function houseBlock(): HTMLElement {
       annex(tea.href, '☕', tea.name, services === 0 ? 'À découvrir' : `${services} ${services === 1 ? tea.unit[0] : tea.unit[1]}`),
       annex('#/peche', '🎣', 'La pêche', caught === 0 ? 'L’étang du jardin' : `${caught}/${FISH.length} poissons`),
       annex('#/feuilles', '🍂', 'Les feuilles', cleanedZones === 0 ? 'Le parc à nettoyer' : `${cleanedZones}/${ZONES.length} lieux propres`),
+      annex('#/aquarium', '🐠', 'L’aquarium', residents === 0 ? (caught === 0 ? 'Pêche d’abord un poisson' : 'Tes poissons t’attendent') : `${residents} espèce${residents > 1 ? 's' : ''} à l’abri`),
     ),
   );
 }

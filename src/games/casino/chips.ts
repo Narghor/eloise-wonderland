@@ -171,15 +171,23 @@ export function redeemGift(code: string): RedeemResult {
 // PROGRESSIVE JACKPOTS
 // -----------------------------------------------
 
-export function jackpot(machineId: string): number {
-  return loadCasino().jackpots[machineId] ?? JACKPOT_SEED;
+/** A pool's amount; `seed` is what a pool starts from (and goes back to once won). */
+export function jackpot(machineId: string, seed = JACKPOT_SEED): number {
+  return loadCasino().jackpots[machineId] ?? seed;
 }
 
 /** Feeds a share of a bet into the machine's pool. */
-export function feedJackpot(machineId: string, amount: number): void {
+export function feedJackpot(machineId: string, amount: number, seed = JACKPOT_SEED): void {
   if (amount <= 0) return;
   const save = loadCasino();
-  save.jackpots[machineId] = (save.jackpots[machineId] ?? JACKPOT_SEED) + amount;
+  save.jackpots[machineId] = (save.jackpots[machineId] ?? seed) + amount;
+  saveCasino(save);
+}
+
+/** Puts a pool back to its seed without paying it (its value was paid by the caller). */
+export function resetJackpot(machineId: string, seed = JACKPOT_SEED): void {
+  const save = loadCasino();
+  save.jackpots[machineId] = seed;
   saveCasino(save);
 }
 

@@ -11,7 +11,9 @@ export const ROWS = 3;
 export const CELLS = COLS * ROWS;
 export const JACKPOT_FEED = 0.01;
 /** The Grand pays at least this many bets, topping up the progressive pool. */
-export const GRAND_MIN_BETS = 1150;
+export const GRAND_MIN_BETS = 1380;
+/** Share of the table paid by the base game: kept light, the door bonus carries the machine. */
+export const PAY_SCALE = 0.6;
 
 export type Rng = () => number;
 /** 'door' opens the bonus; a number forces that jackpot tier in it. */ // TEST-BUTTONS
@@ -122,7 +124,7 @@ export function lineWins(grid: Grid): LineWin[] {
     if (symbol === DOOR) return;
     let count = 1;
     while (count < COLS && grid[count][rows[count]] === symbol) count++;
-    if (count >= 3) wins.push({ line, symbol, count, mult: SYMBOLS[symbol].pays[count - 3] });
+    if (count >= 3) wins.push({ line, symbol, count, mult: SYMBOLS[symbol].pays[count - 3] * PAY_SCALE });
   });
   return wins;
 }
@@ -143,17 +145,21 @@ export function grandPrize(pool: number, bet: number): number {
 // -----------------------------------------------
 
 export const START_COINS = 6;
+/** A bonus always pays at least this many times the bet. */
+export const BONUS_MIN_X = 30;
 export const RESPINS = 3;
 /** Chance per empty cell per respin to land a coin. */
 export const LAND_CHANCE = 0.04;
 
 export const JACKPOT_NAMES = ['Mini', 'Minor', 'Major', 'Grand'];
 /** Fixed jackpots in multiples of the bet (Grand is the progressive pool). */
-export const JACKPOT_MULTS = [10, 46, 230];
-const JACKPOT_WEIGHTS = [3, 0.6, 0.1];
+export const JACKPOT_MULTS = [12, 55, 275];
+/** Each spin at a bet level grows that level's Minor and Major by this many bets (the Mini stays fixed). */
+export const JACKPOT_GROWTH = [0, 0.015, 0.03];
+const JACKPOT_WEIGHTS = [3, 0.8, 0.2];
 
 export const COIN_VALUES: [number, number][] = [
-  [4, 30], [5, 26], [8, 16], [10, 12], [15, 7], [29, 5], [46, 2],
+  [4, 30], [5, 26], [8, 16], [10, 12], [15, 7], [40, 6], [80, 3],
 ];
 
 export type Coin = { kind: 'value'; mult: number } | { kind: 'jackpot'; tier: number };
@@ -167,8 +173,10 @@ export interface BonusStep {
 
 export interface BonusResult {
   steps: BonusStep[];
-  /** Chips from coins and fixed jackpots. */
+  /** Chips from coins and fixed jackpots, the top-up included. */
   chips: number;
+  /** Chips added at the end to reach BONUS_MIN_X (0 when the coins paid enough). */
+  topUp: number;
   /** All 15 cells filled at a level that unlocks the Grand. */
   grand: boolean;
 }
@@ -188,11 +196,17 @@ function drawCoin(rng: Rng, jackpotTier: number): Coin {
   return { kind: 'value', mult: 1 };
 }
 
-export function coinChips(coin: Coin, bet: number): number {
-  return coin.kind === 'value' ? coin.mult * bet : JACKPOT_MULTS[coin.tier] * bet;
+/** The fixed jackpots at their starting value, in chips, for this bet. */
+export function baseJackpots(bet: number): number[] {
+  return JACKPOT_MULTS.map((m) => m * bet);
 }
 
-export function playBonus(rng: Rng, level: BetLevel, forceTier?: number): BonusResult { // TEST-BUTTONS
+/** `jackpots`: what Mini, Minor and Major are worth right now, in chips. */
+export function coinChips(coin: Coin, bet: number, jackpots = baseJackpots(bet)): number {
+  return coin.kind === 'value' ? coin.mult * bet : jackpots[coin.tier];
+}
+
+export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpots = baseJackpots(level.bet)): BonusResult { // TEST-BUTTONS
   const cells: (Coin | null)[] = new Array(CELLS).fill(null);
   const order = [...Array(CELLS).keys()];
   for (let i = order.length - 1; i > 0; i--) {
@@ -219,6 +233,7 @@ export function playBonus(rng: Rng, level: BetLevel, forceTier?: number): BonusR
     left = fresh.length > 0 ? RESPINS : left - 1;
     steps.push({ cells: [...cells], fresh, respinsLeft: left });
   }
-  const chips = cells.reduce((sum, c) => sum + (c ? coinChips(c, level.bet) : 0), 0);
-  return { steps, chips, grand: filled === CELLS && (level.jackpotTier >= 3 || forceTier === 3) }; // TEST-BUTTONS
+  const coins = cells.reduce((sum, c) => sum + (c ? coinChips(c, level.bet, jackpots) : 0), 0);
+  const topUp = Math.max(0, BONUS_MIN_X * level.bet - coins);
+  return { steps, chips: coins + topUp, topUp, grand: filled === CELLS && (level.jackpotTier >= 3 || forceTier === 3) }; // TEST-BUTTONS
 }

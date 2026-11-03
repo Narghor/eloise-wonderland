@@ -16,6 +16,7 @@ import {
   FREE_RETRIGGER_SPINS,
   LINES,
   MIN_SCATTERS,
+  PAY_SCALE,
   ROWS,
   SCATTER,
   SYMBOLS,
@@ -509,7 +510,7 @@ function artify(root: HTMLElement): void {
 
 function paytable(stake: number): HTMLElement[] {
   const entries = SYMBOLS.slice(0, SCATTER)
-    .map((s, i) => ({ glyph: s.glyph, name: SYMBOL_NAMES[i], counts: [3, 4, 5, 6], multipliers: s.pays }))
+    .map((s, i) => ({ glyph: s.glyph, name: SYMBOL_NAMES[i], counts: [3, 4, 5, 6], multipliers: s.pays.map((p) => p * PAY_SCALE) }))
     .reverse();
   const fullReels: [number, number][] = [0, 1, 2, 3, 4].flatMap((r): [number, number][] => [[0, r], [1, r], [2, r], [4, r]]);
   const temples: [number, number][] = [[0, 3], [2, 0], [5, 1]];

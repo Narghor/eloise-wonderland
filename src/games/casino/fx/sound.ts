@@ -208,6 +208,34 @@ export function playRustle(): void {
   noise(0, 0.09, 0.07, 3200);
 }
 
+/** A pinch of food touching the water: a soft splash. */
+export function playSprinkle(): void {
+  noise(0, 0.12, 0.08, 1800);
+  tone(900, 0.02, 0.08, 'sine', 0.05, 1300);
+}
+
+/** A fish snapping up a bite; `favorite` makes it a happy rising plop. */
+export function playGulp(favorite = false): void {
+  tone(favorite ? 500 : 380, 0, 0.09, 'sine', 0.16, favorite ? 1100 : 620);
+  if (favorite) tone(C_MAJOR[4] * 2, 0.08, 0.15, 'sine', 0.08);
+}
+
+/** A cloth rubbing the glass: a short airy squeak. */
+export function playWipe(): void {
+  noise(0, 0.07, 0.05, 2400);
+  tone(1500 + Math.random() * 300, 0, 0.05, 'sine', 0.02);
+}
+
+/** The glass clean again: a bright little sparkle. */
+export function playShine(): void {
+  [4, 6, 7].forEach((n, i) => tone(C_MAJOR[n] * 2, i * 0.07, 0.2, 'sine', 0.1));
+}
+
+/** A happy tank moment (the fish's round, a find on the sand): a soft music box chime. */
+export function playChime(): void {
+  [0, 4, 7, 4].forEach((n, i) => tone(C_MAJOR[n] * 2, i * 0.12, 0.3, 'triangle', 0.08));
+}
+
 /** The basket emptied on the compost heap: a soft thump and a little chime. */
 export function playCompost(): void {
   noise(0, 0.2, 0.2, 500);

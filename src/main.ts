@@ -24,6 +24,7 @@ import { renderCasino } from './games/casino/casinoScreen';
 import { renderHouse } from './house/houseScreen';
 import { renderFishing } from './games/fishing/fishingScreen';
 import { renderLeaves } from './games/leaves/leavesScreen';
+import { renderAquarium } from './games/aquarium/aquariumScreen';
 import { requestPersistentStorage } from './save';
 import { watchForUpdates } from './update';
 
@@ -56,6 +57,7 @@ const routes: Record<string, Screen> = {
   maison: renderHouse,
   peche: renderFishing,
   feuilles: renderLeaves,
+  aquarium: renderAquarium,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;
