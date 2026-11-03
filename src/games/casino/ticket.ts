@@ -9,7 +9,7 @@ import { CASINO_TEST_BUTTONS } from './fx/testMode'; // TEST-BUTTONS
 // -----------------------------------------------
 
 /** One finished level in TICKET_ODDS drops a ticket. */
-const TICKET_ODDS = 10;
+const TICKET_ODDS = 5;
 
 /** [min, max] chips per difficulty, Decouverte to Expert. */
 const TICKET_RANGES: readonly (readonly [number, number])[] = [
