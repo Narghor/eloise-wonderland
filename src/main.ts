@@ -23,6 +23,7 @@ import { renderMahjong } from './games/mahjong/mahjongScreen';
 import { renderCasino } from './games/casino/casinoScreen';
 import { renderHouse } from './house/houseScreen';
 import { renderFishing } from './games/fishing/fishingScreen';
+import { renderLeaves } from './games/leaves/leavesScreen';
 import { requestPersistentStorage } from './save';
 import { watchForUpdates } from './update';
 
@@ -54,6 +55,7 @@ const routes: Record<string, Screen> = {
   casino: renderCasino,
   maison: renderHouse,
   peche: renderFishing,
+  feuilles: renderLeaves,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

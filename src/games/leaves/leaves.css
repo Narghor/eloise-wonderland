@@ -1,0 +1,402 @@
+.leaves-screen {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding-block: 12px 32px;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+}
+
+.leaves-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leaves-gold {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fbe3c4;
+  font-weight: 800;
+  color: #8a4a1a;
+}
+
+.leaves-head {
+  display: grid;
+  gap: 4px;
+}
+
+.leaves-zone-title {
+  font-size: 1.15rem;
+}
+
+.leaves-clean {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leaves-clean-bar,
+.leaves-basket-bar {
+  flex: 1;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f1e6d6;
+}
+
+.leaves-clean-bar span,
+.leaves-basket-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8fcf6e, #5aa84a);
+  transition: width 0.2s;
+}
+
+.leaves-basket-bar span {
+  background: linear-gradient(90deg, #f2c94c, #d9772b);
+}
+
+.leaves-clean small {
+  min-width: 70px;
+  color: var(--muted, #8a7a92);
+  text-align: right;
+}
+
+.leaves-stage {
+  position: relative;
+}
+
+.leaves-canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 360 / 440;
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgb(90 60 30 / 0.2);
+  image-rendering: pixelated;
+  touch-action: none;
+  cursor: grab;
+}
+
+.leaves-sparkle {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  font-weight: 900;
+  white-space: nowrap;
+  color: #5aa84a;
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.leaves-sparkle.is-on {
+  opacity: 1;
+  animation: leaves-shine 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes leaves-shine {
+  to { box-shadow: 0 0 18px #fff6a8; }
+}
+
+.leaves-basket {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.leaves-basket-text {
+  min-width: 64px;
+  font-weight: 800;
+}
+
+.leaves-basket .button {
+  padding-block: 8px;
+}
+
+.leaves-status {
+  min-height: 1.4em;
+  margin: 0;
+  font-weight: 700;
+  text-align: center;
+}
+
+.leaves-zones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.leaves-zone {
+  padding: 6px 12px;
+  border: 2px solid #ecdcc6;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.leaves-zone.is-on { border-color: #d9772b; background: #fff3e2; }
+.leaves-zone.is-done::after { content: ' ✓'; color: #5aa84a; }
+.leaves-zone:disabled { opacity: 0.55; cursor: default; }
+
+.leaves-section {
+  margin: 8px 0 0;
+  font-size: 1rem;
+}
+
+.leaves-note {
+  margin: 0;
+  color: var(--muted, #8a7a92);
+  font-size: 0.85rem;
+}
+
+.leaves-upgrades {
+  display: grid;
+  gap: 8px;
+}
+
+.leaves-upgrade {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 10px 12px;
+  border: 2px solid #ecdcc6;
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.leaves-upgrade-icon {
+  grid-row: span 2;
+  font-size: 1.6rem;
+}
+
+.leaves-upgrade small {
+  color: var(--muted, #8a7a92);
+}
+
+.leaves-upgrade-cost {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  font-weight: 900;
+  color: #8a4a1a;
+}
+
+.leaves-upgrade:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.leaves-herbarium {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+}
+
+.leaves-page {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  background: #fffaf0;
+  box-shadow: inset 0 0 0 2px #ecdcc6;
+  text-align: center;
+}
+
+.leaves-page small {
+  font-size: 0.7rem;
+}
+
+.leaves-page.is-unknown {
+  opacity: 0.6;
+}
+
+.leaves-page-leaf {
+  width: 26px;
+  height: 26px;
+  border-radius: 0 60% 0 60%;
+  transform: rotate(-30deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leaves-sparkle.is-on {
+    animation: none;
+  }
+}
+
+/* -----------------------------------------------
+   THE LIVING PARK: light of the hour, creatures, pop-ups, events
+   ----------------------------------------------- */
+
+.leaves-canvas {
+  aspect-ratio: 360 / 480;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext x='0' y='26' font-size='26'%3E%F0%9F%A7%B9%3C/text%3E%3C/svg%3E") 4 28, pointer;
+}
+
+.leaves-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.leaves-zone-level {
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid #e8c49a;
+  border-radius: 999px;
+  background: #fbe3c4;
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #8a4a1a;
+}
+
+.leaves-sky {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+.leaves-sky.is-dawn { background: rgb(255 180 200 / 0.12); }
+.leaves-sky.is-dusk { background: linear-gradient(rgb(255 140 60 / 0.28), rgb(255 120 80 / 0.12)); mix-blend-mode: multiply; }
+.leaves-sky.is-night { background: radial-gradient(ellipse at 50% 60%, rgb(60 60 140 / 0.08), rgb(30 30 90 / 0.3)); mix-blend-mode: multiply; }
+
+.leaves-firefly {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff7a0;
+  box-shadow: 0 0 8px 3px #fff36b;
+  mix-blend-mode: normal;
+  animation: leaves-firefly 4s ease-in-out infinite alternate;
+}
+
+@keyframes leaves-firefly {
+  0% { transform: translate(0, 0); opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { transform: translate(24px, -18px); opacity: 0.3; }
+}
+
+.leaves-critters {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+.leaves-critter {
+  position: absolute;
+  translate: -50% -50%;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 1.9rem;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.35));
+  cursor: pointer;
+  pointer-events: auto;
+  animation: leaves-critter-in 0.4s ease-out, leaves-hop 0.8s 0.4s ease-in-out infinite alternate;
+}
+
+.leaves-critter.is-running {
+  left: -10% !important;
+  animation: leaves-run 5s linear forwards;
+}
+
+.leaves-critter.is-firefly {
+  font-size: 1.2rem;
+  animation: leaves-critter-in 0.4s ease-out, leaves-firefly 3s ease-in-out infinite alternate;
+}
+
+@keyframes leaves-critter-in { from { transform: scale(0); } }
+@keyframes leaves-hop { to { transform: translateY(-4px); } }
+@keyframes leaves-run {
+  0% { left: -10%; transform: scaleX(-1); }
+  100% { left: 110%; transform: scaleX(-1); }
+}
+
+.leaves-pop {
+  position: absolute;
+  translate: -50% -50%;
+  font-size: 1.6rem;
+  font-weight: 900;
+  pointer-events: none;
+  animation: leaves-pop 1.1s ease-out forwards;
+}
+
+.leaves-pop.is-gold { font-size: 1rem; color: #fff; text-shadow: 0 0 6px #ffb300, 0 2px 0 #8a5a00; }
+
+@keyframes leaves-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  25% { transform: scale(1.3) translateY(-10px); opacity: 1; }
+  100% { transform: scale(1) translateY(-40px); opacity: 0; }
+}
+
+.leaves-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.94);
+  font-size: 0.9rem;
+  font-weight: 900;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.leaves-banner.is-on { opacity: 1; }
+.leaves-banner.is-clean { color: #3f9a3a; animation: leaves-shine 1.2s ease-in-out infinite alternate; }
+.leaves-banner.is-gold { color: #b07a00; background: #fff6cc; animation: leaves-shine 0.8s ease-in-out infinite alternate; }
+
+.leaves-collection-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.leaves-collection {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.leaves-page strong {
+  font-size: 0.78rem;
+}
+
+.leaves-page small {
+  color: var(--muted, #8a7a92);
+}
+
+.leaves-page-icon {
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leaves-critter,
+  .leaves-firefly,
+  .leaves-banner.is-clean,
+  .leaves-banner.is-gold {
+    animation: none;
+  }
+}

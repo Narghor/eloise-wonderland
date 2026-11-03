@@ -9,6 +9,8 @@ import { loadCasino } from './games/casino/chips';
 import { loadHouse } from './house/houseSave';
 import { FISH } from './games/fishing/fishingData';
 import { loadFishing } from './games/fishing/fishingSave';
+import { ZONES } from './games/leaves/leavesData';
+import { loadLeaves } from './games/leaves/leavesSave';
 import { grantDailyGift } from './games/casino/casinoScreen';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
@@ -236,6 +238,7 @@ function houseCard(): HTMLElement {
 /** The house, with the games around it attached underneath: the tea room and the pond. */
 function houseBlock(): HTMLElement {
   const caught = Object.keys(loadFishing().caught).length;
+  const cleanedZones = Object.values(loadLeaves().zones).filter((z) => z.cleared > 0).length;
   const tea = GAMES.tea;
   const services = doneCount(tea);
   const annex = (href: string, icon: string, name: string, progress: string) =>
@@ -249,6 +252,7 @@ function houseBlock(): HTMLElement {
       { class: 'home-annexes' },
       annex(tea.href, '☕', tea.name, services === 0 ? 'À découvrir' : `${services} ${services === 1 ? tea.unit[0] : tea.unit[1]}`),
       annex('#/peche', '🎣', 'La pêche', caught === 0 ? 'L’étang du jardin' : `${caught}/${FISH.length} poissons`),
+      annex('#/feuilles', '🍂', 'Les feuilles', cleanedZones === 0 ? 'Le parc à ratisser' : `${cleanedZones}/${ZONES.length} lieux propres`),
     ),
   );
 }

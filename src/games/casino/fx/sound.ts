@@ -203,6 +203,18 @@ export function playFishBite(): void {
   noise(0.02, 0.25, 0.18, 450);
 }
 
+/** Dry leaves gathered under the rake: a soft crackle. */
+export function playRustle(): void {
+  noise(0, 0.09, 0.07, 3200);
+}
+
+/** The basket emptied on the compost heap: a soft thump and a little chime. */
+export function playCompost(): void {
+  noise(0, 0.2, 0.2, 500);
+  tone(C_MAJOR[2] * 2, 0.12, 0.15, 'sine', 0.12);
+  tone(C_MAJOR[4] * 2, 0.2, 0.2, 'sine', 0.1);
+}
+
 /** One step of a tally: each call `step` plays a little higher. */
 export function playTallyNote(step: number): void {
   tone(C_MAJOR[step % 8] * 2 ** Math.floor(step / 8), 0, 0.12, 'square', 0.08);

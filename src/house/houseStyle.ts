@@ -40,6 +40,8 @@ export interface WallDeco {
   sprite: Sprite;
   /** CSS class for a little life (twinkling lights, a swinging pendulum). */
   animated?: 'twinkle' | 'sway';
+  /** Not for sale: won in a game, hidden from the shop until owned. */
+  reward?: true;
 }
 
 export const WALL_DECOS: WallDeco[] = [
@@ -116,6 +118,67 @@ export const WALL_DECOS: WallDeco[] = [
     sprite: {
       pixels: ['...yyyy...', '..yyy.....', '.yyy......', '.yyy......', '.yyy......', '..yyy.....', '...yyyy...'],
       colors: { y: '#fff3a0' },
+    },
+  },
+  {
+    id: 'deco-ginkgo-frame',
+    name: 'Ginkgo encadré',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['ffffffffff', 'fccccccccf', 'fcyyyyyycf', 'fcyyyyyycf', 'fccyyyyccf', 'fcccyycccf', 'fcccbccccf', 'fccccbcccf', 'ffffffffff'],
+      colors: { f: '#8a5a3c', c: '#fff6e0', y: '#ffd23f', b: '#9a7a3a' },
+    },
+  },
+  {
+    id: 'deco-maple-wreath',
+    name: 'Couronne d’érable',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['...rorr...', '.ro....or.', 'r........o', 'o........r', 'r........o', '.or....ro.', '...rppr...', '....pp....'],
+      colors: { r: '#e8322a', o: '#f09a3c', p: '#ff7fae' },
+    },
+  },
+  {
+    id: 'deco-apple-basket',
+    name: 'Panier de pommes',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['..kkkkkk..', '.k......k.', 'k.rr.rr..k', 'krrrrrrrrk', 'bbbbbbbbbb', 'bwbwbwbwbb', '.bbbbbbbb.'],
+      colors: { k: '#8a5a3c', r: '#e04848', b: '#c4893a', w: '#a8743f' },
+    },
+  },
+  {
+    id: 'deco-fountain-print',
+    name: 'Gravure de fontaine',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['ffffffffffff', 'fsssswsssssf', 'fsssbwbssssf', 'fssbbwbbsssf', 'fsgggggggssf', 'fgwwwwwwwwgf', 'fggggggggggf', 'ffffffffffff'],
+      colors: { f: '#b07a3e', s: '#f6e3c4', b: '#7fc4e8', w: '#cfeaf7', g: '#9a9aa8' },
+    },
+  },
+  {
+    id: 'deco-bench-heart',
+    name: 'Cœur gravé',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['wwwwwwwwwwww', 'wwwpwwwwpwww', 'wwpppwwpppww', 'wwppppppppww', 'wwwppppppwww', 'wwwwppppwwww', 'wwwwwppwwwww', 'wwwwwwwwwwww'],
+      colors: { w: '#a8743f', p: '#e0457b' },
+    },
+  },
+  {
+    id: 'deco-autumn-garland',
+    name: 'Guirlande d’automne',
+    price: 0,
+    animated: 'sway',
+    reward: true,
+    sprite: {
+      pixels: ['k.............k', '.kk.........kk.', '...kkkkkkkkk...', '..r..o..y..v...', '.rrr.oo.yy.vv..', '..r..o..y..v...'],
+      colors: { k: '#5a4a3a', r: '#e8322a', o: '#f09a3c', y: '#ffd23f', v: '#8e5ad8' },
     },
   },
 ];

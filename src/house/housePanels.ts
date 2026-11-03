@@ -662,7 +662,7 @@ function stylePart(ctx: PanelContext, room: RoomId): HTMLElement[] {
   parts.push(sectionTitle('Décos murales'), el('div', { class: 'house-decor' }, ...decoSpots));
   const openSpot = typeof styleOpen?.part === 'number' && styleOpen.room === room ? styleOpen.part : null;
   if (openSpot !== null) {
-    const choices = WALL_DECOS.map((deco) => {
+    const choices = WALL_DECOS.filter((deco) => !deco.reward || save.ownedStyles.includes(deco.id)).map((deco) => {
       const owned = save.ownedStyles.includes(deco.id);
       const used = style.decos[openSpot] === deco.id;
       const button = el('button', { class: 'house-seed', type: 'button' }, spriteCanvas(deco.sprite, 2), el('span', { text: deco.name }), label(owned, used, deco.price));
