@@ -2,6 +2,7 @@ import './blackjack.css';
 import { el, topBar } from '../../../dom';
 import { bet, chips, pay } from '../chips';
 import { Round, Shoe, isBlackjack, totalLabel, type Card, type HandResult } from './blackjackLogic';
+import { openTips } from './blackjackTips';
 
 const CHIP_VALUES = [10, 25, 50, 100, 1000];
 const RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
@@ -244,6 +245,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
         }, pending > 0, true),
         ...(lastBet > 0 ? [button(`Rejouer la même mise (${lastBet})`, () => deal(lastBet), lastBet <= left, true)] : []),
       ),
+      el('div', { class: 'button-row' }, button('🎓 Conseils de pro', openTips, true, true)),
       el('p', {
         class: 'bj-rules',
         text: 'Sabot de 6 jeux · le croupier reçoit une seule carte et tire après toi · il reste sur 17 · blackjack payé 3 pour 2 · contre un blackjack du croupier, tu ne perds que ta mise de départ · pas d’assurance',

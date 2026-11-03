@@ -70,3 +70,34 @@
 .bj-chip-50 { background: #d1453d; }
 .bj-chip-100 { background: #222; }
 .bj-chip-1000 { background: #7b3fc4; }
+
+/* Conseils de pro */
+.bjt {
+  width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto;
+  padding: 20px 14px; background: #0d3a2b; color: #f3ecd9; text-align: left;
+}
+.bjt::backdrop { background: rgb(0 0 0 / 0.55); }
+.bjt h2 { margin-top: 0; text-align: center; color: #e8c15a; font-size: 1.6rem; }
+.bjt h3 { margin: 18px 0 4px; color: #e8c15a; }
+.bjt-note { margin: 0 0 8px; font-size: 0.85rem; color: #cfe0d6; }
+.bjt-note strong { color: #f3ecd9; }
+.bjt-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.8rem; }
+.bjt-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.bjt-chart { overflow-x: auto; border: 3px solid #5a2d1a; border-radius: 10px; background: #082a1f; }
+.bjt table { border-collapse: separate; border-spacing: 2px; width: 100%; }
+.bjt th, .bjt td { padding: 0; height: 26px; text-align: center; font-size: 0.72rem; }
+.bjt thead th { color: #e8c15a; }
+.bjt tbody th { text-align: right; padding-right: 4px; white-space: nowrap; }
+.bjt-corner { font-size: 0.6rem !important; color: #cfe0d6; font-weight: 400; }
+.bjt-cell {
+  display: inline-grid; place-items: center; width: 100%; min-width: 22px; height: 24px;
+  border-radius: 4px; color: #1b1b17; font-weight: 800; font-size: 0.72rem;
+}
+.bjt-legend .bjt-cell { width: 26px; }
+.bjt-R { background: #e8c15a; }
+.bjt-T { background: #f3ecd9; }
+.bjt-D { background: #46c79a; }
+.bjt-Ds { background: linear-gradient(135deg, #46c79a 50%, #e8c15a 50%); }
+.bjt-S { background: #e8746a; }
+.bjt-rules { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 6px; font-size: 0.9rem; }
+.bjt .button { display: block; margin: 0 auto; }
