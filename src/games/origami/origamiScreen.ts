@@ -32,8 +32,10 @@ export function renderOrigami(root: HTMLElement): () => void {
   /** 0 = flat, 1 = folded over: how far the flap of the current fold has turned. */
   let progress = 0;
   let dragging = false;
-  /** Where the finger is now, in sheet units, while dragging. */
+  /** Where the held corner is now, in sheet units, while dragging (the finger minus where it grabbed). */
   let finger: Point | null = null;
+  /** How far from the corner the finger landed: a finger rarely grabs it dead centre. */
+  let grabOffset: Point = { x: 0, y: 0 };
   /** Folds missed on this model; each one left a crumple on the paper. */
   let mistakes = 0;
   let crumples: Point[] = [];
@@ -345,14 +347,16 @@ export function renderOrigami(root: HTMLElement): () => void {
       return;
     }
     dragging = true;
-    finger = p;
+    grabOffset = { x: p.x - fold.handle.x, y: p.y - fold.handle.y };
+    finger = { ...fold.handle };
     canvas.setPointerCapture(event.pointerId);
     progress = 0.02;
   });
   canvas.addEventListener('pointermove', (event) => {
     if (!dragging) return;
     const fold = model.folds[step];
-    finger = point(event);
+    const p = point(event);
+    finger = { x: p.x - grabOffset.x, y: p.y - grabOffset.y };
     progress = Math.max(0.02, progressAt(fold, finger));
     // Too far off the arrow's path, the corner slips out of the fingers.
     if (offPath(fold, finger) > SLIP) miss('Le coin a glissé ! Suis bien la flèche.');
