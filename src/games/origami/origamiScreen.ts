@@ -15,12 +15,28 @@ const GRAB = 34;
 /** Letting go this close to the target makes the fold; this close is perfect. */
 const ON_TARGET = 14;
 const PERFECT = 6;
+/** A grip closer than this to the crease is too short a lever to pull the flap. */
+const MIN_GRIP = 12;
 /** Straying this far from the arrow's path makes the corner slip. */
 const SLIP = 32;
 /** Let go before half way, the corner just falls back: a hesitation, not a mistake. */
 const HESITATION = 0.5;
 /** Coins kept per star mark: 3 stars keep them all. */
 const STAR_SHARE = [0, 0.3, 0.6, 1];
+
+/** Whether a point lies inside a convex polygon. */
+function inside(points: Point[], p: Point): boolean {
+  let sign = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+    if (cross === 0) continue;
+    if (sign === 0) sign = Math.sign(cross);
+    else if (Math.sign(cross) !== sign) return false;
+  }
+  return true;
+}
 
 export function renderOrigami(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -32,10 +48,10 @@ export function renderOrigami(root: HTMLElement): () => void {
   /** 0 = flat, 1 = folded over: how far the flap of the current fold has turned. */
   let progress = 0;
   let dragging = false;
-  /** Where the held corner is now, in sheet units, while dragging (the finger minus where it grabbed). */
+  /** Where the finger is, in sheet units, while dragging. */
   let finger: Point | null = null;
-  /** How far from the corner the finger landed: a finger rarely grabs it dead centre. */
-  let grabOffset: Point = { x: 0, y: 0 };
+  /** The spot of paper the finger grabbed: the corner, or anywhere on the part that folds. */
+  let grip: Point = { x: 0, y: 0 };
   /** Folds missed on this model; each one left a crumple on the paper. */
   let mistakes = 0;
   let crumples: Point[] = [];
@@ -331,16 +347,26 @@ export function renderOrigami(root: HTMLElement): () => void {
     return { x: ((event.clientX - box.left) * W) / box.width - OFFSET.x, y: ((event.clientY - box.top) * H) / box.height - OFFSET.y };
   }
 
-  /** How far the finger has carried the handle: 0 on its corner, 1 on the corner's mirror image. */
+  /** How far the fold has turned: 0 flat, 1 folded over. */
   function progressAt(fold: Fold, finger: Point): number {
     return Math.max(0, Math.min(1, travelAt(fold, finger)));
   }
 
-  /** The same, not capped: above 1 the corner has gone past its target. */
+  /** The same, not capped: above 1 the corner has gone past its target. The grabbed spot of paper follows the finger. */
   function travelAt(fold: Fold, finger: Point): number {
     const { distance } = creaseFrame(fold);
-    const reach = distance(fold.handle);
+    const reach = distance(grip);
     return (reach - distance(finger)) / (2 * reach);
+  }
+
+  /** Whether a spot of the sheet is on the part this fold turns over, far enough from the crease to pull it. */
+  function onFlap(fold: Fold, p: Point): boolean {
+    const { distance } = creaseFrame(fold);
+    if (distance(p) < MIN_GRIP) return false;
+    return pieces.some((piece) => {
+      const flap = split(piece, distance).moving;
+      return flap !== null && inside(flap.points, p);
+    });
   }
 
   /** How far the corner, as drawn, is from its target: only along its path, what the eye sees. */
@@ -353,21 +379,21 @@ export function renderOrigami(root: HTMLElement): () => void {
     const fold = model.folds[step];
     if (!fold || settling) return;
     const p = point(event);
-    if (Math.hypot(p.x - fold.handle.x, p.y - fold.handle.y) > GRAB) {
-      hint.textContent = `👉 Attrape le rond qui clignote. ${fold.hint}`;
+    // The corner, or anywhere on the part that folds: holding it back from the corner keeps the target in sight.
+    if (Math.hypot(p.x - fold.handle.x, p.y - fold.handle.y) > GRAB && !onFlap(fold, p)) {
+      hint.textContent = `👉 Attrape la partie à plier, ou le rond qui clignote. ${fold.hint}`;
       return;
     }
     dragging = true;
-    grabOffset = { x: p.x - fold.handle.x, y: p.y - fold.handle.y };
-    finger = { ...fold.handle };
+    grip = p;
+    finger = p;
     canvas.setPointerCapture(event.pointerId);
     progress = 0.02;
   });
   canvas.addEventListener('pointermove', (event) => {
     if (!dragging) return;
     const fold = model.folds[step];
-    const p = point(event);
-    finger = { x: p.x - grabOffset.x, y: p.y - grabOffset.y };
+    finger = point(event);
     progress = Math.max(0.02, progressAt(fold, finger));
     // Too far off the arrow's path, the corner slips out of the fingers.
     if (offPath(fold, finger) > SLIP) miss('Le coin a glissé ! Suis bien la flèche.');
@@ -410,10 +436,11 @@ export function renderOrigami(root: HTMLElement): () => void {
     return turned(fold.handle, normal, distance, 1);
   }
 
-  /** How far the finger strays sideways from the straight path between the corner and its target. */
+  /** How far the finger strays sideways from the straight path between the grabbed spot and where it lands. */
   function offPath(fold: Fold, p: Point): number {
-    const a = fold.handle;
-    const b = targetOf(fold);
+    const { normal, distance } = creaseFrame(fold);
+    const a = grip;
+    const b = turned(grip, normal, distance, 1);
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const t = Math.max(0, Math.min(1.3, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
