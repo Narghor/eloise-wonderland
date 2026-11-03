@@ -12,6 +12,7 @@ import { loadFishing } from './games/fishing/fishingSave';
 import { ZONES } from './games/leaves/leavesData';
 import { loadLeaves } from './games/leaves/leavesSave';
 import { loadAquarium } from './games/aquarium/aquariumSave';
+import { loadOrigami } from './games/origami/origamiSave';
 import { grantDailyGift } from './games/casino/casinoScreen';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
@@ -87,7 +88,7 @@ function levelInProgress(entry: GameEntry): { number: number | null } | null {
 export function renderHome(root: HTMLElement): () => void {
   grantDailyGift();
   const sections = SECTIONS.map(({ title, games }) =>
-    homeSection(title, games.map((id) => gameTile(GAMES[id])), title === 'Création' ? [gardenTile()] : []),
+    homeSection(title, games.map((id) => gameTile(GAMES[id])), title === 'Création' ? [gardenTile(), origamiTile()] : []),
   );
   root.append(
     el(
@@ -159,6 +160,12 @@ function gardenTile(): HTMLElement {
   if (pending > 0) progress = `${pending} à colorier`;
   else if (creatures.length > 0) progress = creatures.length === 1 ? '1 petite bête' : `${creatures.length} petites bêtes`;
   return tile('#/jardin', icon, 'Le Jardin', progress);
+}
+
+function origamiTile(): HTMLElement {
+  const folded = Object.values(loadOrigami().folded).reduce((sum, n) => sum + n, 0);
+  const icon = pixelIcon(['10001', '11011', '11111', '01110', '00100'], 'is-origami');
+  return tile('#/origami', icon, 'Origami', folded === 0 ? 'À découvrir' : folded === 1 ? '1 pliage' : `${folded} pliages`);
 }
 
 function resumeRow(): HTMLElement[] {

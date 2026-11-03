@@ -549,6 +549,10 @@ a {
   background: #4f9d69;
 }
 
+.game-card-icon.is-origami span.is-on {
+  background: #e8763a;
+}
+
 .game-card-icon.is-potions {
   width: 69px;
   height: 69px;

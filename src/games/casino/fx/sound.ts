@@ -208,6 +208,12 @@ export function playRustle(): void {
   noise(0, 0.09, 0.07, 3200);
 }
 
+/** A paper crease snapping into place: a crisp swish and a soft tap. */
+export function playFold(): void {
+  noise(0, 0.08, 0.12, 4200);
+  tone(260, 0.05, 0.06, 'triangle', 0.12, 180);
+}
+
 /** A pinch of food touching the water: a soft splash. */
 export function playSprinkle(): void {
   noise(0, 0.12, 0.08, 1800);

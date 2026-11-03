@@ -1,0 +1,78 @@
+.ori-screen {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding-block: 12px 32px;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+}
+
+.ori-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ori-title {
+  margin: 0;
+  font-size: 1.15rem;
+  text-align: center;
+}
+
+.ori-steps {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.ori-step {
+  width: 22px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ecdcc6;
+}
+
+.ori-step.is-on {
+  background: #6a8ec8;
+}
+
+.ori-step.is-done {
+  background: #e8763a;
+}
+
+.ori-canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 360 / 330;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgb(90 60 30 / 0.2);
+  touch-action: none;
+}
+
+.ori-hint {
+  min-height: 2.8em;
+  margin: 0;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ori-done {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.ori-done:empty {
+  display: none;
+}
+
+.ori-stars {
+  font-size: 1.6rem;
+  letter-spacing: 0.1em;
+}
+
+.ori-done span {
+  color: var(--muted, #8a7a92);
+}

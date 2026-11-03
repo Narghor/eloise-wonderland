@@ -25,6 +25,7 @@ import { renderHouse } from './house/houseScreen';
 import { renderFishing } from './games/fishing/fishingScreen';
 import { renderLeaves } from './games/leaves/leavesScreen';
 import { renderAquarium } from './games/aquarium/aquariumScreen';
+import { renderOrigami } from './games/origami/origamiScreen';
 import { requestPersistentStorage } from './save';
 import { watchForUpdates } from './update';
 
@@ -58,6 +59,7 @@ const routes: Record<string, Screen> = {
   peche: renderFishing,
   feuilles: renderLeaves,
   aquarium: renderAquarium,
+  origami: renderOrigami,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;
