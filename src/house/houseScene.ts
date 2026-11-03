@@ -124,10 +124,21 @@ export class HouseScene {
     }
     this.view.scrollLeft = scroll;
 
+    // Everyone already in the house keeps their room, spot and pose; only newcomers are placed at random.
     const now = performance.now();
-    const companion = this.makeActor(null, loadCompanion().look, 'living', 0.5, now);
-    this.actors = [companion, ...save.visitors.map((id, i) => this.makeActor(character(id), character(id).look, this.randomRoom(), 0.2 + Math.random() * 0.6, now + 2500 + i * 3000))];
-    for (const actor of this.actors) this.rooms.get(actor.room)?.append(actor.root);
+    const kept = (id: string | null) => this.actors.find((a) => (a.character?.id ?? null) === id);
+    const companion = kept(null) ?? this.makeActor(null, loadCompanion().look, 'living', 0.5, now);
+    const visitors = save.visitors.map((id, i) => kept(id) ?? this.makeActor(character(id), character(id).look, this.randomRoom(), 0.2 + Math.random() * 0.6, now + 2500 + i * 3000));
+    this.actors = [companion, ...visitors];
+    for (const actor of this.actors) {
+      if (actor.pair && !this.actors.includes(actor.pair.partner)) actor.pair = null;
+      if (!save.rooms.includes(actor.room)) {
+        actor.room = this.randomRoom();
+        actor.nextRoom = null;
+        actor.pending = null;
+      }
+      this.rooms.get(actor.room)?.append(actor.root);
+    }
     this.renderMap();
     this.scrollToActive();
   }
