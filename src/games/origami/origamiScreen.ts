@@ -280,7 +280,7 @@ export function renderOrigami(root: HTMLElement): () => void {
   /** Where the grabbed corner must land: it lights up when the finger is on it. */
   function drawTarget(fold: Fold): void {
     const target = targetOf(fold);
-    const on = finger !== null && Math.hypot(finger.x - target.x, finger.y - target.y) <= ON_TARGET;
+    const on = finger !== null && gapToTarget(fold, finger) <= ON_TARGET;
     const p = at(target);
     ctx.strokeStyle = on ? 'rgb(80 170 90 / 0.95)' : 'rgb(60 90 160 / 0.6)';
     ctx.fillStyle = on ? 'rgb(140 220 140 / 0.35)' : 'rgb(255 255 255 / 0.2)';
@@ -333,9 +333,20 @@ export function renderOrigami(root: HTMLElement): () => void {
 
   /** How far the finger has carried the handle: 0 on its corner, 1 on the corner's mirror image. */
   function progressAt(fold: Fold, finger: Point): number {
+    return Math.max(0, Math.min(1, travelAt(fold, finger)));
+  }
+
+  /** The same, not capped: above 1 the corner has gone past its target. */
+  function travelAt(fold: Fold, finger: Point): number {
     const { distance } = creaseFrame(fold);
     const reach = distance(fold.handle);
-    return Math.max(0, Math.min(1, (reach - distance(finger)) / (2 * reach)));
+    return (reach - distance(finger)) / (2 * reach);
+  }
+
+  /** How far the corner, as drawn, is from its target: only along its path, what the eye sees. */
+  function gapToTarget(fold: Fold, finger: Point): number {
+    const { distance } = creaseFrame(fold);
+    return Math.abs(1 - travelAt(fold, finger)) * 2 * distance(fold.handle);
   }
 
   canvas.addEventListener('pointerdown', (event) => {
@@ -365,7 +376,8 @@ export function renderOrigami(root: HTMLElement): () => void {
     if (!dragging) return;
     dragging = false;
     const fold = model.folds[step];
-    const gap = finger ? Math.hypot(finger.x - targetOf(fold).x, finger.y - targetOf(fold).y) : Infinity;
+    const gap = finger ? gapToTarget(fold, finger) : Infinity;
+    const overshot = finger !== null && travelAt(fold, finger) > 1;
     finger = null;
     if (gap <= ON_TARGET) {
       if (gap <= PERFECT) praise = { text: 'Parfait !', at: performance.now() };
@@ -374,7 +386,7 @@ export function renderOrigami(root: HTMLElement): () => void {
       settling = { from: progress, to: 0, start: performance.now() };
       hint.textContent = fold.hint;
     }
-    else miss(progress >= 1 ? 'Trop loin ! Lâche pile sur le cercle.' : 'Pas assez loin ! Lâche pile sur le cercle.');
+    else miss(overshot ? 'Trop loin ! Lâche pile sur le cercle.' : 'Pas assez loin ! Lâche pile sur le cercle.');
   };
 
   /** A fold let go off target: the flap falls back and the paper keeps a crumple. */
