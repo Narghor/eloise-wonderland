@@ -2,6 +2,8 @@ import { readGame, writeGame } from '../../save';
 import { CRITTERS, MAX_LEVEL, ORNAMENTS, RARE_LEAVES, TREASURES, UPGRADES, ZONES, type UpgradeId } from './leavesData';
 
 const GAME_ID = 'leaves';
+/** Bumped when the game changes so much that old progress makes no sense: an older save starts over. */
+const SAVE_VERSION = 2;
 
 export interface ZoneState {
   /** Leaves left when the player went away. */
@@ -10,17 +12,16 @@ export interface ZoneState {
   at: number;
   /** Levels finished here: the place's level is this plus one. */
   cleared: number;
-  /** Leaves raked toward the next level's goal. */
-  progress: number;
   /** Finished level played again, or 0 when moving on to the next one. */
   replay: number;
-  /** Leaves raked toward the replayed level's goal. */
-  replayProgress: number;
+  /** Carpets of leaves already cleared in the level being played. */
+  carpets: number;
   /** Ornaments bought for this place. */
   ornaments: string[];
 }
 
 export interface LeavesSave {
+  version: number;
   gold: number;
   /** Leaves in the basket, and what they will give on the compost. */
   basket: number;
@@ -38,8 +39,9 @@ export interface LeavesSave {
 }
 
 export function loadLeaves(): LeavesSave {
-  const raw = readGame(GAME_ID);
-  const data = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const raw = rec(readGame(GAME_ID));
+  // An older version starts over, except the daily coin cap, so coins are not taken twice today.
+  const data: Record<string, unknown> = raw.version === SAVE_VERSION ? raw : { coinsDay: raw.coinsDay, coinsTaken: raw.coinsTaken };
   const levels = {} as Record<UpgradeId, number>;
   for (const u of UPGRADES) {
     const value = rec(data.levels)[u.id];
@@ -53,13 +55,13 @@ export function loadLeaves(): LeavesSave {
       left: isCount(s.left) ? s.left : -1,
       at: typeof s.at === 'number' ? s.at : Date.now(),
       cleared,
-      progress: isCount(s.progress) ? s.progress : 0,
       replay: isCount(s.replay) && s.replay <= cleared ? s.replay : 0,
-      replayProgress: isCount(s.replayProgress) ? s.replayProgress : 0,
+      carpets: isCount(s.carpets) ? s.carpets : 0,
       ornaments: Array.isArray(s.ornaments) ? s.ornaments.filter((id): id is string => ORNAMENTS.some((o) => o.id === id)) : [],
     };
   }
   return {
+    version: SAVE_VERSION,
     gold: isCount(data.gold) ? data.gold : 0,
     basket: isCount(data.basket) ? data.basket : 0,
     basketGold: typeof data.basketGold === 'number' && data.basketGold >= 0 ? data.basketGold : isCount(data.basket) ? data.basket : 0,

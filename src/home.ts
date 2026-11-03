@@ -252,7 +252,7 @@ function houseBlock(): HTMLElement {
       { class: 'home-annexes' },
       annex(tea.href, '☕', tea.name, services === 0 ? 'À découvrir' : `${services} ${services === 1 ? tea.unit[0] : tea.unit[1]}`),
       annex('#/peche', '🎣', 'La pêche', caught === 0 ? 'L’étang du jardin' : `${caught}/${FISH.length} poissons`),
-      annex('#/feuilles', '🍂', 'Les feuilles', cleanedZones === 0 ? 'Le parc à ratisser' : `${cleanedZones}/${ZONES.length} lieux propres`),
+      annex('#/feuilles', '🍂', 'Les feuilles', cleanedZones === 0 ? 'Le parc à nettoyer' : `${cleanedZones}/${ZONES.length} lieux propres`),
     ),
   );
 }

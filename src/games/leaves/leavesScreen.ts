@@ -5,10 +5,14 @@ import { loadHouse, saveHouse } from '../../house/houseSave';
 import { WALL_DECOS } from '../../house/houseStyle';
 import { armSoundUnlock, muteButton, playCompost, playRustle, playSmallWin } from '../casino/fx/sound';
 import { timeOfDay } from '../fishing/fishingLogic';
-import { GROUND_TOP, H, LEAF_SIZE, SHAPE_COUNT, W, drawBack, drawFront, leafSprite } from './leavesArt';
+import { GROUND_TOP, H, LEAF_SIZE, SCALE, SHAPE_COUNT, W, drawBack, drawFront, leafSprite, sharpCanvas } from './leavesArt';
+import { thingSprite } from './leavesThings';
 import {
-  AWAY_REFILL,
   BASKET_SIZE,
+  CARPET,
+  CARPETS,
+  LAST_LEAVES,
+  PILE_SIZE,
   CRITTERS,
   DAILY_COINS,
   DECO_CHANCE,
@@ -18,16 +22,16 @@ import {
   GOLDEN_WIND_SECONDS,
   GOLD_PER_COIN,
   LEAF_VALUE,
-  LEVEL_FALL,
   LEVEL_GOAL,
-  LEVEL_LEAVES,
   LEVEL_VALUE,
   LUCK,
   MAX_LEVEL,
   OPEN_AT_LEVEL,
   ORNAMENTS,
   ORNAMENT_VALUE,
-  RAKE_RADIUS,
+  GRAB,
+  GRAB_REACH,
+  TOUCH_REACH,
   RARE_CHANCE,
   RARE_LEAVES,
   TREASURES,
@@ -98,10 +102,7 @@ export function renderLeaves(root: HTMLElement): () => void {
   let flyers: Flyer[] = [];
   let back = document.createElement('canvas');
   let front = document.createElement('canvas');
-  const layer = document.createElement('canvas');
-  layer.width = W;
-  layer.height = H;
-  const layerCtx = layer.getContext('2d')!;
+  const [layer, layerCtx] = sharpCanvas(W, H);
   let layerDirty = true;
   let frame = 0;
   let lastTime = performance.now();
@@ -111,8 +112,7 @@ export function renderLeaves(root: HTMLElement): () => void {
   let goldenUntil = 0;
   let nextGust = 0;
   let nextEvent = 0;
-  let raking = false;
-  let last: { x: number; y: number } | null = null;
+  let sparks: { x: number; y: number; t: number }[] = [];
   let lastRustle = 0;
   let openCollection: Collection | null = null;
   const timers = new Set<number>();
@@ -128,8 +128,9 @@ export function renderLeaves(root: HTMLElement): () => void {
   // PAGE
   // -----------------------------------------------
 
-  const canvas = el('canvas', { class: 'leaves-canvas', width: `${W}`, height: `${H}` });
+  const canvas = el('canvas', { class: 'leaves-canvas', width: `${W * SCALE}`, height: `${H * SCALE}` });
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(SCALE, SCALE);
   const banner = el('div', { class: 'leaves-banner' });
   const sky = el('div', { class: `leaves-sky is-${time}` });
   const critterLayer = el('div', { class: 'leaves-critters' });
@@ -183,10 +184,10 @@ export function renderLeaves(root: HTMLElement): () => void {
   /** A spotless place can only be replayed. */
   const replaying = () => state().replay > 0 || state().cleared >= MAX_LEVEL;
   const level = () => state().replay || Math.min(MAX_LEVEL, state().cleared + 1);
-  const progress = () => (replaying() ? state().replayProgress : state().progress);
-  const capacity = () => Math.round(zone.leaves * (1 + LEVEL_LEAVES * (level() - 1)));
   const luck = () => LUCK(save.levels.luck);
   const goal = () => LEVEL_GOAL(zone.leaves, level());
+  const carpet = () => CARPET(zone.leaves, level());
+  const progress = () => Math.max(0, state().carpets * carpet() + carpet() - leaves.length);
   const isOpen = (i: number) => i === 0 || save.zones[ZONES[i - 1].id].cleared >= OPEN_AT_LEVEL;
 
   function makeLeaf(x: number, y: number): Leaf {
@@ -211,36 +212,45 @@ export function renderLeaves(root: HTMLElement): () => void {
     zone = next;
     save.zone = zone.id;
     const state = save.zones[zone.id];
-    const cap = capacity();
-    const hours = (Date.now() - state.at) / 3_600_000;
-    const left = state.left < 0 ? cap : Math.min(cap, Math.round(state.left + cap * AWAY_REFILL * hours));
     back = drawBack(zone);
     front = drawFront(zone);
-    leaves = [];
     falling = [];
     flyers = [];
-    hidden = [];
     critterLayer.replaceChildren();
-    // Some leaves gather in piles; a hedgehog may sleep under one.
-    const piles = Math.min(4, Math.floor(left / 90));
-    let placed = 0;
-    for (let p = 0; p < piles; p++) {
-      const c = randomSpot();
-      for (let i = 0; i < 26 && placed < left; i++, placed++) leaves.push(makeLeaf(c.x + (Math.random() - 0.5) * 34, Math.min(H - 8, Math.max(GROUND_TOP + 4, c.y + (Math.random() - 0.5) * 26))));
-      if (p === 0 && Math.random() < 0.45 && !hidden.some((h) => h.kind === 'hedgehog')) hidden.push({ x: c.x, y: c.y, icon: '🦔', kind: 'hedgehog' });
-    }
-    while (placed++ < left) {
-      const s = randomSpot();
-      leaves.push(makeLeaf(s.x, s.y));
-    }
-    hideTreasures();
-    state.left = leaves.length;
+    // An empty saved ground means the last carpet was cleared: a fresh one waits.
+    spreadCarpet(state.left > 0 ? Math.min(carpet(), state.left) : carpet());
     state.at = Date.now();
-    saveLeaves(save);
-    layerDirty = true;
     banner.className = 'leaves-banner';
     paintLevels();
     paint();
+  }
+
+  /** Lays a carpet: the whole ground covered evenly, plus small piles a pass or two can clear. */
+  function spreadCarpet(count: number): void {
+    leaves = [];
+    hidden = [];
+    const piles = Math.floor((count * 0.15) / PILE_SIZE);
+    const even = count - piles * PILE_SIZE;
+    // A jittered grid covers the ground with no bare patches.
+    const top = GROUND_TOP + 4;
+    const cell = Math.sqrt((W * (H - 8 - top)) / even);
+    const cols = Math.ceil(W / cell);
+    const cells: { x: number; y: number }[] = [];
+    for (let y = top; y < H - 8; y += cell) for (let c = 0; c < cols; c++) cells.push({ x: c * cell, y });
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+    for (const c of cells.slice(0, even)) leaves.push(makeLeaf(Math.min(W - 4, c.x + Math.random() * cell), Math.min(H - 8, c.y + Math.random() * cell)));
+    for (let p = 0; p < piles; p++) {
+      const c = randomSpot();
+      for (let i = 0; i < PILE_SIZE; i++) leaves.push(makeLeaf(c.x + (Math.random() - 0.5) * 16, Math.min(H - 8, Math.max(top, c.y + (Math.random() - 0.5) * 12))));
+      if (p === 0 && Math.random() < 0.45) hidden.push({ x: c.x, y: c.y, icon: '🦔', kind: 'hedgehog' });
+    }
+    hideTreasures();
+    save.zones[zone.id].left = leaves.length;
+    saveLeaves(save);
+    layerDirty = true;
   }
 
   /** Buries the treasures of this level under the leaves. */
@@ -273,51 +283,52 @@ export function renderLeaves(root: HTMLElement): () => void {
     return { x: ((event.clientX - box.left) * W) / box.width, y: ((event.clientY - box.top) * H) / box.height };
   }
 
-  function rake(at: { x: number; y: number }): void {
-    const from = last ?? at;
-    const radius = RAKE_RADIUS(save.levels.rake);
-    const steps = Math.max(1, Math.ceil(Math.hypot(at.x - from.x, at.y - from.y) / (radius / 2)));
-    let room = BASKET_SIZE(save.levels.basket) - save.basket;
-    let taken = 0;
-    for (let s = 1; s <= steps; s++) {
-      const x = from.x + ((at.x - from.x) * s) / steps;
-      const y = from.y + ((at.y - from.y) * s) / steps;
-      for (let i = leaves.length - 1; i >= 0; i--) {
-        const leaf = leaves[i];
-        if (Math.abs(leaf.x - x) > radius || Math.abs(leaf.y - y) > radius || Math.hypot(leaf.x - x, leaf.y - y) > radius) continue;
-        if (leaf.wet) {
-          // First pass: the leaf dries and loosens.
-          leaf.wet = false;
-          leaf.sprite = leafSprite(leaf.shape, leaf.color, false);
-          layerDirty = true;
-          continue;
-        }
-        if (room <= 0) continue;
-        leaves.splice(i, 1);
-        room--;
-        taken++;
-        collect(leaf);
-      }
-      reveal(x, y, radius);
-    }
-    last = at;
-    if (taken === 0 && room <= 0) status.textContent = 'Le panier est plein ! Vide-le au compost pour continuer.';
-    if (taken > 0) {
-      const t = performance.now();
-      if (t - lastRustle > 90) {
-        playRustle();
-        lastRustle = t;
-      }
+  /** A tap picks the leaf under the finger, then its nearest neighbours; a tap beside every leaf does nothing. */
+  function pick(at: { x: number; y: number }): void {
+    const dist = (leaf: Leaf) => Math.hypot(leaf.x - at.x, leaf.y - at.y);
+    let touched: Leaf | null = null;
+    for (const leaf of leaves) if (dist(leaf) <= TOUCH_REACH && (!touched || dist(leaf) < dist(touched))) touched = leaf;
+    if (!touched) return;
+    if (touched.wet) {
+      // A wet leaf sticks: the first tap only loosens it.
+      touched.wet = false;
+      touched.sprite = leafSprite(touched.shape, touched.color, false);
       layerDirty = true;
-      if (progress() >= goal()) cleaned();
-      paint();
+      sparks.push({ x: touched.x, y: touched.y, t: 0 });
+      return;
     }
+    const room = BASKET_SIZE(save.levels.basket) - save.basket;
+    if (room <= 0) {
+      status.textContent = 'Le panier est plein ! Vide-le au compost pour continuer.';
+      return;
+    }
+    const target = touched;
+    const reach = GRAB_REACH(save.levels.rake);
+    const near = leaves
+      .filter((leaf) => leaf !== target && !leaf.wet && Math.hypot(leaf.x - target.x, leaf.y - target.y) <= reach)
+      .sort((a, b) => Math.hypot(a.x - target.x, a.y - target.y) - Math.hypot(b.x - target.x, b.y - target.y));
+    const taken = [target, ...near].slice(0, Math.min(room, GRAB(save.levels.rake)));
+    const gone = new Set(taken);
+    leaves = leaves.filter((leaf) => !gone.has(leaf));
+    for (const leaf of taken) {
+      collect(leaf);
+      reveal(leaf.x, leaf.y, 8);
+    }
+    sparks.push({ x: target.x, y: target.y, t: 0 });
+    if (taken.length > 1) pop(target.x, target.y - 10, `+${taken.length}`, 'is-gold');
+    const t = performance.now();
+    if (t - lastRustle > 60) {
+      playRustle();
+      lastRustle = t;
+    }
+    navigator.vibrate?.(8);
+    layerDirty = true;
+    if (leaves.length === 0) carpetCleared();
+    paint();
   }
 
   function collect(leaf: Leaf): void {
     save.basket++;
-    if (replaying()) state().replayProgress++;
-    else state().progress++;
     const zoneValue = 1 + LEVEL_VALUE * (level() - 1) + ORNAMENT_VALUE * state().ornaments.length;
     const golden = now() < goldenUntil ? 2 : 1;
     save.basketGold += (leaf.golden ? GOLDEN_VALUE : 1) * zoneValue * golden;
@@ -369,6 +380,34 @@ export function renderLeaves(root: HTMLElement): () => void {
     paint();
   }
 
+  /** The ground is spotless: a small win, then the wind lays the next carpet (or the level is done). */
+  function carpetCleared(): void {
+    const s = state();
+    s.carpets++;
+    if (s.carpets >= CARPETS(level())) {
+      s.carpets = 0;
+      cleaned();
+    } else {
+      playSmallWin();
+      banner.textContent = `✨ Tout propre ! ${s.carpets}/${CARPETS(level())} ✨`;
+      banner.className = 'leaves-banner is-on is-clean';
+      later(2200, () => (banner.className = 'leaves-banner'));
+      saveLeaves(save);
+    }
+    nextCarpet();
+  }
+
+  /** A gust of leaves drifts down, then the new carpet is there. */
+  function nextCarpet(): void {
+    later(1600, () => {
+      for (let i = 0; i < 30; i++) dropLeaf(true);
+      later(1400, () => {
+        if (leaves.length === 0) spreadCarpet(carpet());
+        paint();
+      });
+    });
+  }
+
   function cleaned(): void {
     const s = state();
     const finished = level();
@@ -378,12 +417,10 @@ export function renderLeaves(root: HTMLElement): () => void {
     banner.className = 'leaves-banner is-on is-clean';
     later(4000, () => (banner.className = 'leaves-banner'));
     if (replaying()) {
-      s.replayProgress = 0;
       banner.textContent = `✨ Niveau ${finished} réussi ! ✨`;
       status.textContent = `Niveau ${finished} réussi encore une fois : +${(zone.levelReward * finished).toLocaleString('fr-FR')} feuilles d’or. Les trésors sont de nouveau cachés.`;
     } else {
       s.cleared++;
-      s.progress = 0;
       const next = ZONES[ZONES.indexOf(zone) + 1];
       const opened = s.cleared === OPEN_AT_LEVEL && next;
       if (s.cleared >= MAX_LEVEL) {
@@ -398,34 +435,19 @@ export function renderLeaves(root: HTMLElement): () => void {
         status.textContent = `${zone.name} passe au niveau ${level()} : plus de feuilles, plus de trésors, et chaque feuille vaut plus !${opened ? ` Nouveau lieu : ${next.name} !` : ''}`;
       }
     }
-    hideTreasures();
     paintLevels();
     if (Math.random() < 0.6) later(1500, () => critter('cat'));
     saveLeaves(save);
     paintZones();
   }
 
-  const down = (event: PointerEvent) => {
+  canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
-    canvas.setPointerCapture(event.pointerId);
-    raking = true;
-    last = null;
-    rake(point(event));
-  };
-  const move = (event: PointerEvent) => {
-    if (raking) rake(point(event));
-  };
-  const up = () => {
-    raking = false;
-    last = null;
+    pick(point(event));
     save.zones[zone.id].left = leaves.length;
     save.zones[zone.id].at = Date.now();
     saveLeaves(save);
-  };
-  canvas.addEventListener('pointerdown', down);
-  canvas.addEventListener('pointermove', move);
-  canvas.addEventListener('pointerup', up);
-  canvas.addEventListener('pointercancel', up);
+  });
 
   compost.addEventListener('click', () => {
     if (save.basket === 0) return;
@@ -470,9 +492,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   }
 
   function update(dt: number, t: number): void {
-    const cap = capacity();
-    if (t > calmUntil && leaves.length + falling.length < cap) {
-      fallDebt += dt * (FALL_RATE + ZONES.indexOf(zone) * 0.4) * (1 + LEVEL_FALL * (level() - 1)) * (t < goldenUntil ? 2 : 1);
+    if (t > calmUntil) {
+      fallDebt += dt * FALL_RATE * (t < goldenUntil ? 3 : 1);
       while (fallDebt >= 1) {
         fallDebt--;
         dropLeaf(false);
@@ -480,10 +501,7 @@ export function renderLeaves(root: HTMLElement): () => void {
     }
     if (t > nextGust) {
       nextGust = t + 25000 + Math.random() * 20000;
-      if (leaves.length < cap * 0.9) {
-        for (let i = 0; i < 26; i++) dropLeaf(true);
-        if (leaves.length > 0) status.textContent = '🌬️ Un coup de vent ! Des feuilles tombent des arbres.';
-      }
+      for (let i = 0; i < 8; i++) dropLeaf(true);
     }
     if (t > nextEvent) {
       nextEvent = t + 20000 + Math.random() * 25000;
@@ -496,15 +514,10 @@ export function renderLeaves(root: HTMLElement): () => void {
       f.leaf.y += f.vy * dt;
       if (f.leaf.x < 0) f.leaf.x += W;
       if (f.leaf.x > W) f.leaf.x -= W;
-      if (f.leaf.y >= f.landY) {
-        f.leaf.cos = Math.cos(f.angle);
-        f.leaf.sin = Math.sin(f.angle);
-        leaves.push(f.leaf);
-        stamp(f.leaf);
-        falling.splice(i, 1);
-      }
+      if (f.leaf.y >= f.landY) falling.splice(i, 1);
     }
     if (flyers.length > 0) flyers = flyers.filter((f) => (f.t += dt * 2.4) < 1);
+    if (sparks.length > 0) sparks = sparks.filter((s) => (s.t += dt * 3) < 1);
     if (t > goldenUntil && banner.classList.contains('is-gold')) banner.className = 'leaves-banner';
   }
 
@@ -520,7 +533,7 @@ export function renderLeaves(root: HTMLElement): () => void {
     goldenUntil = now() + GOLDEN_WIND_SECONDS * 1000;
     banner.textContent = '🌟 Vent doré ! Les feuilles valent double';
     banner.className = 'leaves-banner is-on is-gold';
-    for (let i = 0; i < 20; i++) dropLeaf(true);
+    for (let i = 0; i < 10; i++) dropLeaf(true);
   }
 
   /** A little creature shows up; touching it before it leaves adds it to the album. */
@@ -565,10 +578,16 @@ export function renderLeaves(root: HTMLElement): () => void {
   // DRAWING
   // -----------------------------------------------
 
+  /** Draws a sprite of `size` units centred on (x, y), turned by the rotation (cos, sin) and scaled. */
+  function drawTurned(g: CanvasRenderingContext2D, sprite: HTMLCanvasElement, x: number, y: number, cos: number, sin: number, size: number): void {
+    g.save();
+    g.transform(cos, sin, -sin, cos, x, y);
+    g.drawImage(sprite, -size / 2, -size / 2, size, size);
+    g.restore();
+  }
+
   function stamp(leaf: Leaf): void {
-    layerCtx.setTransform(leaf.cos, leaf.sin, -leaf.sin, leaf.cos, leaf.x, leaf.y);
-    layerCtx.drawImage(leaf.sprite, -LEAF_SIZE / 2, -LEAF_SIZE / 2);
-    layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+    drawTurned(layerCtx, leaf.sprite, leaf.x, leaf.y, leaf.cos, leaf.sin, LEAF_SIZE);
   }
 
   function redrawLayer(): void {
@@ -582,32 +601,26 @@ export function renderLeaves(root: HTMLElement): () => void {
     lastTime = t;
     update(dt, t);
     if (layerDirty) redrawLayer();
-    ctx.drawImage(back, 0, 0);
-    ctx.font = '16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const h of hidden) ctx.fillText(h.icon, h.x, h.y);
-    ctx.drawImage(layer, 0, 0);
-    ctx.font = '24px sans-serif';
-    for (const o of ORNAMENTS) if (state().ornaments.includes(o.id)) ctx.fillText(o.icon, o.x, o.y);
+    ctx.drawImage(back, 0, 0, W, H);
+    for (const h of hidden) ctx.drawImage(thingSprite(h.treasure?.id ?? h.kind, h.icon), h.x - 12, h.y - 12, 24, 24);
+    ctx.drawImage(layer, 0, 0, W, H);
+    for (const o of ORNAMENTS) if (state().ornaments.includes(o.id)) ctx.drawImage(thingSprite(o.id, o.icon, 36), o.x - 18, o.y - 18, 36, 36);
     // Falling leaves: a shadow where they will land, and bigger the higher they are.
     for (const f of falling) {
       const height = Math.max(0, f.landY - f.leaf.y);
       const lift = Math.min(1, height / 220);
-      ctx.fillStyle = `rgb(40 30 20 / ${0.12 + 0.18 * (1 - lift)})`;
+      ctx.fillStyle = `rgb(40 30 20 / ${0.12 * Math.min(1, height / 40)})`;
       ctx.beginPath();
       ctx.ellipse(f.leaf.x, f.landY, 6 + lift * 4, 2.5 + lift * 1.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     for (const f of falling) {
       const lift = Math.min(1, Math.max(0, f.landY - f.leaf.y) / 220);
-      const scale = 1 + lift * 0.8;
-      const c = Math.cos(f.angle) * scale;
-      const s = Math.sin(f.angle) * scale;
-      ctx.setTransform(c, s, -s, c, f.leaf.x, f.leaf.y);
-      ctx.drawImage(f.leaf.sprite, -LEAF_SIZE / 2, -LEAF_SIZE / 2);
+      // Scenery only: bigger the higher they are, and they fade out before touching the ground.
+      ctx.globalAlpha = Math.min(0.85, (f.landY - f.leaf.y) / 40);
+      drawTurned(ctx, f.leaf.sprite, f.leaf.x, f.leaf.y, Math.cos(f.angle), Math.sin(f.angle), LEAF_SIZE * (1.2 + lift * 0.8));
     }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
     for (const f of flyers) {
       const x = f.x + (W * 0.1 - f.x) * f.t;
       const y = f.y + (H + 40 - f.y) * f.t * f.t;
@@ -624,19 +637,24 @@ export function renderLeaves(root: HTMLElement): () => void {
       ctx.fillRect(leaf.x - 1, leaf.y - 7, 2, 2);
       ctx.fillRect(leaf.x + 5, leaf.y - 1, 2, 2);
     }
-    ctx.drawImage(front, 0, 0);
-    if (raking && last) {
-      // The rake's reach under the finger.
-      const radius = RAKE_RADIUS(save.levels.rake);
-      ctx.strokeStyle = 'rgb(255 250 235 / 0.8)';
-      ctx.fillStyle = 'rgb(255 250 235 / 0.15)';
+    // The last few leaves of a carpet shine, so nobody hunts for them.
+    if (leaves.length > 0 && leaves.length <= LAST_LEAVES) {
+      ctx.strokeStyle = `rgb(255 255 255 / ${0.5 + glint * 0.5})`;
+      ctx.lineWidth = 2;
+      for (const leaf of leaves) {
+        ctx.beginPath();
+        ctx.arc(leaf.x, leaf.y, 9 + glint * 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.drawImage(front, 0, 0, W, H);
+    // A small ring where a tap picked something.
+    for (const s of sparks) {
+      ctx.strokeStyle = `rgb(255 250 220 / ${1 - s.t})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(last.x, last.y, radius, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(s.x, s.y, 4 + s.t * 14, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.font = '22px sans-serif';
-      ctx.fillText('🧹', last.x + radius * 0.7, last.y - radius * 0.7);
     }
     if (Math.floor(t / 250) !== Math.floor((t - dt * 1000) / 250)) paintClean();
     frame = requestAnimationFrame(tick);
@@ -646,12 +664,12 @@ export function renderLeaves(root: HTMLElement): () => void {
   // PANELS
   // -----------------------------------------------
 
-  /** The level bar counts raked leaves; how clean the place looks is said beside it. */
+  /** The level bar counts every carpet's leaves; beside it, the carpet being cleaned. */
   function paintClean(): void {
-    const clean = Math.max(0, Math.round((1 - leaves.length / capacity()) * 100));
-    const done = progress();
-    cleanFill.style.width = `${Math.min(100, (done / goal()) * 100)}%`;
-    cleanText.textContent = `${done.toLocaleString('fr-FR')}/${goal().toLocaleString('fr-FR')} feuilles · ${clean} % propre`;
+    const s = state();
+    const total = CARPETS(level());
+    cleanFill.style.width = `${Math.min(100, (progress() / goal()) * 100)}%`;
+    cleanText.textContent = `Tapis ${Math.min(total, s.carpets + 1)}/${total} · ${Math.floor((1 - leaves.length / carpet()) * 100)} % propre`;
   }
 
   function paint(): void {
@@ -686,9 +704,9 @@ export function renderLeaves(root: HTMLElement): () => void {
   zoneLevel.addEventListener('change', () => {
     const s = state();
     s.replay = Number(zoneLevel.value);
-    s.replayProgress = 0;
     s.left = -1;
-    status.textContent = s.replay ? `Niveau ${s.replay} : ${goal().toLocaleString('fr-FR')} feuilles à ramasser.` : `Retour au niveau ${level()}, ta progression t’attendait.`;
+    s.carpets = 0;
+    status.textContent = s.replay ? `Niveau ${s.replay} : ${goal().toLocaleString('fr-FR')} feuilles à ramasser.` : `Retour au niveau ${level()} : un tas tout neuf t’attend.`;
     openZone(zone);
   });
 

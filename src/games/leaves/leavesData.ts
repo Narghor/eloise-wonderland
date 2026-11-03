@@ -34,13 +34,14 @@ export const MAX_LEVEL = 10;
 /** The next place opens when the previous one reaches this level. */
 export const OPEN_AT_LEVEL = 3;
 
-/** Leaves to rake for a level: the place's full cover three times, plus one cover per level. */
-export const LEVEL_GOAL = (leaves: number, level: number) => Math.round(leaves * (3 + (level - 1)));
-
-/** Each level adds this share of leaves on the ground, of leaf value, and of falling speed. */
-export const LEVEL_LEAVES = 0.2;
+/** Each level adds this share of leaves on the ground and of leaf value. */
+export const LEVEL_LEAVES = 0.1;
 export const LEVEL_VALUE = 0.1;
-export const LEVEL_FALL = 0.1;
+
+/** A level is a run of carpets: clean the whole ground, the wind lays the next carpet. */
+export const CARPET = (leaves: number, level: number) => Math.round(leaves * (1 + LEVEL_LEAVES * (level - 1)));
+export const CARPETS = (level: number) => 1 + Math.ceil(level / 2);
+export const LEVEL_GOAL = (leaves: number, level: number) => CARPET(leaves, level) * CARPETS(level);
 
 export interface RareLeaf {
   id: string;
@@ -175,23 +176,30 @@ export interface Upgrade {
   describe(level: number): string;
 }
 
-export const BASKET_SIZE = (level: number) => 160 + level * 100;
-export const RAKE_RADIUS = (level: number) => 16 + level * 5;
+export const BASKET_SIZE = (level: number) => 250 + level * 150;
+/** Leaves picked by one tap: the touched leaf, then its nearest neighbours. */
+export const GRAB = (level: number) => [1, 3, 5, 8, 12, 16, 20, 25, 30][level];
+/** How far from the finger a tap still finds a leaf, and how far its neighbours may be. */
+export const TOUCH_REACH = 12;
+export const GRAB_REACH = (level: number) => 18 + level * 6;
+/** Below this many leaves left on a carpet, the last ones shine so nobody hunts for them. */
+export const LAST_LEAVES = 25;
+/** Leaves in each small pile of a carpet. */
+export const PILE_SIZE = 20;
 export const LEAF_VALUE = (level: number) => 1 + level * 0.25;
 /** Multiplier on rare leaves, golden leaves and treasures. */
 export const LUCK = (level: number) => 1 + level * 0.25;
 
 export const UPGRADES: Upgrade[] = [
-  { id: 'basket', name: 'Panier', icon: '🧺', max: 10, cost: (l) => Math.round(400 * 1.85 ** l), describe: (l) => `${BASKET_SIZE(l)} feuilles` },
-  { id: 'rake', name: 'Râteau', icon: '🧹', max: 8, cost: (l) => Math.round(700 * 2.08 ** l), describe: (l) => `largeur ${l + 1}` },
-  { id: 'value', name: 'Compost', icon: '🌱', max: 8, cost: (l) => Math.round(1500 * 1.95 ** l), describe: (l) => `×${LEAF_VALUE(l).toLocaleString('fr-FR')} feuille d’or par feuille` },
-  { id: 'luck', name: 'Trèfle', icon: '🍀', max: 6, cost: (l) => Math.round(3000 * 2.2 ** l), describe: (l) => `chance ×${LUCK(l).toLocaleString('fr-FR')} (raretés, trésors)` },
+  { id: 'basket', name: 'Panier', icon: '🧺', max: 10, cost: (l) => Math.round(1200 * 1.85 ** l), describe: (l) => `${BASKET_SIZE(l)} feuilles` },
+  // Kept as 'rake' in saves: it is the gloves now.
+  { id: 'rake', name: 'Gants', icon: '🧤', max: 8, cost: (l) => (l === 0 ? 500 : Math.round(2100 * 2.08 ** l)), describe: (l) => `${GRAB(l)} feuille${GRAB(l) > 1 ? 's' : ''} par toucher` },
+  { id: 'value', name: 'Compost', icon: '🌱', max: 8, cost: (l) => Math.round(4500 * 1.95 ** l), describe: (l) => `×${LEAF_VALUE(l).toLocaleString('fr-FR')} feuille d’or par feuille` },
+  { id: 'luck', name: 'Trèfle', icon: '🍀', max: 6, cost: (l) => Math.round(9000 * 2.2 ** l), describe: (l) => `chance ×${LUCK(l).toLocaleString('fr-FR')} (raretés, trésors)` },
 ];
 
-/** Leaves falling from the trees each second while playing, before the place's own extra. */
-export const FALL_RATE = 4;
-/** Leaves brought back per hour away, as a share of a full place. */
-export const AWAY_REFILL = 0.5;
+/** Leaves drifting down from the trees each second: scenery only, they never land on the heap. */
+export const FALL_RATE = 0.6;
 /** Gold leaves for one coin, and the coins a day can give. */
 export const GOLD_PER_COIN = 80;
 export const DAILY_COINS = 40;
