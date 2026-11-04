@@ -3,7 +3,7 @@ import { el, topBar } from '../../dom';
 import { addCoins, loadCompanion } from '../../companion/companionSave';
 import { loadHouse, saveHouse } from '../../house/houseSave';
 import { WALL_DECOS } from '../../house/houseStyle';
-import { armSoundUnlock, muteButton, playBigWin, playCompost, playRustle, playSmallWin } from '../casino/fx/sound';
+import { armSoundUnlock, muteButton, playBigWin, playChime, playCompost, playRustle, playSmallWin, playTallyNote } from '../casino/fx/sound';
 import { timeOfDay } from '../fishing/fishingLogic';
 import { GROUND_TOP, H, LEAF_SIZE, SCALE, SHAPE_COUNT, W, drawBack, drawFront, leafSprite, sharpCanvas } from './leavesArt';
 import { thingSprite } from './leavesThings';
@@ -22,9 +22,16 @@ import {
   STAR_CHANCE,
   MEGA_STAR_CHANCE,
   THIEF_CHANCE,
-  THIEF_MS,
+  THIEF_SPEED,
+  THIEF_MIN_MS,
+  TEST_THIEF_EVERY_6S,
   BUTTERFLY_MS,
   BUTTERFLY_GAUGE_SHARE,
+  RAINBOW_CHANCE,
+  RARE_CRITTER_CHANCE,
+  CRITTER_GAUGE_SHARE,
+  RARE_CRITTER_GAUGE_SHARE,
+  COLLECTION_REWARDS,
   STAR_GAUGE_SHARE,
   GOLDEN_VALUE,
   GOLD_PER_COIN,
@@ -100,7 +107,7 @@ interface Flyer {
   t: number;
 }
 
-type Collection = 'herbarium' | 'treasures' | 'critters';
+type Collection = 'herbarium' | 'herbarium2' | 'treasures' | 'critters';
 
 export function renderLeaves(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -115,6 +122,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   let front = document.createElement('canvas');
   const [layer, layerCtx] = sharpCanvas(W, H);
   let layerDirty = true;
+  /** Only this part of the ground changed (the leaves a tap took): redrawn alone, not the whole carpet. */
+  let dirtyArea: { x0: number; y0: number; x1: number; y1: number } | null = null;
   let frame = 0;
   let lastTime = performance.now();
   let fallDebt = 0;
@@ -146,7 +155,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   const banner = el('div', { class: 'leaves-banner' });
   const sky = el('div', { class: `leaves-sky is-${time}` });
   const critterLayer = el('div', { class: 'leaves-critters' });
-  const stage = el('div', { class: 'leaves-stage' }, canvas, sky, critterLayer, banner);
+  const lootBubble = el('div', { class: 'leaves-loot', 'aria-live': 'polite' });
+  const stage = el('div', { class: 'leaves-stage' }, canvas, sky, critterLayer, banner, lootBubble);
   const goldView = el('span', { class: 'leaves-gold' });
   const coinsView = el('span', { class: 'coin-pill' });
   const basketFill = el('span', {});
@@ -216,7 +226,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   }
 
   function pickRare(): RareLeaf {
-    const available = RARE_LEAVES.filter((r) => r.id !== 'night' || time === 'night');
+    const here = { time, zone: zone.id, level: level() };
+    const available = RARE_LEAVES.filter((r) => (r.when ? r.when(here) : !r.page));
     return available[Math.floor(Math.random() * available.length)];
   }
 
@@ -272,6 +283,13 @@ export function renderLeaves(root: HTMLElement): () => void {
       for (let i = 0; i < PILE_SIZE; i++) leaves.push(makeLeaf(c.x + (Math.random() - 0.5) * 16, Math.min(H - 8, Math.max(top, c.y + (Math.random() - 0.5) * 12)), allGolden));
       if (p === 0 && !buried && Math.random() < 0.45) hidden.push({ x: c.x, y: c.y, icon: '🦔', kind: 'hedgehog' });
     }
+    if (allGolden && fresh && leaves.length > 0) {
+      const gold = RARE_LEAVES.find((r) => r.id === 'goldbar')!;
+      const leaf = leaves[Math.floor(Math.random() * leaves.length)];
+      leaf.rare = gold;
+      leaf.color = gold.color;
+      leaf.sprite = leafSprite(leaf.shape, gold.color);
+    }
     if (buried) restoreBuried(buried);
     else {
       hideTreasures();
@@ -318,6 +336,8 @@ export function renderLeaves(root: HTMLElement): () => void {
     const start = now();
     for (const leaf of leaves) leaf.fall = { at: start + (leaf.x / W) * (CARPET_FALL_MS - LEAF_FALL_MS) * (0.75 + Math.random() * 0.25), drift: (Math.random() - 0.3) * 40 };
     fallingUntil = start + CARPET_FALL_MS;
+    layerCtx.clearRect(0, 0, W, H);
+    dirtyArea = null;
     for (let i = 0; i < 4; i++) later(i * 350, () => playRustle());
   }
 
@@ -384,7 +404,7 @@ export function renderLeaves(root: HTMLElement): () => void {
       lastRustle = t;
     }
     navigator.vibrate?.(8);
-    layerDirty = true;
+    markDirty(taken);
     if (leaves.length === 0) carpetCleared();
     paint();
   }
@@ -401,8 +421,8 @@ export function renderLeaves(root: HTMLElement): () => void {
     if (leaf.rare) {
       const isNew = !save.herbarium[leaf.rare.id];
       save.herbarium[leaf.rare.id] = (save.herbarium[leaf.rare.id] ?? 0) + 1;
-      playSmallWin();
       pop(leaf.x, leaf.y, '✨', 'is-rare');
+      loot(leafSwatch(leaf.rare.color), leaf.rare.name, isNew ? 'new' : '');
       status.textContent = isNew ? `✨ Nouvelle feuille pour l’herbier : ${leaf.rare.name} ! ${leaf.rare.note}` : `✨ ${leaf.rare.name} ! (×${save.herbarium[leaf.rare.id]})`;
       refreshCollection();
     }
@@ -426,23 +446,26 @@ export function renderLeaves(root: HTMLElement): () => void {
       saveLeaves(save);
       return;
     }
-    playSmallWin();
     pop(h.x, h.y, h.icon, 'is-find');
     if (h.kind === 'megastar') {
+      loot(spriteIcon('megastar', h.icon), 'Méga feuille étoile', 'big');
       status.textContent = '🌟✨ Une MÉGA feuille étoile ! La jauge dorée est pleine d’un coup !';
       fillGoldenGauge(Math.max(0, goldenTarget() - save.goldenGauge));
+      grantRare('crystal');
     } else if (h.kind === 'star') {
+      loot(spriteIcon('star', h.icon), 'Feuille étoile');
       status.textContent = '🌟 Une feuille étoile ! La jauge dorée fait un bond.';
       fillGoldenGauge(Math.ceil(goldenTarget() * STAR_GAUGE_SHARE));
     } else if (h.kind === 'hedgehog') {
+      loot(spriteIcon('hedgehog', h.icon), 'Hérisson', save.critters.hedgehog ? '' : 'new');
       meet('hedgehog');
-      save.gold += 25;
-      status.textContent = '🦔 Un hérisson dormait sous le tas ! Il te remercie de l’avoir découvert : +25 feuilles d’or.';
+      status.textContent = `🦔 Un hérisson dormait sous le tas ! ${rewardShare(CRITTER_GAUGE_SHARE)}`;
     } else if (h.kind === 'deco' && h.decoId) {
       const house = loadHouse();
       const deco = WALL_DECOS.find((d) => d.id === h.decoId)!;
       if (!house.ownedStyles.includes(deco.id)) house.ownedStyles.push(deco.id);
       saveHouse(house);
+      loot('🎁', deco.name, 'new');
       status.textContent = `🎁 Une déco pour la maison : ${deco.name} ! Elle t’attend dans « Décos murales ».`;
     } else if (h.treasure) {
       creditTreasure(h.treasure, 1);
@@ -625,6 +648,10 @@ export function renderLeaves(root: HTMLElement): () => void {
   }
 
   function randomEvent(): void {
+    if (Math.random() < RARE_CRITTER_CHANCE) {
+      rareCritter()?.();
+      return;
+    }
     const options: (() => void)[] = [() => critter('squirrel'), () => critter('robin'), () => critter('ladybug'), butterfly, butterfly];
     if (zone.snails) options.push(() => critter('snail'));
     if (time === 'dusk') options.push(() => critter('fox'));
@@ -635,10 +662,11 @@ export function renderLeaves(root: HTMLElement): () => void {
   /** A little creature shows up; touching it before it leaves adds it to the album. */
   function critter(id: CritterId): void {
     const info = CRITTERS.find((c) => c.id === id)!;
+    const rare = id === 'owl' || id === 'deer';
     const spot = randomSpot();
-    const running = id === 'squirrel' || id === 'fox';
+    const running = id === 'squirrel' || id === 'fox' || id === 'deer';
     const node = el('button', {
-      class: `leaves-critter is-${id}${running ? ' is-running' : ''}`,
+      class: `leaves-critter is-${id}${running ? ' is-running' : ''}${id === 'deer' ? ' is-fast' : ''}`,
       type: 'button',
       'aria-label': info.name,
       text: info.icon,
@@ -647,31 +675,34 @@ export function renderLeaves(root: HTMLElement): () => void {
     node.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
       node.remove();
+      loot(info.icon, info.name, save.critters[id] ? (rare ? 'big' : '') : 'new');
       meet(id);
-      const bonus = id === 'squirrel' ? 30 : id === 'fox' ? 40 : 10;
-      save.gold += bonus;
+      status.textContent = `${info.icon} ${info.name} ! ${info.note} ${rewardShare(rare ? RARE_CRITTER_GAUGE_SHARE : CRITTER_GAUGE_SHARE)}`;
       saveLeaves(save);
-      playSmallWin();
-      status.textContent = `${info.icon} ${info.name} ! ${info.note} +${bonus} feuilles d’or.`;
       paint();
     });
     critterLayer.append(node);
-    later(running ? 5000 : 7000, () => node.remove());
+    playChime();
+    later(id === 'deer' ? 2000 : id === 'owl' ? 2200 : running ? 3500 : 4000, () => node.remove());
   }
 
+  /** A treasure is worth its gold times the compost, so it keeps its value as the player grows. */
   function creditTreasure(t: Treasure, times: number): void {
     const isNew = !save.treasures[t.id];
     save.treasures[t.id] = (save.treasures[t.id] ?? 0) + 1;
-    save.gold += t.gold * times;
+    const gold = Math.round(t.gold * LEAF_VALUE(save.levels.value)) * times;
+    save.gold += gold;
+    loot(spriteIcon(t.id, t.icon), `${t.name} +${gold.toLocaleString('fr-FR')}`, isNew ? 'new' : times > 1 ? 'big' : '');
     const what = times > 1
-      ? `${t.icon} ${t.name} rattrapé : +${t.gold * times} feuilles d’or (×${times}) !`
-      : `${t.icon} ${isNew ? 'Nouvelle trouvaille' : 'Trouvé'} : ${t.name} ! +${t.gold} feuilles d’or.`;
+      ? `${t.icon} ${t.name} rattrapé : +${gold.toLocaleString('fr-FR')} feuilles d’or (×${times}) !`
+      : `${t.icon} ${isNew ? 'Nouvelle trouvaille' : 'Trouvé'} : ${t.name} ! +${gold.toLocaleString('fr-FR')} feuilles d’or.`;
     status.textContent = `${what} ${isNew ? t.note : ''}`;
   }
 
   /** A squirrel snatches the treasure just found and runs for the nearest edge: caught in time, it pays twice. */
   function thief(t: Treasure, x: number, y: number): void {
-    const toLeft = x < W / 2;
+    // Toward the far edge: a squirrel found near a side would otherwise vanish at once.
+    const toLeft = x > W / 2;
     const node = el(
       'button',
       { class: `leaves-critter leaves-thief${toLeft ? '' : ' is-right'}`, type: 'button', 'aria-label': `Écureuil qui file avec ${t.name}`, style: `left:${(x / W) * 100}%;top:${(y / H) * 100}%` },
@@ -679,20 +710,34 @@ export function renderLeaves(root: HTMLElement): () => void {
       el('span', { class: 'leaves-thief-loot', text: t.icon }),
     );
     status.textContent = `🐿️ Un écureuil file avec ${t.icon} ${t.name} ! Attrape-le vite !`;
+    loot('🐿️', `Un écureuil file avec ${t.name} !`, 'alert');
+    playChime();
     node.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
       node.remove();
       meet('squirrel');
       creditTreasure(t, 2);
-      playSmallWin();
       pop(x, y, '🐿️✨', 'is-find');
       saveLeaves(save);
       refreshCollection();
       paint();
     });
     critterLayer.append(node);
+    // Zigzags across the ground at a steady, fast speed; the run lasts at least THIEF_MIN_MS.
+    const endX = toLeft ? -0.12 * W : 1.12 * W;
+    const path = [{ x, y }];
+    for (let i = 1; i <= 4; i++) {
+      const swing = (i % 2 ? -1 : 1) * (40 + Math.random() * 30);
+      path.push({ x: x + ((endX - x) * i) / 5, y: Math.min(H - 14, Math.max(GROUND_TOP + 10, y + swing)) });
+    }
+    path.push({ x: endX, y: path[path.length - 1].y });
+    let length = 0;
+    for (let i = 1; i < path.length; i++) length += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
     node
-      .animate([{ left: `${(x / W) * 100}%` }, { left: toLeft ? '-12%' : '112%' }], { duration: THIEF_MS, easing: 'ease-in' })
+      .animate(
+        path.map((p) => ({ left: `${(p.x / W) * 100}%`, top: `${(p.y / H) * 100}%` })),
+        { duration: Math.max(THIEF_MIN_MS, (length / THIEF_SPEED) * 1000), easing: 'linear' },
+      )
       .finished.then(() => {
         if (!node.isConnected) return;
         node.remove();
@@ -704,34 +749,121 @@ export function renderLeaves(root: HTMLElement): () => void {
   /** The golden butterfly zigzags across the place: touch it before it is gone. */
   function butterfly(): void {
     const info = CRITTERS.find((c) => c.id === 'butterfly')!;
+    zigzag('butterfly', BUTTERFLY_MS, 'leaves-butterfly', () => {
+      status.textContent = `🦋 ${info.name} attrapé ! ${rewardShare(BUTTERFLY_GAUGE_SHARE)}`;
+      if (Math.random() < RAINBOW_CHANCE) grantRare('rainbow');
+    });
+  }
+
+  /** A creature crossing the place in zigzags; touched in time, it is met and `onCatch` rewards it. */
+  function zigzag(id: CritterId, ms: number, className: string, onCatch: () => void): void {
+    const info = CRITTERS.find((c) => c.id === id)!;
     const fromLeft = Math.random() < 0.5;
     const points = [{ x: fromLeft ? -0.08 : 1.08, y: 0.35 + Math.random() * 0.4 }];
     for (let i = 1; i <= 5; i++) points.push({ x: fromLeft ? i / 6 : 1 - i / 6, y: 0.25 + Math.random() * 0.6 });
     points.push({ x: fromLeft ? 1.08 : -0.08, y: 0.3 + Math.random() * 0.4 });
-    const node = el('button', { class: 'leaves-critter leaves-butterfly', type: 'button', 'aria-label': info.name, text: info.icon });
+    const node = el('button', { class: `leaves-critter ${className}`, type: 'button', 'aria-label': info.name, text: info.icon });
     node.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
       const box = node.getBoundingClientRect();
       const stageBox = critterLayer.getBoundingClientRect();
       node.remove();
-      meet('butterfly');
-      playSmallWin();
-      pop(((box.left + box.width / 2 - stageBox.left) / stageBox.width) * W, ((box.top - stageBox.top) / stageBox.height) * H, '🦋✨', 'is-find');
-      if (save.goldenNext) {
-        save.gold += 50;
-        status.textContent = `🦋 ${info.name} attrapé ! La jauge est déjà pleine : +50 feuilles d’or.`;
-      } else {
-        status.textContent = `🦋 ${info.name} attrapé ! La jauge dorée monte.`;
-        fillGoldenGauge(Math.ceil(goldenTarget() * BUTTERFLY_GAUGE_SHARE));
-      }
+      loot(info.icon, info.name, save.critters[id] ? (id === 'rabbit' ? 'big' : '') : 'new');
+      meet(id);
+      pop(((box.left + box.width / 2 - stageBox.left) / stageBox.width) * W, ((box.top - stageBox.top) / stageBox.height) * H, `${info.icon}✨`, 'is-find');
+      onCatch();
       saveLeaves(save);
       paint();
     });
     critterLayer.append(node);
+    playChime();
     node
-      .animate(points.map((p) => ({ left: `${p.x * 100}%`, top: `${p.y * 100}%` })), { duration: BUTTERFLY_MS, easing: 'ease-in-out' })
+      .animate(points.map((p) => ({ left: `${p.x * 100}%`, top: `${p.y * 100}%` })), { duration: ms, easing: 'ease-in-out' })
       .finished.then(() => node.remove())
       .catch(() => {});
+  }
+
+  // -----------------------------------------------
+  // THE LOOT BUBBLE: what one tap found, gathered where it can be seen
+  // -----------------------------------------------
+
+  let lootHide = 0;
+  let lootNotes = 0;
+
+  /** Adds a find to the bubble over the place; finds close together pile up in the same bubble. */
+  function loot(icon: Node | string, name: string, mark: '' | 'new' | 'big' | 'alert' = ''): void {
+    if (!lootBubble.classList.contains('is-on')) {
+      lootBubble.replaceChildren();
+      lootNotes = 0;
+    }
+    const item = el('div', { class: `leaves-loot-item${mark ? ` is-${mark}` : ''}` }, typeof icon === 'string' ? el('span', { class: 'leaves-loot-icon', text: icon }) : icon, el('span', { class: 'leaves-loot-name', text: name }));
+    if (mark === 'new') item.append(el('b', { class: 'leaves-loot-new', text: 'NOUVEAU !' }));
+    lootBubble.append(item);
+    while (lootBubble.childElementCount > 5) lootBubble.firstElementChild!.remove();
+    lootBubble.classList.add('is-on');
+    playTallyNote(lootNotes++);
+    if (mark === 'big' || mark === 'new') playSmallWin();
+    window.clearTimeout(lootHide);
+    timers.delete(lootHide);
+    lootHide = window.setTimeout(() => lootBubble.classList.remove('is-on'), 2800);
+    timers.add(lootHide);
+  }
+
+  /** A drawn thing (treasure, star, hedgehog) as a small icon for the bubble. */
+  function spriteIcon(id: string, fallback: string): HTMLCanvasElement {
+    const sprite = thingSprite(id, fallback);
+    const icon = document.createElement('canvas');
+    icon.width = sprite.width;
+    icon.height = sprite.height;
+    icon.className = 'leaves-loot-icon';
+    icon.getContext('2d')!.drawImage(sprite, 0, 0);
+    return icon;
+  }
+
+  function leafSwatch(color: string): HTMLElement {
+    return el('span', { class: 'leaves-page-leaf leaves-loot-icon', style: `background:${color}` });
+  }
+
+  /** Gold a whole carpet is worth here, for rewards that must keep their value as the player grows. */
+  function carpetGold(): number {
+    const zoneValue = 1 + LEVEL_VALUE * (level() - 1) + ORNAMENT_VALUE * state().ornaments.length;
+    return carpet() * zoneValue * LEAF_VALUE(save.levels.value);
+  }
+
+  /** A creature's reward: this share of the golden gauge, or of a carpet's gold when the gauge is already full. */
+  function rewardShare(share: number): string {
+    if (save.goldenNext) {
+      const gold = Math.round(carpetGold() * share);
+      save.gold += gold;
+      return `+${gold.toLocaleString('fr-FR')} feuilles d’or.`;
+    }
+    fillGoldenGauge(Math.ceil(goldenTarget() * share));
+    return 'La jauge dorée monte !';
+  }
+
+  /** A rare leaf given by an event rather than picked on the ground. */
+  function grantRare(id: string): void {
+    const r = RARE_LEAVES.find((x) => x.id === id)!;
+    const isNew = !save.herbarium[id];
+    save.herbarium[id] = (save.herbarium[id] ?? 0) + 1;
+    loot(leafSwatch(r.color), r.name, isNew ? 'new' : 'big');
+    status.textContent += isNew ? ` ✨ Nouvelle feuille pour l’herbier : ${r.name} !` : ` ✨ ${r.name} (×${save.herbarium[id]})`;
+    saveLeaves(save);
+    refreshCollection();
+  }
+
+  /** A rare creature of this time of day, or none. */
+  function rareCritter(): (() => void) | null {
+    if (time === 'night') return () => critter('owl');
+    if (time === 'dawn' || time === 'dusk') return () => critter('deer');
+    return rabbit;
+  }
+
+  /** The white rabbit hops across in zigzags, fast. */
+  function rabbit(): void {
+    zigzag('rabbit', 2200, 'leaves-rabbit', () => {
+      status.textContent = `🐇 Lapin blanc attrapé ! Toujours pressé… ${rewardShare(RARE_CRITTER_GAUGE_SHARE)}`;
+    });
   }
 
   function meet(id: CritterId): void {
@@ -749,23 +881,56 @@ export function renderLeaves(root: HTMLElement): () => void {
   // DRAWING
   // -----------------------------------------------
 
-  /** Draws a sprite of `size` units centred on (x, y), turned by the rotation (cos, sin) and scaled. */
+  /**
+   * Draws a sprite of `size` units centred on (x, y), turned by the rotation (cos, sin).
+   * setTransform, not save/restore: thousands of leaves are drawn at once, and it is much cheaper.
+   */
   function drawTurned(g: CanvasRenderingContext2D, sprite: HTMLCanvasElement, x: number, y: number, cos: number, sin: number, size: number): void {
-    g.save();
-    g.transform(cos, sin, -sin, cos, x, y);
+    g.setTransform(SCALE * cos, SCALE * sin, -SCALE * sin, SCALE * cos, SCALE * x, SCALE * y);
     g.drawImage(sprite, -size / 2, -size / 2, size, size);
-    g.restore();
+    g.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  }
+
+  function markDirty(taken: Leaf[]): void {
+    const pad = LEAF_SIZE;
+    for (const leaf of taken) {
+      const a = dirtyArea ?? { x0: leaf.x, y0: leaf.y, x1: leaf.x, y1: leaf.y };
+      dirtyArea = { x0: Math.min(a.x0, leaf.x - pad), y0: Math.min(a.y0, leaf.y - pad), x1: Math.max(a.x1, leaf.x + pad), y1: Math.max(a.y1, leaf.y + pad) };
+    }
+  }
+
+  /** Clears the changed part of the ground and draws back only the leaves that reach into it. */
+  function redrawArea(area: { x0: number; y0: number; x1: number; y1: number }): void {
+    const w = area.x1 - area.x0;
+    const h = area.y1 - area.y0;
+    layerCtx.save();
+    layerCtx.beginPath();
+    layerCtx.rect(area.x0, area.y0, w, h);
+    layerCtx.clip();
+    layerCtx.clearRect(area.x0, area.y0, w, h);
+    const reach = LEAF_SIZE;
+    for (const leaf of leaves) {
+      if (leaf.x < area.x0 - reach || leaf.x > area.x1 + reach || leaf.y < area.y0 - reach || leaf.y > area.y1 + reach) continue;
+      stamp(leaf);
+    }
+    layerCtx.restore();
   }
 
   function stamp(leaf: Leaf): void {
     drawTurned(layerCtx, leaf.sprite, leaf.x, leaf.y, leaf.cos, leaf.sin, LEAF_SIZE);
   }
 
-  /** Each leaf drops from above the trees to its spot, drifting a little, and fades in as it falls. */
+  /** Each leaf drops from above the trees to its spot, drifting a little, and fades in; landed, it joins the ground layer. */
   function drawFallingCarpet(t: number): void {
     for (const leaf of leaves) {
-      const p = leaf.fall ? Math.min(1, Math.max(0, (t - leaf.fall.at) / LEAF_FALL_MS)) : 1;
+      if (!leaf.fall) continue;
+      const p = Math.min(1, Math.max(0, (t - leaf.fall.at) / LEAF_FALL_MS));
       if (p <= 0) continue;
+      if (p >= 1) {
+        leaf.fall = undefined;
+        stamp(leaf);
+        continue;
+      }
       const ease = 1 - (1 - p) * (1 - p);
       const from = -20 - leaf.y * 0.15;
       const x = leaf.x + (leaf.fall?.drift ?? 0) * (1 - ease);
@@ -792,10 +957,18 @@ export function renderLeaves(root: HTMLElement): () => void {
       for (const leaf of leaves) leaf.fall = undefined;
       layerDirty = true;
     }
-    if (layerDirty && !carpetFalling) redrawLayer();
+    if (layerDirty && !carpetFalling) {
+      redrawLayer();
+      dirtyArea = null;
+    } else if (dirtyArea && !carpetFalling) {
+      redrawArea(dirtyArea);
+      dirtyArea = null;
+    }
     ctx.drawImage(back, 0, 0, W, H);
-    if (carpetFalling) drawFallingCarpet(t);
-    else {
+    if (carpetFalling) {
+      ctx.drawImage(layer, 0, 0, W, H);
+      drawFallingCarpet(t);
+    } else {
       for (const h of hidden) ctx.drawImage(thingSprite(h.treasure?.id ?? h.kind, h.icon), h.x - 12, h.y - 12, 24, 24);
       ctx.drawImage(layer, 0, 0, W, H);
     }
@@ -989,13 +1162,44 @@ export function renderLeaves(root: HTMLElement): () => void {
     );
   }
 
+  const herbariumCount = (page: 2 | undefined): string => {
+    const pageLeaves = RARE_LEAVES.filter((r) => r.page === page);
+    return `${pageLeaves.filter((r) => save.herbarium[r.id]).length}/${pageLeaves.length}`;
+  };
+
   const COLLECTIONS: { id: Collection; label: string; total: () => string }[] = [
-    { id: 'herbarium', label: '🍁 Herbier', total: () => `${Object.keys(save.herbarium).length}/${RARE_LEAVES.length}` },
+    { id: 'herbarium', label: '🍁 Herbier', total: () => herbariumCount(undefined) },
+    { id: 'herbarium2', label: '🌈 Herbier II', total: () => herbariumCount(2) },
     { id: 'treasures', label: '🧭 Trouvailles', total: () => `${Object.keys(save.treasures).length}/${TREASURES.length}` },
     { id: 'critters', label: '🦔 Petites bêtes', total: () => `${Object.keys(save.critters).length}/${CRITTERS.length}` },
   ];
 
+  const collectionDone: Record<Collection, () => boolean> = {
+    herbarium: () => RARE_LEAVES.filter((r) => !r.page).every((r) => save.herbarium[r.id]),
+    herbarium2: () => RARE_LEAVES.filter((r) => r.page === 2).every((r) => save.herbarium[r.id]),
+    treasures: () => TREASURES.every((t) => save.treasures[t.id]),
+    critters: () => CRITTERS.every((c) => save.critters[c.id]),
+  };
+
+  /** A finished collection gives its decoration for the house, once. */
+  function rewardFinishedCollections(): void {
+    const house = loadHouse();
+    for (const c of Object.keys(COLLECTION_REWARDS) as Collection[]) {
+      const decoId = COLLECTION_REWARDS[c];
+      if (house.ownedStyles.includes(decoId) || !collectionDone[c]()) continue;
+      house.ownedStyles.push(decoId);
+      saveHouse(house);
+      const deco = WALL_DECOS.find((x) => x.id === decoId)!;
+      banner.textContent = '🏆 Collection complète ! 🏆';
+      banner.className = 'leaves-banner is-on is-clean';
+      later(4000, () => (banner.className = 'leaves-banner'));
+      playSmallWin();
+      status.textContent = `🏆 Collection complète ! Cadeau pour la maison : ${deco.name} (dans « Décos murales »).`;
+    }
+  }
+
   function refreshCollection(): void {
+    rewardFinishedCollections();
     collectionTabs.replaceChildren(
       ...COLLECTIONS.map((c) => {
         const button = el('button', { class: `leaves-zone${openCollection === c.id ? ' is-on' : ''}`, type: 'button', text: `${c.label} ${c.total()}` });
@@ -1008,11 +1212,12 @@ export function renderLeaves(root: HTMLElement): () => void {
     );
     const card = (known: boolean, icon: HTMLElement | string, name: string, detail: string) =>
       el('div', { class: `leaves-page${known ? '' : ' is-unknown'}` }, typeof icon === 'string' ? el('span', { class: 'leaves-page-icon', text: icon }) : icon, el('strong', { text: known ? name : '???' }), el('small', { text: detail }));
-    if (openCollection === 'herbarium') {
+    if (openCollection === 'herbarium' || openCollection === 'herbarium2') {
+      const page = openCollection === 'herbarium2' ? 2 : undefined;
       collectionView.replaceChildren(
-        ...RARE_LEAVES.map((r) => {
+        ...RARE_LEAVES.filter((r) => r.page === page).map((r) => {
           const n = save.herbarium[r.id] ?? 0;
-          return card(n > 0, el('span', { class: 'leaves-page-leaf', style: `background:${n ? r.color : '#d9d2c4'}` }), r.name, n ? `${r.note} ×${n}` : r.id === 'night' ? 'Seulement la nuit' : 'Encore à trouver');
+          return card(n > 0, el('span', { class: 'leaves-page-leaf', style: `background:${n ? r.color : '#d9d2c4'}` }), r.name, n ? `${r.note} ×${n}` : r.hint ?? (r.id === 'night' ? 'Seulement la nuit' : 'Encore à trouver'));
         }),
       );
     } else if (openCollection === 'treasures') {
@@ -1024,6 +1229,16 @@ export function renderLeaves(root: HTMLElement): () => void {
 
   if (time === 'night') {
     for (let i = 0; i < 6; i++) sky.append(el('span', { class: 'leaves-firefly', style: `left:${10 + i * 15}%;top:${30 + ((i * 37) % 55)}%;animation-delay:-${i * 0.7}s` }));
+  }
+
+  // TEST: never in the published site (import.meta.env.DEV is false in a build).
+  if (import.meta.env.DEV && TEST_THIEF_EVERY_6S) {
+    const testThief = window.setInterval(() => {
+      const t = TREASURES[Math.floor(Math.random() * TREASURES.length)];
+      const spot = randomSpot();
+      thief(t, spot.x, spot.y);
+    }, 6000 + Math.random() * 1500);
+    timers.add(testThief);
   }
 
   nextGust = now() + 15000;

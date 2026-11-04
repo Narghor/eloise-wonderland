@@ -320,13 +320,15 @@
 
 .leaves-critter.is-running {
   left: -10% !important;
-  animation: leaves-run 5s linear forwards;
+  animation: leaves-run 3.5s linear forwards;
 }
 
 .leaves-thief { display: flex; align-items: center; animation: leaves-critter-in 0.2s ease-out; }
 .leaves-thief.is-right .leaves-thief-body { transform: scaleX(-1); }
 .leaves-thief-loot { font-size: 1.1rem; margin-left: -0.3em; }
 .leaves-thief.is-right .leaves-thief-loot { order: -1; margin: 0 -0.3em 0 0; }
+.leaves-critter.is-running.is-fast { animation-duration: 2s; }
+.leaves-rabbit { font-size: 1.7rem; animation: leaves-hop 0.22s ease-in-out infinite alternate; }
 .leaves-butterfly { font-size: 1.5rem; animation: leaves-flutter 0.18s ease-in-out infinite alternate; }
 @keyframes leaves-flutter { to { transform: scaleX(0.6); } }
 
@@ -410,4 +412,50 @@
   .leaves-banner.is-gold {
     animation: none;
   }
+}
+/* A ring around a creature as it shows up, so it is seen in the middle of a sweep. */
+.leaves-critter::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 3px solid rgb(255 255 255 / 0.9);
+  pointer-events: none;
+  animation: leaves-ring 0.8s ease-out forwards;
+}
+@keyframes leaves-ring { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+
+/* ---- the loot bubble ---- */
+.leaves-loot {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  padding: 5px 9px;
+  border-radius: 12px;
+  background: rgb(255 252 240 / 0.9);
+  box-shadow: 0 6px 20px rgb(60 40 20 / 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 4;
+}
+.leaves-loot.is-on { opacity: 1; transform: none; }
+.leaves-loot-item { display: flex; align-items: center; gap: 5px; font-weight: 700; color: #4a3428; font-size: 0.75rem; animation: leaves-loot-in 0.3s cubic-bezier(.2,1.6,.4,1); }
+.leaves-loot-icon { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; font-size: 0.95rem; }
+.leaves-loot-icon.leaves-page-leaf { width: 14px; height: 14px; }
+.leaves-loot-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leaves-loot-new { flex: none; white-space: nowrap; margin-left: auto; padding: 0 5px; border-radius: 999px; background: #e0457b; color: #fff; font-size: 0.6rem; letter-spacing: 0.05em; }
+.leaves-loot-item.is-big .leaves-loot-name { color: #b07a00; }
+.leaves-loot-item.is-alert .leaves-loot-name { color: #c4332a; }
+@keyframes leaves-loot-in { from { transform: scale(0.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .leaves-critter::after, .leaves-loot-item { animation: none; }
 }

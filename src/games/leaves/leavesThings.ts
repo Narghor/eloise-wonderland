@@ -263,6 +263,52 @@ const DRAW: Record<string, (g: G) => void> = {
     disc(g, 11, 0, 3.5, '#bfe6f6');
     g.restore();
   },
+  goldenacorn(g) {
+    ball(g, 0, 2, 6.5, '#ffc93a');
+    g.fillStyle = '#b8860b';
+    g.beginPath();
+    g.ellipse(0, -2, 7.5, 4, 0, Math.PI, 0);
+    g.fill();
+    line(g, '#8a6400', 1.5, [0, -6, 1, -9]);
+    sparkle(g, 5, 0, 2.2);
+  },
+  pocketwatch(g) {
+    line(g, '#d9a52a', 1.2, [0, -8, -3, -10, -6, -9]);
+    ball(g, 0, 1, 7.5, '#f2c230');
+    disc(g, 0, 1, 5.5, '#fffaf0');
+    line(g, '#3a2a1a', 1, [0, 1, 0, -3]);
+    line(g, '#3a2a1a', 1, [0, 1, 3, 2]);
+    disc(g, 0, -7.5, 1.6, '#d9a52a');
+  },
+  bottle(g) {
+    g.save();
+    g.rotate(-0.5);
+    g.fillStyle = 'rgb(120 200 160 / 0.85)';
+    g.beginPath();
+    g.roundRect(-4.5, -3, 9, 12, 3);
+    g.fill();
+    g.fillRect(-2, -8, 4, 6);
+    g.fillStyle = '#a8743f';
+    g.fillRect(-2, -10, 4, 2.5);
+    g.fillStyle = '#fff3d6';
+    g.fillRect(-2.5, -1, 5, 7);
+    line(g, '#c9a27a', 0.6, [-1.5, 1, 1.5, 1]);
+    line(g, '#c9a27a', 0.6, [-1.5, 3, 1.5, 3]);
+    g.restore();
+    sparkle(g, 5, -5, 2);
+  },
+  goldenegg(g) {
+    const grad = g.createRadialGradient(-2, -3, 1, 0, 0, 9);
+    grad.addColorStop(0, '#fff6c2');
+    grad.addColorStop(0.5, '#ffd23f');
+    grad.addColorStop(1, '#c48a00');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.ellipse(0, 1, 6, 8, 0, 0, Math.PI * 2);
+    g.fill();
+    sparkle(g, 4, -5, 2.4);
+    sparkle(g, -4, 5, 1.6);
+  },
   crown(g) {
     const colors = ['#e8322a', '#f09a3c', '#ffd23f', '#f09a3c', '#e8322a'];
     for (let i = 0; i < 5; i++) {

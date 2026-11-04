@@ -43,11 +43,24 @@ export const CARPET = (leaves: number, level: number) => Math.round(leaves * (1 
 export const CARPETS = (level: number) => 1 + Math.ceil(level / 2);
 export const LEVEL_GOAL = (leaves: number, level: number) => CARPET(leaves, level) * CARPETS(level);
 
+/** Where and when a rare leaf is being looked for. */
+export interface RareContext {
+  time: string;
+  zone: string;
+  level: number;
+}
+
 export interface RareLeaf {
   id: string;
   name: string;
   color: string;
   note: string;
+  /** The second page of the herbarium. */
+  page?: 2;
+  /** Told in the herbarium before it is found. */
+  hint?: string;
+  /** Only drawn on a carpet when this says so; never drawn when it always says no (given another way). */
+  when?: (c: RareContext) => boolean;
 }
 
 export const RARE_CHANCE = 1 / 180;
@@ -66,10 +79,28 @@ export const STAR_GAUGE_SHARE = 0.25;
 export const MEGA_STAR_CHANCE = 0.12;
 /** Chance a squirrel snatches a treasure just found; caught in time, it pays the treasure twice. */
 export const THIEF_CHANCE = 0.25;
-export const THIEF_MS = 1800;
+/** The thief runs this fast (place units per second), toward the far edge, and stays on screen at least this long. */
+export const THIEF_SPEED = 210;
+export const THIEF_MIN_MS = 1600;
+/** TEST: a squirrel thief every ~6 s on the local dev server only, to judge its speed. Set to false once judged. */
+export const TEST_THIEF_EVERY_6S = false;
 /** The golden butterfly zigzags across fast; touching it fills this share of the golden gauge. */
-export const BUTTERFLY_MS = 3000;
+export const BUTTERFLY_MS = 2600;
 export const BUTTERFLY_GAUGE_SHARE = 0.15;
+/** Catching the butterfly may also give the rainbow leaf. */
+export const RAINBOW_CHANCE = 0.35;
+/** A random event is a rare creature (owl, deer, rabbit, by time of day) this often. */
+export const RARE_CRITTER_CHANCE = 0.15;
+/** Catching a creature fills this share of the golden gauge (worth the same at every level). */
+export const CRITTER_GAUGE_SHARE = 0.05;
+export const RARE_CRITTER_GAUGE_SHARE = 0.3;
+/** A finished collection gives this decoration for the house. */
+export const COLLECTION_REWARDS = {
+  herbarium: 'deco-herbarium-book',
+  herbarium2: 'deco-rainbow-leaf',
+  treasures: 'deco-treasure-shelf',
+  critters: 'deco-critter-portrait',
+} as const;
 
 export const RARE_LEAVES: RareLeaf[] = [
   { id: 'maple', name: 'Érable rouge', color: '#ff2a3a', note: 'Rouge comme une joue qui a froid.' },
@@ -81,7 +112,15 @@ export const RARE_LEAVES: RareLeaf[] = [
   { id: 'clover', name: 'Trèfle à quatre feuilles', color: '#3fbf5a', note: 'Égaré parmi les feuilles. Porte-bonheur !' },
   { id: 'sun', name: 'Feuille de soleil', color: '#ff9e2c', note: 'Elle garde la chaleur de l’été.' },
   { id: 'sakura', name: 'Pétale de cerisier', color: '#ffc4dd', note: 'Venu du printemps, on ne sait comment.' },
-  { id: 'night', name: 'Feuille de nuit', color: '#3a4a8a', note: 'On ne la trouve qu’une fois le soleil couché.' },
+  { id: 'night', name: 'Feuille de nuit', color: '#3a4a8a', note: 'On ne la trouve qu’une fois le soleil couché.', when: (c) => c.time === 'night' },
+  { id: 'moon', page: 2, name: 'Feuille de lune', color: '#c9d4ff', note: 'Pâle et argentée, elle brille dans le noir.', hint: 'Seulement la nuit', when: (c) => c.time === 'night' },
+  { id: 'dawn', page: 2, name: 'Feuille d’aube', color: '#ffb38a', note: 'Encore rose de la lumière du matin.', hint: 'Seulement au lever du soleil', when: (c) => c.time === 'dawn' },
+  { id: 'lily', page: 2, name: 'Feuille de nénuphar', color: '#5fc7a8', note: 'Elle a flotté jusqu’ici, toute ronde.', hint: 'Près de l’eau : la fontaine ou le petit pont', when: (c) => c.zone === 'fountain' || c.zone === 'bridge' },
+  { id: 'blossom', page: 2, name: 'Feuille de pommier en fleur', color: '#ffd1e6', note: 'Une feuille avec une fleur encore accrochée.', hint: 'Au verger', when: (c) => c.zone === 'orchard' },
+  { id: 'ancient', page: 2, name: 'Feuille ancienne', color: '#a08060', note: 'Elle a vu passer cent automnes.', hint: 'Aux niveaux 8 à 10', when: (c) => c.level >= 8 },
+  { id: 'goldbar', page: 2, name: 'Feuille d’or massif', color: '#ffb000', note: 'Lourde comme un lingot, elle ne s’envole jamais.', hint: 'Cachée dans un tapis doré', when: () => false },
+  { id: 'rainbow', page: 2, name: 'Feuille arc-en-ciel', color: '#ff7fae', note: 'Le papillon doré l’a laissée tomber.', hint: 'Parfois, en attrapant le papillon doré', when: () => false },
+  { id: 'crystal', page: 2, name: 'Feuille de cristal', color: '#bff3ff', note: 'Transparente, elle fait des arcs-en-ciel au soleil.', hint: 'Sous une méga feuille étoile', when: () => false },
 ];
 
 // -----------------------------------------------
@@ -117,6 +156,10 @@ export const TREASURES: Treasure[] = [
   { id: 'locket', name: 'Médaillon', icon: '📿', weight: 2, gold: 400, note: 'Il y a une minuscule photo dedans.', minLevel: 7 },
   { id: 'telescope', name: 'Longue-vue', icon: '🔭', weight: 1, gold: 600, note: 'Pour regarder les étoiles depuis le banc.', minLevel: 8 },
   { id: 'crown', name: 'Couronne de feuilles', icon: '👑', weight: 1, gold: 1000, note: 'La reine de l’automne l’a laissée là.', minLevel: 9 },
+  { id: 'goldenacorn', name: 'Gland d’or', icon: '🌰', weight: 2, gold: 1500, note: 'L’écureuil le plus riche du parc l’a perdu.', minLevel: 8 },
+  { id: 'pocketwatch', name: 'Montre à gousset', icon: '⏱️', weight: 2, gold: 1800, note: 'Elle fait encore tic-tac, tout doucement.', minLevel: 9 },
+  { id: 'bottle', name: 'Bouteille à message', icon: '🍾', weight: 1, gold: 2500, note: '« À qui trouvera ceci : bel automne ! »', minLevel: 10 },
+  { id: 'goldenegg', name: 'Œuf doré', icon: '🥚', weight: 1, gold: 3000, note: 'Personne ne sait quel oiseau l’a pondu.', minLevel: 10 },
 ];
 
 // -----------------------------------------------
@@ -155,7 +198,7 @@ export const DECO_CHANCE = 0.06;
 // LITTLE CREATURES
 // -----------------------------------------------
 
-export type CritterId = 'squirrel' | 'hedgehog' | 'robin' | 'ladybug' | 'cat' | 'snail' | 'fox' | 'firefly' | 'butterfly';
+export type CritterId = 'squirrel' | 'hedgehog' | 'robin' | 'ladybug' | 'cat' | 'snail' | 'fox' | 'firefly' | 'butterfly' | 'owl' | 'deer' | 'rabbit';
 
 export interface Critter {
   id: CritterId;
@@ -176,6 +219,9 @@ export const CRITTERS: Critter[] = [
   { id: 'fox', name: 'Renardeau', icon: '🦊', note: 'Il saute dans les tas de feuilles. Comme nous.', hint: 'Il passe parfois au crépuscule.' },
   { id: 'firefly', name: 'Luciole', icon: '✨', note: 'Une petite lumière dans la nuit.', hint: 'Elle danse la nuit au-dessus des feuilles.' },
   { id: 'butterfly', name: 'Papillon doré', icon: '🦋', note: 'Il ne tient pas en place. L’attraper fait briller la jauge dorée.', hint: 'Il traverse le parc en zigzag, très vite.' },
+  { id: 'owl', name: 'Chouette', icon: '🦉', note: 'Elle a cligné de l’œil, puis s’est envolée.', hint: 'Très rare, la nuit : elle ne reste qu’un instant.' },
+  { id: 'deer', name: 'Biche', icon: '🦌', note: 'Elle a bondi entre les arbres sans un bruit.', hint: 'Très rare, à l’aube ou au crépuscule : elle passe en courant.' },
+  { id: 'rabbit', name: 'Lapin blanc', icon: '🐇', note: 'Toujours pressé, comme celui du conte.', hint: 'Très rare, en journée : il file en zigzag.' },
 ];
 
 // -----------------------------------------------

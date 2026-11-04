@@ -181,6 +181,47 @@ export const WALL_DECOS: WallDeco[] = [
       colors: { k: '#5a4a3a', r: '#e8322a', o: '#f09a3c', y: '#ffd23f', v: '#8e5ad8' },
     },
   },
+  {
+    id: 'deco-herbarium-book',
+    name: 'Herbier relié',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['bbbbbbbbbb', 'bppppppppb', 'bpprrpgppb', 'bpprrrggpb', 'bppprgggpb', 'bppppkpppb', 'bpppkppppb', 'bbbbbbbbbb'],
+      colors: { b: '#7a3e2a', p: '#fff3d6', r: '#e8322a', g: '#ffd23f', k: '#8a5a2a' },
+    },
+  },
+  {
+    id: 'deco-rainbow-leaf',
+    name: 'Feuille arc-en-ciel encadrée',
+    price: 0,
+    reward: true,
+    animated: 'twinkle',
+    sprite: {
+      pixels: ['ffffffffff', 'fccccccccf', 'fccrrocccf', 'fcrooyyccf', 'fcoyygbccf', 'fccygbvccf', 'fcccbvkccf', 'fccccckccf', 'ffffffffff'],
+      colors: { f: '#d9a52a', c: '#fffaf0', r: '#ff5a5a', o: '#ffa64d', y: '#ffe14a', g: '#6fd17a', b: '#5ab4ff', v: '#a77bff', k: '#8a5a2a' },
+    },
+  },
+  {
+    id: 'deco-treasure-shelf',
+    name: 'Vitrine de trouvailles',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['wwwwwwwwwwww', 'wggggggggggw', 'wgyygrrgbbgw', 'wwwwwwwwwwww', 'wggggggggggw', 'wgoogpggyygw', 'wwwwwwwwwwww'],
+      colors: { w: '#8a5a3c', g: '#d8eef5', y: '#ffd23f', r: '#e04848', b: '#5ab4ff', o: '#c98a4a', p: '#ff7fae' },
+    },
+  },
+  {
+    id: 'deco-critter-portrait',
+    name: 'Portrait des petites bêtes',
+    price: 0,
+    reward: true,
+    sprite: {
+      pixels: ['ffffffffffff', 'fssssssssssf', 'fsoosssbbssf', 'fsooosbbbssf', 'fsoossbbbssf', 'fggggggggggf', 'fggggggggggf', 'ffffffffffff'],
+      colors: { f: '#b07a3e', s: '#cfe8ff', o: '#e8763a', b: '#8a6a4a', g: '#7cc26a' },
+    },
+  },
 ];
 
 export const WALL_DECO_SPOTS = 2;
