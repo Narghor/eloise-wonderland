@@ -6,14 +6,17 @@ import {
   playCoinLand, playDoorOpen, playRespinMiss, playTallyNote, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
   winPop, igniteCells,
   type WinLinesHandle, type WinPath,
+  keepScreenOn,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
+import { BONUS_DEFS, TREASURE_DOOR } from './bonusArt';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import {
   BET_LEVELS,
   CELLS,
   BONUS_MIN_X,
-  COIN_VALUES,
+  OPENING_COIN_VALUES,
+  RESPIN_COIN_VALUES,
   PAY_SCALE,
   COLS,
   DOOR,
@@ -53,13 +56,16 @@ const TENSION_MS = 2200;
 const STEP_MS = 900;
 const COIN_GAP_MS = 220;
 const LAST_DOOR_REEL = DOOR_REELS[DOOR_REELS.length - 1];
-const MIN_COIN = COIN_VALUES[0][0];
-const MAX_COIN = COIN_VALUES[COIN_VALUES.length - 1][0];
+const MIN_COIN = OPENING_COIN_VALUES[0][0];
+const MAX_COIN = RESPIN_COIN_VALUES[RESPIN_COIN_VALUES.length - 1][0];
+const MAX_OPENING_COIN = OPENING_COIN_VALUES[OPENING_COIN_VALUES.length - 1][0];
 
 export function renderBonusSlot(root: HTMLElement): () => void {
   armSoundUnlock();
   const timers = new Set<number>();
   let disposed = false;
+  /** Set while a bonus plays: lets the screen sleep again. */
+  let releaseScreen: (() => void) | null = null;
   const wait = (ms: number) =>
     new Promise<void>((resolve) => {
       const id = window.setTimeout(() => {
@@ -80,7 +86,11 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   );
   const jackpotsView = el('div', { class: 'bonus-jackpots' }, ...jackpotBoxes);
   const cellViews: HTMLElement[] = [];
-  for (let i = 0; i < CELLS; i++) cellViews.push(el('div', { class: 'bonus-cell' }, randomGlyph(i % COLS)));
+  for (let i = 0; i < CELLS; i++) {
+    const cell = el('div', { class: 'bonus-cell' });
+    paintSymbol(cell, randomSymbol(i % COLS));
+    cellViews.push(cell);
+  }
   const grid = el('div', { class: 'bonus-grid' }, ...cellViews);
   /** cells[col][row], the layout the fx kit expects. */
   const cells: HTMLElement[][] = Array.from({ length: COLS }, (_, c) => Array.from({ length: ROWS }, (_, r) => cellViews[r * COLS + c]));
@@ -127,6 +137,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   tapToSpin(machine, spinButton);
   const right = el('span', { class: 'bonus-top-right' }, balance, muteButton());
   root.replaceChildren(topBar('Machine à porte', right, BACK_CASINO), screen);
+  screen.insertAdjacentHTML('afterbegin', BONUS_DEFS);
 
   const level = () => BET_LEVELS[levelIndex];
 
@@ -249,7 +260,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     const stopLoop = playSpinLoop('door');
     const roll = window.setInterval(() => {
       cellViews.forEach((v, i) => {
-        if (v.classList.contains('bonus-rolling')) v.textContent = randomGlyph(i % COLS);
+        if (v.classList.contains('bonus-rolling')) paintSymbol(v, randomSymbol(i % COLS));
       });
     }, 70);
     timers.add(roll);
@@ -276,7 +287,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       cells[c].forEach((v, r) => {
         const symbol = result[c][r];
         v.className = `bonus-cell bonus-landed${symbol === DOOR ? ' bonus-door' : ''}`;
-        v.textContent = SYMBOLS[symbol].glyph;
+        paintSymbol(v, symbol);
       });
       if (tense) (hasDoor(result, c) ? playSuspenseHit : playSuspenseMiss)();
       if (DOOR_REELS.includes(c) && hasDoor(result, c)) doorsShown++;
@@ -292,7 +303,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     const banner = el(
       'div',
       { class: 'bonus-celebrate', role: 'dialog' },
-      el('div', { class: 'bonus-celebrate-door', text: '🚪' }),
+      el('div', { class: 'bonus-celebrate-door' }),
       el('div', { class: 'bonus-celebrate-text', text: 'BONUS !' }),
       el('div', { class: 'bonus-celebrate-sub', text: 'HOLD & SPIN' }),
       el('div', { text: `Chaque pièce qui tombe = des jetons pour toi !` }),
@@ -300,6 +311,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       el('div', { text: `Pièces de ${lv.bet * MIN_COIN} à ${lv.bet * MAX_COIN} jetons` }),
       el('div', { class: 'bonus-small-light', text: `Jackpots : ${JACKPOT_NAMES.slice(0, lv.jackpotTier + 1).join(', ')}` }),
     );
+    banner.querySelector('.bonus-celebrate-door')!.innerHTML = TREASURE_DOOR;
     document.body.append(banner);
     burst(banner, 30, 'confetti');
     await Promise.race([wait(3000), new Promise<void>((r) => banner.addEventListener('click', () => r(), { once: true }))]);
@@ -325,6 +337,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     if (disposed) return;
 
     screen.classList.add('bonus-in-feature');
+    releaseScreen = keepScreenOn();
     message.textContent = '';
     message.className = 'bonus-message';
     paintTotal(0);
@@ -439,10 +452,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     shake(machine, 3);
     burst(reelWindow, 40, 'coins');
     const ratio = Math.round(bonus.chips / lv.bet);
-    winPop(reelWindow, bonus.chips, { label: `Bonus · ×${ratio} ta mise`, durationMs: 2000 });
-    await wait(2000);
-    if (disposed) return;
-    await showBigWin(document.body, bonus.chips, lv.bet, 'BONUS TERMINÉ !');
+    // The tally just counted the coins: the celebration shows the total, it does not count it again.
+    await showBigWin(document.body, bonus.chips, lv.bet, 'BONUS TERMINÉ !', { counted: true });
     totalView.replaceChildren();
     message.textContent = `Bonus : ${bonus.chips.toLocaleString('fr-FR')} jetons (×${ratio} ta mise) !`;
     if (bonus.grand) {
@@ -461,6 +472,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     respinsView.replaceChildren();
     jackpotBoxes.forEach((box) => box.classList.remove('bonus-jp-hit'));
     screen.classList.remove('bonus-in-feature');
+    releaseScreen?.();
+    releaseScreen = null;
   }
 
   /** The coins light up one by one and pour into the total, each note a little higher. */
@@ -494,6 +507,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   refresh();
   return () => {
     disposed = true;
+    releaseScreen?.();
     lines?.clear();
     for (const id of timers) {
       window.clearTimeout(id);
@@ -510,10 +524,16 @@ function compact(n: number): string {
   return Math.floor(n).toLocaleString('fr-FR');
 }
 
-/** A random glyph for a spinning reel; doors only flash on the reels that carry them. */
-function randomGlyph(column: number): string {
+/** A random symbol for a spinning reel; doors only flash on the reels that carry them. */
+function randomSymbol(column: number): number {
   const count = DOOR_REELS.includes(column) ? SYMBOLS.length : DOOR;
-  return SYMBOLS[Math.floor(Math.random() * count)].glyph;
+  return Math.floor(Math.random() * count);
+}
+
+/** The door is drawn (SVG), the other symbols are emoji. */
+function paintSymbol(cell: HTMLElement, symbol: number): void {
+  if (symbol === DOOR) cell.innerHTML = TREASURE_DOOR;
+  else cell.textContent = SYMBOLS[symbol].glyph;
 }
 
 /** Two high symbols at the start of a line, or two doors out of three: worth a "so close". */
@@ -555,7 +575,7 @@ function rules(lv: BetLevel): HTMLElement[] {
       'La porte 🚪',
       'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 106, quelle que soit la mise).',
       `Tu commences avec ${START_COINS} pièces et ${RESPINS} relances. Chaque nouvelle pièce reste bloquée et remet les relances à ${RESPINS}.`,
-      `Une pièce vaut de ${MIN_COIN} à ${MAX_COIN} × ta mise (de ${MIN_COIN * lv.bet} à ${MAX_COIN * lv.bet} jetons à cette mise).`,
+      `Les ${START_COINS} pièces de départ valent de ${MIN_COIN} à ${MAX_OPENING_COIN} × ta mise. Celles qui tombent pendant les relances valent bien plus, jusqu’à ${MAX_COIN} × ta mise, et ce sont elles qui portent les jackpots.`,
       `Un bonus rapporte toujours au moins ${BONUS_MIN_X} × ta mise, souvent bien plus : plus tu mises, plus il paie.`,
     ),
     rulesBlock(

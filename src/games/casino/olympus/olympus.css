@@ -103,7 +103,7 @@
   z-index: 1;
   padding: 2px;
   background: radial-gradient(circle at 50% 55%, #6a3aa3, #24104a 75%);
-  box-shadow: inset 0 0 0 2px #f2c230, 0 0 8px 2px rgb(255 205 70 / 0.55);
+  box-shadow: 0 0 0 2px #ffe27a, 0 0 10px 3px #f2c230;
   animation: oly-glow 1.8s ease-in-out infinite alternate;
 }
 /* The breathing halo: a fixed shadow whose opacity moves (cheap), instead of an animated shadow. */
@@ -116,6 +116,20 @@
   box-shadow: 0 0 14px 5px rgb(255 205 70 / 0.85);
   animation: oly-fade 1.8s ease-in-out infinite alternate;
 }
+/* Slow golden rays turning behind the temple, masked to a soft disc. */
+.oly-cell.oly-scatter::before {
+  content: '';
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: repeating-conic-gradient(rgb(255 220 90 / 0.75) 0 12deg, transparent 12deg 30deg);
+  -webkit-mask: radial-gradient(circle, #000 35%, transparent 70%);
+  mask: radial-gradient(circle, #000 35%, transparent 70%);
+  animation: oly-rays 6s linear infinite;
+}
+@keyframes oly-rays { to { transform: rotate(360deg); } }
 .oly-art { width: 100%; height: 100%; display: block; }
 .oly-inline-art { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: middle; }
 .oly-inline-art .oly-temple-art { background: #24104a; border-radius: 4px; box-shadow: inset 0 0 0 1px #f2c230; }
@@ -306,5 +320,5 @@
 @keyframes oly-shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .oly-flooded::before, .oly-scatter, .oly-scatter::after, .oly-tension { animation: none; }
+  .oly-flooded::before, .oly-scatter, .oly-scatter::before, .oly-scatter::after, .oly-tension { animation: none; }
 }

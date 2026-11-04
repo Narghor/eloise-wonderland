@@ -104,6 +104,12 @@
   to { box-shadow: 0 0 18px #fff6a8; }
 }
 
+.leaves-golden { display: flex; align-items: center; gap: 10px; }
+.leaves-golden-bar { flex: 1; height: 8px; overflow: hidden; border-radius: 999px; background: rgb(0 0 0 / 0.08); }
+.leaves-golden-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffe680, #ffb300); transition: width 0.3s ease-out; }
+.leaves-golden-text { min-width: 9em; font-weight: 700; color: #b07a00; text-align: right; }
+.leaves-banner.is-gold { color: #b07a00; background: #fff6cc; animation: leaves-shine 0.8s ease-in-out infinite alternate; }
+
 .leaves-basket {
   display: flex;
   align-items: center;
@@ -317,6 +323,13 @@
   animation: leaves-run 5s linear forwards;
 }
 
+.leaves-thief { display: flex; align-items: center; animation: leaves-critter-in 0.2s ease-out; }
+.leaves-thief.is-right .leaves-thief-body { transform: scaleX(-1); }
+.leaves-thief-loot { font-size: 1.1rem; margin-left: -0.3em; }
+.leaves-thief.is-right .leaves-thief-loot { order: -1; margin: 0 -0.3em 0 0; }
+.leaves-butterfly { font-size: 1.5rem; animation: leaves-flutter 0.18s ease-in-out infinite alternate; }
+@keyframes leaves-flutter { to { transform: scaleX(0.6); } }
+
 .leaves-critter.is-firefly {
   font-size: 1.2rem;
   animation: leaves-critter-in 0.4s ease-out, leaves-firefly 3s ease-in-out infinite alternate;
@@ -364,7 +377,6 @@
 
 .leaves-banner.is-on { opacity: 1; }
 .leaves-banner.is-clean { color: #3f9a3a; animation: leaves-shine 1.2s ease-in-out infinite alternate; }
-.leaves-banner.is-gold { color: #b07a00; background: #fff6cc; animation: leaves-shine 0.8s ease-in-out infinite alternate; }
 
 .leaves-collection-tabs {
   display: flex;

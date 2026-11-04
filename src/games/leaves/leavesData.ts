@@ -12,8 +12,8 @@ export interface Zone {
   leaves: number;
   /** Leaf colours of this place's trees. */
   palette: string[];
-  /** Share of wet leaves (two passes needed). */
-  wet: number;
+  /** The snail shows up here (damp places). */
+  snails: boolean;
   /** Gold leaves for each level cleared. */
   levelReward: number;
   /** House decoration won when the place is spotless (last level). */
@@ -21,12 +21,12 @@ export interface Zone {
 }
 
 export const ZONES: Zone[] = [
-  { id: 'path', name: 'L’allée des ginkgos', scene: 'path', leaves: 650, palette: ['#ffd23f', '#f2c94c', '#e8b23a', '#f7dc6f', '#d9a22a'], wet: 0, levelReward: 80, spotlessDeco: 'deco-ginkgo-frame' },
-  { id: 'deck', name: 'La terrasse aux érables', scene: 'deck', leaves: 800, palette: ['#e8322a', '#c9402e', '#e06a3a', '#f09a3c', '#a83a2a'], wet: 0.05, levelReward: 110, spotlessDeco: 'deco-maple-wreath' },
-  { id: 'orchard', name: 'Le verger', scene: 'orchard', leaves: 950, palette: ['#e8a33a', '#d9772b', '#c4532a', '#f2c94c', '#9aa83a'], wet: 0.08, levelReward: 150, spotlessDeco: 'deco-apple-basket' },
-  { id: 'fountain', name: 'La fontaine', scene: 'fountain', leaves: 1100, palette: ['#d94f3a', '#e8763a', '#b8402e', '#f0a03c', '#ffd23f'], wet: 0.18, levelReward: 200, spotlessDeco: 'deco-fountain-print' },
-  { id: 'bench', name: 'Le banc des amoureux', scene: 'bench', leaves: 1250, palette: ['#e8b23a', '#d98a2c', '#b86a2a', '#f4d36a', '#c9402e'], wet: 0.1, levelReward: 260, spotlessDeco: 'deco-bench-heart' },
-  { id: 'bridge', name: 'Le petit pont', scene: 'bridge', leaves: 1400, palette: ['#c9402e', '#e06a3a', '#f09a3c', '#a83a2a', '#8e5ad8'], wet: 0.22, levelReward: 340, spotlessDeco: 'deco-autumn-garland' },
+  { id: 'path', name: 'L’allée des ginkgos', scene: 'path', leaves: 650, palette: ['#ffd23f', '#f2c94c', '#e8b23a', '#f7dc6f', '#d9a22a'], snails: false, levelReward: 80, spotlessDeco: 'deco-ginkgo-frame' },
+  { id: 'deck', name: 'La terrasse aux érables', scene: 'deck', leaves: 800, palette: ['#e8322a', '#c9402e', '#e06a3a', '#f09a3c', '#a83a2a'], snails: false, levelReward: 110, spotlessDeco: 'deco-maple-wreath' },
+  { id: 'orchard', name: 'Le verger', scene: 'orchard', leaves: 950, palette: ['#e8a33a', '#d9772b', '#c4532a', '#f2c94c', '#9aa83a'], snails: false, levelReward: 150, spotlessDeco: 'deco-apple-basket' },
+  { id: 'fountain', name: 'La fontaine', scene: 'fountain', leaves: 1100, palette: ['#d94f3a', '#e8763a', '#b8402e', '#f0a03c', '#ffd23f'], snails: true, levelReward: 200, spotlessDeco: 'deco-fountain-print' },
+  { id: 'bench', name: 'Le banc des amoureux', scene: 'bench', leaves: 1250, palette: ['#e8b23a', '#d98a2c', '#b86a2a', '#f4d36a', '#c9402e'], snails: true, levelReward: 260, spotlessDeco: 'deco-bench-heart' },
+  { id: 'bridge', name: 'Le petit pont', scene: 'bridge', leaves: 1400, palette: ['#c9402e', '#e06a3a', '#f09a3c', '#a83a2a', '#8e5ad8'], snails: true, levelReward: 340, spotlessDeco: 'deco-autumn-garland' },
 ];
 
 /** Levels of a place; the last one makes it spotless. */
@@ -54,6 +54,22 @@ export const RARE_CHANCE = 1 / 180;
 /** Golden leaves: rare, worth a lot, not for the herbarium. */
 export const GOLDEN_CHANCE = 1 / 70;
 export const GOLDEN_VALUE = 15;
+/**
+ * Golden leaves that fill the golden gauge (full, the next carpet falls all golden): this share of a carpet,
+ * so the gauge takes the same number of carpets in a small place and a big one. The Clover speeds it up.
+ */
+export const GOLDEN_GAUGE = (carpet: number) => Math.max(10, Math.round(carpet / 14));
+/** The star leaf, hidden under some carpets: finding it fills this share of the golden gauge. */
+export const STAR_CHANCE = 0.5;
+export const STAR_GAUGE_SHARE = 0.25;
+/** The mega star, rarer: finding it fills the golden gauge at once. */
+export const MEGA_STAR_CHANCE = 0.12;
+/** Chance a squirrel snatches a treasure just found; caught in time, it pays the treasure twice. */
+export const THIEF_CHANCE = 0.25;
+export const THIEF_MS = 1800;
+/** The golden butterfly zigzags across fast; touching it fills this share of the golden gauge. */
+export const BUTTERFLY_MS = 3000;
+export const BUTTERFLY_GAUGE_SHARE = 0.15;
 
 export const RARE_LEAVES: RareLeaf[] = [
   { id: 'maple', name: 'Érable rouge', color: '#ff2a3a', note: 'Rouge comme une joue qui a froid.' },
@@ -139,7 +155,7 @@ export const DECO_CHANCE = 0.06;
 // LITTLE CREATURES
 // -----------------------------------------------
 
-export type CritterId = 'squirrel' | 'hedgehog' | 'robin' | 'ladybug' | 'cat' | 'snail' | 'fox' | 'firefly';
+export type CritterId = 'squirrel' | 'hedgehog' | 'robin' | 'ladybug' | 'cat' | 'snail' | 'fox' | 'firefly' | 'butterfly';
 
 export interface Critter {
   id: CritterId;
@@ -155,10 +171,11 @@ export const CRITTERS: Critter[] = [
   { id: 'hedgehog', name: 'Hérisson', icon: '🦔', note: 'Il dormait bien au chaud sous les feuilles.', hint: 'Il dort sous un gros tas de feuilles.' },
   { id: 'robin', name: 'Rouge-gorge', icon: '🐦', note: 'Il vient voir s’il y a des vers.', hint: 'Il se pose un instant pour picorer.' },
   { id: 'ladybug', name: 'Coccinelle', icon: '🐞', note: 'Sept points. Elle porte bonheur.', hint: 'Elle se promène sur les feuilles.' },
-  { id: 'snail', name: 'Escargot', icon: '🐌', note: 'Il prend son temps. Lui aussi.', hint: 'Il sort quand le sol est mouillé.' },
+  { id: 'snail', name: 'Escargot', icon: '🐌', note: 'Il prend son temps. Lui aussi.', hint: 'Il vit près de l’eau et des endroits humides.' },
   { id: 'cat', name: 'Chat du voisin', icon: '🐈', note: 'Il vient toujours fêter les grands ménages.', hint: 'Il vient quand un lieu monte de niveau.' },
   { id: 'fox', name: 'Renardeau', icon: '🦊', note: 'Il saute dans les tas de feuilles. Comme nous.', hint: 'Il passe parfois au crépuscule.' },
   { id: 'firefly', name: 'Luciole', icon: '✨', note: 'Une petite lumière dans la nuit.', hint: 'Elle danse la nuit au-dessus des feuilles.' },
+  { id: 'butterfly', name: 'Papillon doré', icon: '🦋', note: 'Il ne tient pas en place. L’attraper fait briller la jauge dorée.', hint: 'Il traverse le parc en zigzag, très vite.' },
 ];
 
 // -----------------------------------------------
@@ -203,5 +220,3 @@ export const FALL_RATE = 0.6;
 /** Gold leaves for one coin, and the coins a day can give. */
 export const GOLD_PER_COIN = 80;
 export const DAILY_COINS = 40;
-/** The golden wind: rarely, for a short while, leaves are worth double. */
-export const GOLDEN_WIND_SECONDS = 20;

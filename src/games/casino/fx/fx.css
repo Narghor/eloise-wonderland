@@ -35,31 +35,34 @@
   margin: -4.5px 0 0 -4.5px;
   border-radius: 50%;
   background: #6b4a12;
-  box-shadow: none;
 }
+/* The lit states are layers whose opacity alone moves: the phone blends them without repainting the frame. */
+.fx-bulb::before,
+.fx-bulb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: 0;
+  will-change: opacity;
+}
+.fx-bulb::after { background: #ffe066; box-shadow: 0 0 8px 2px #ffd23f; }
 
 /* Photosensitivity: every bulb fades smoothly, never faster than ~1 cycle per 0.75 s. */
-.fx-marquee-idle .fx-bulb { animation: fx-bulb 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.8s); }
-.fx-marquee-spin .fx-bulb { animation: fx-bulb 1.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.4s); }
-.fx-marquee-win .fx-bulb { animation: fx-bulb-all 1.6s ease-in-out infinite; }
-.fx-marquee-big .fx-bulb { animation: fx-bulb-rainbow 3s ease-in-out infinite; animation-delay: calc(var(--i) * -1s); }
+.fx-marquee-idle .fx-bulb::after { animation: fx-bulb-lit 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.8s); }
+.fx-marquee-spin .fx-bulb::after { animation: fx-bulb-lit 1.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.4s); }
 
-@keyframes fx-bulb {
-  0%, 100% { background: #6b4a12; box-shadow: none; }
-  33% { background: #ffe066; box-shadow: 0 0 8px 2px #ffd23f; }
-  66% { background: #6b4a12; box-shadow: none; }
-}
+.fx-marquee-win .fx-bulb { background: #c9a23a; box-shadow: 0 0 4px 1px #ffd23f; }
+.fx-marquee-win .fx-bulb::after { background: #fff6c2; box-shadow: 0 0 10px 3px #ffd23f; animation: fx-bulb-pulse 1.6s ease-in-out infinite; }
 
-@keyframes fx-bulb-all {
-  0%, 100% { background: #c9a23a; box-shadow: 0 0 4px 1px #ffd23f; }
-  50% { background: #fff6c2; box-shadow: 0 0 10px 3px #ffd23f; }
-}
+/* Rainbow: pink underneath, yellow then cyan layers taking turns. */
+.fx-marquee-big .fx-bulb { background: #ff8ac4; box-shadow: 0 0 8px 2px #ff4fa3; }
+.fx-marquee-big .fx-bulb::before { background: #ffe066; box-shadow: 0 0 8px 2px #ffd23f; animation: fx-bulb-lit 3s ease-in-out infinite; animation-delay: calc(var(--i) * -1s); }
+.fx-marquee-big .fx-bulb::after { background: #8aeeff; box-shadow: 0 0 8px 2px #3fe0ff; animation: fx-bulb-second-third 3s ease-in-out infinite; animation-delay: calc(var(--i) * -1s); }
 
-@keyframes fx-bulb-rainbow {
-  0%, 100% { background: #ff8ac4; box-shadow: 0 0 8px 2px #ff4fa3; }
-  33% { background: #ffe066; box-shadow: 0 0 8px 2px #ffd23f; }
-  66% { background: #8aeeff; box-shadow: 0 0 8px 2px #3fe0ff; }
-}
+@keyframes fx-bulb-lit { 0%, 66%, 100% { opacity: 0; } 33% { opacity: 1; } }
+@keyframes fx-bulb-pulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes fx-bulb-second-third { 0%, 33%, 100% { opacity: 0; } 66% { opacity: 1; } }
 
 /* ---- win lines ---- */
 .fx-lines-host { position: relative; }
@@ -278,7 +281,7 @@
 .fx-rules ul { margin: 0; padding-left: 18px; font-size: 0.9rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fx-bigwin-halo, .fx-cell-win, .fx-marquee .fx-bulb { animation: none; }
+  .fx-bigwin-halo, .fx-cell-win, .fx-marquee .fx-bulb::before, .fx-marquee .fx-bulb::after { animation: none; }
 }
 
 /* TEST-BUTTONS: temporary bar, remove with fx/testMode.ts */

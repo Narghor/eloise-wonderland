@@ -4,7 +4,9 @@ import { bet, chips, pay } from '../chips';
 import { Round, Shoe, isBlackjack, totalLabel, type Card, type HandResult } from './blackjackLogic';
 import { openTips } from './blackjackTips';
 
-const CHIP_VALUES = [10, 25, 50, 100, 1000];
+const CHIP_VALUES = [10, 25, 50, 100, 1000, 10000];
+/** "10k" fits on a chip, "10000" does not. */
+const chipLabel = (value: number): string => (value >= 10000 ? `${value / 1000}k` : String(value));
 const RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
 const SUITS: Record<Card['suit'], string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const OUTCOME_TEXT: Record<HandResult['outcome'], string> = {
@@ -13,9 +15,12 @@ const OUTCOME_TEXT: Record<HandResult['outcome'], string> = {
   push: 'Égalité',
   lose: 'Perdu',
 };
-/** Pause before each dealer card; the second one is longer (suspense). */
-const DEALER_STEP_MS = 650;
+/** Pause before each dealer card once the previous one is face up; the second one waits longer (suspense). */
+const DEALER_STEP_MS = 250;
 const DEALER_SUSPENSE_MS = 1100;
+/** Time for a dealt card to land face up (matches bj-slide + bj-turn, and their suspense version). */
+const CARD_FACE_MS = 750;
+const SUSPENSE_FACE_MS = 1300;
 const BANNER_DELAY_MS = 450;
 
 const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -29,6 +34,9 @@ export function renderBlackjack(root: HTMLElement): () => void {
   /** Dealer cards currently revealed (the reveal runs after the round is resolved). */
   let dealerShown = 0;
   let settled = true;
+  /** New cards are still flying in: totals and outcomes wait, or they would tell the result first. */
+  let landing = false;
+  let dealerTurn = false;
   let timer = 0;
   /** Cards already on screen, per row key: only newer ones get the deal animation. */
   const shown = new Map<string, number>();
@@ -83,6 +91,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
     round = new Round(shoe, amount);
     dealerShown = 1;
     settled = false;
+    dealerTurn = false;
     afterAction();
   }
 
@@ -93,9 +102,41 @@ export function renderBlackjack(root: HTMLElement): () => void {
   }
 
   function afterAction(): void {
-    render();
-    if (round?.phase === 'over') revealDealer();
+    land(CARD_FACE_MS, () => {
+      if (round?.phase === 'over') {
+        dealerTurn = true;
+        render();
+        revealDealer();
+      } else render();
+    });
   }
+
+  /** Renders the new cards, then waits for them to be face up before `then`. */
+  function land(ms: number, then: () => void): void {
+    if (reducedMotion() || !hasNewCards()) {
+      render();
+      then();
+      return;
+    }
+    landing = true;
+    render();
+    timer = window.setTimeout(() => {
+      landing = false;
+      then();
+    }, ms);
+  }
+
+  function hasNewCards(): boolean {
+    if (!round) return false;
+    return dealerShown > (shown.get('dealer') ?? 0) || round.hands.some((h, i) => h.cards.length > (shown.get(`hand${i}`) ?? 0));
+  }
+
+  /** The cards whose value can be shown: the ones still flying in are left out. */
+  function visible(key: string, cards: Card[]): Card[] {
+    return landing ? cards.slice(0, shown.get(key) ?? 0) : cards;
+  }
+
+  const label = (cards: Card[]): string => (cards.length > 0 ? totalLabel(cards) : '…');
 
   /** Shows the dealer's drawn cards one by one, then pays and shows the banner. */
   function revealDealer(): void {
@@ -107,11 +148,14 @@ export function renderBlackjack(root: HTMLElement): () => void {
       return;
     }
     if (dealerShown < r.dealer.length) {
+      const suspense = dealerShown === 1;
       timer = window.setTimeout(() => {
         dealerShown++;
-        render();
-        revealDealer();
-      }, dealerShown === 1 ? DEALER_SUSPENSE_MS : DEALER_STEP_MS);
+        land(suspense ? SUSPENSE_FACE_MS : CARD_FACE_MS, () => {
+          render();
+          revealDealer();
+        });
+      }, suspense ? DEALER_SUSPENSE_MS : DEALER_STEP_MS);
       return;
     }
     timer = window.setTimeout(settle, BANNER_DELAY_MS);
@@ -141,7 +185,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
       el(
         'section',
         { class: 'bj-zone' },
-        el('h2', { class: 'bj-label', text: `Croupier · ${totalLabel(dealerCards)}` }),
+        el('h2', { class: 'bj-label', text: `Croupier · ${label(visible('dealer', dealerCards))}` }),
         row('dealer', dealerCards, 1),
       ),
     );
@@ -149,12 +193,13 @@ export function renderBlackjack(root: HTMLElement): () => void {
     r.hands.forEach((h, i) => {
       const active = r.phase === 'player' && i === r.active && r.hands.length > 1;
       const result = settled ? r.results[i] : undefined;
-      const bj = isBlackjack(h.cards) && !h.fromSplit;
+      const seen = visible(`hand${i}`, h.cards);
+      const bj = isBlackjack(seen) && !h.fromSplit;
       hands.append(
         el(
           'section',
           { class: `bj-zone${active ? ' bj-active' : ''}` },
-          el('h2', { class: 'bj-label', text: `${r.hands.length > 1 ? `Main ${i + 1}` : 'Toi'} · ${bj ? 'Blackjack' : totalLabel(h.cards)} · mise ${h.stake}` }),
+          el('h2', { class: 'bj-label', text: `${r.hands.length > 1 ? `Main ${i + 1}` : 'Toi'} · ${bj ? 'Blackjack' : label(seen)} · mise ${h.stake}` }),
           row(`hand${i}`, h.cards),
           result ? el('p', { class: `bj-result bj-${result.outcome}`, text: resultText(result) }) : '',
         ),
@@ -162,16 +207,18 @@ export function renderBlackjack(root: HTMLElement): () => void {
     });
     table.append(hands);
 
-    if (r.phase === 'player') {
+    if (r.phase === 'player' || (landing && !dealerTurn)) {
+      // While a card lands the buttons stay, greyed: their disappearing would give the outcome away.
+      const playing = r.phase === 'player' && !landing;
       const h = r.hand;
       table.append(
         el(
           'div',
           { class: 'button-row bj-actions' },
-          button('Carte', () => act((x) => x.hit())),
-          button('Rester', () => act((x) => x.stand())),
-          button('Doubler', () => act((x) => bet(h.stake) && x.double()), r.canDouble() && chips() >= h.stake, true),
-          button('Séparer', () => act((x) => bet(h.stake) && x.split()), r.canSplit() && chips() >= h.stake, true),
+          button('Carte', () => act((x) => x.hit()), playing),
+          button('Rester', () => act((x) => x.stand()), playing),
+          button('Doubler', () => act((x) => bet(h.stake) && x.double()), playing && r.canDouble() && chips() >= h.stake, true),
+          button('Séparer', () => act((x) => bet(h.stake) && x.split()), playing && r.canSplit() && chips() >= h.stake, true),
         ),
       );
     } else if (!settled) {
@@ -226,7 +273,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
         'div',
         { class: 'bj-chips' },
         ...CHIP_VALUES.map((v) => {
-          const b = el('button', { class: `bj-chip bj-chip-${v}`, type: 'button', text: String(v) });
+          const b = el('button', { class: `bj-chip bj-chip-${v}`, type: 'button', text: chipLabel(v), 'aria-label': `${v} jetons` });
           b.disabled = pending + v > left;
           b.addEventListener('click', () => {
             pending += v;

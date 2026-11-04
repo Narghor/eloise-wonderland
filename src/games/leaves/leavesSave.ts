@@ -18,6 +18,19 @@ export interface ZoneState {
   carpets: number;
   /** Ornaments bought for this place. */
   ornaments: string[];
+  /** The carpet on the ground is a golden one. */
+  golden: boolean;
+  /** What is still buried under this carpet; null when unknown (a save from before it was kept). */
+  hidden: BuriedThing[] | null;
+}
+
+/** Something buried under the leaves, kept so coming back does not bury a fresh set. */
+export interface BuriedThing {
+  x: number;
+  y: number;
+  kind: 'treasure' | 'deco' | 'hedgehog' | 'star' | 'megastar';
+  /** Treasure or decoration id. */
+  id?: string;
 }
 
 export interface LeavesSave {
@@ -36,6 +49,10 @@ export interface LeavesSave {
   coinsTaken: number;
   /** Place shown last. */
   zone: string;
+  /** Golden leaves picked toward the next golden carpet. */
+  goldenGauge: number;
+  /** The gauge is full: the next carpet laid anywhere is golden. */
+  goldenNext: boolean;
 }
 
 export function loadLeaves(): LeavesSave {
@@ -58,6 +75,8 @@ export function loadLeaves(): LeavesSave {
       replay: isCount(s.replay) && s.replay <= cleared ? s.replay : 0,
       carpets: isCount(s.carpets) ? s.carpets : 0,
       ornaments: Array.isArray(s.ornaments) ? s.ornaments.filter((id): id is string => ORNAMENTS.some((o) => o.id === id)) : [],
+      golden: s.golden === true,
+      hidden: Array.isArray(s.hidden) ? s.hidden.map(rec).filter(isBuried).map((b) => ({ x: b.x, y: b.y, kind: b.kind, ...(typeof b.id === 'string' ? { id: b.id } : {}) })) : null,
     };
   }
   return {
@@ -73,6 +92,8 @@ export function loadLeaves(): LeavesSave {
     coinsDay: typeof data.coinsDay === 'string' ? data.coinsDay : '',
     coinsTaken: isCount(data.coinsTaken) ? data.coinsTaken : 0,
     zone: ZONES.some((z) => z.id === data.zone) ? (data.zone as string) : ZONES[0].id,
+    goldenGauge: isCount(data.goldenGauge) ? data.goldenGauge : 0,
+    goldenNext: data.goldenNext === true,
   };
 }
 
@@ -88,6 +109,10 @@ function counts(value: unknown, ids: string[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const [id, n] of Object.entries(rec(value))) if (ids.includes(id) && isCount(n) && n > 0) result[id] = n;
   return result;
+}
+
+function isBuried(b: Record<string, unknown>): b is Record<string, unknown> & BuriedThing {
+  return typeof b.x === 'number' && typeof b.y === 'number' && (b.kind === 'treasure' || b.kind === 'deco' || b.kind === 'hedgehog' || b.kind === 'star' || b.kind === 'megastar');
 }
 
 function isCount(value: unknown): value is number {

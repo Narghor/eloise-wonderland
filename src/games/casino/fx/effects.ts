@@ -19,6 +19,32 @@ export const BUZZ = {
   jackpot: [300, 100, 300, 100, 600],
 };
 
+/**
+ * Keeps the screen awake (Screen Wake Lock) until the returned function is called,
+ * for a bonus that plays on its own. Does nothing where the browser does not support it.
+ */
+export function keepScreenOn(): () => void {
+  let lock: WakeLockSentinel | null = null;
+  let active = true;
+  const request = (): void => {
+    if (!active || document.hidden || !('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then((l) => {
+      if (active) lock = l;
+      else void l.release();
+    }).catch(() => {});
+  };
+  // The browser drops the lock when the page is hidden: take it again on return.
+  const onVisibility = (): void => request();
+  document.addEventListener('visibilitychange', onVisibility);
+  request();
+  return () => {
+    active = false;
+    document.removeEventListener('visibilitychange', onVisibility);
+    void lock?.release();
+    lock = null;
+  };
+}
+
 /** Buzzes the phone where allowed (Android); does nothing elsewhere. */
 export function buzz(pattern: number[]): void {
   navigator.vibrate?.(pattern);
@@ -334,10 +360,16 @@ export function countUp(target: HTMLElement, to: number, ms: number, format: (n:
 /**
  * Full-screen big win celebration over `host`: tiered title, counter climbing to `amount`,
  * coins and fanfare. A tap skips the count, a second tap (or a few seconds) closes it.
- * `title` overrides the tier title (e.g. "JACKPOT !"); `themeClass` lets a machine restyle it.
+ * `title` overrides the tier title (e.g. "JACKPOT !"); `themeClass` lets a machine restyle it;
+ * `counted` shows the amount at once, for a win the player just watched being counted.
  * Resolves once closed.
  */
-export function showBigWin(host: HTMLElement, amount: number, stake: number, title?: string, themeClass = ''): Promise<void> {
+export interface BigWinOptions {
+  themeClass?: string;
+  counted?: boolean;
+}
+
+export function showBigWin(host: HTMLElement, amount: number, stake: number, title?: string, { themeClass = '', counted: alreadyCounted = false }: BigWinOptions = {}): Promise<void> {
   const tier = Math.max(1, winTier(amount, stake)) as 1 | 2 | 3;
   const value = el('strong', { class: 'fx-bigwin-amount', text: '0' });
   const overlay = el(
@@ -369,10 +401,15 @@ export function showBigWin(host: HTMLElement, amount: number, stake: number, tit
         resolve();
       }, 250);
     };
-    const skip = countUp(value, amount, 1500 + tier * 800, (n) => n.toLocaleString('fr-FR'), () => {
+    const done = (): void => {
       counted = true;
       closeTimer = window.setTimeout(close, 2500);
-    });
+    };
+    let skip = (): void => {};
+    if (alreadyCounted) {
+      value.textContent = amount.toLocaleString('fr-FR');
+      done();
+    } else skip = countUp(value, amount, 1500 + tier * 800, (n) => n.toLocaleString('fr-FR'), done);
     overlay.addEventListener('click', () => (counted ? close() : skip()));
   });
 }

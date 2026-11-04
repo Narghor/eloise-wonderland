@@ -60,8 +60,14 @@ export const SYMBOLS: SymbolDef[] = [
 export const DOOR = SYMBOLS.length - 1;
 /** Reels (0-based) that can show a door; one door on each triggers the bonus. */
 export const DOOR_REELS = [0, 2, 4];
-export const DOOR_WEIGHT = 8;
+/** Weight a door used to have in each cell: kept as the source of the reel's door chance below. */
+const DOOR_WEIGHT = 8;
 const BASE_WEIGHT = SYMBOLS.reduce((sum, s) => sum + s.weight, 0);
+/**
+ * A door reel shows at most one door (two doors on a reel counted once, which looked like a cheat).
+ * Its chance of showing one is the old chance of showing at least one, so the bonus is exactly as frequent.
+ */
+export const DOOR_REEL_CHANCE = 1 - (BASE_WEIGHT / (BASE_WEIGHT + DOOR_WEIGHT)) ** ROWS;
 
 /** Row index per column, for each of the 10 lines. */
 export const LINES: number[][] = [
@@ -88,22 +94,25 @@ export interface LineWin {
   mult: number;
 }
 
-function drawSymbol(rng: Rng, column: number): number {
-  const doorWeight = DOOR_REELS.includes(column) ? DOOR_WEIGHT : 0;
-  let roll = rng() * (BASE_WEIGHT + doorWeight);
+function drawSymbol(rng: Rng): number {
+  let roll = rng() * BASE_WEIGHT;
   for (let i = 0; i < DOOR; i++) {
     roll -= SYMBOLS[i].weight;
     if (roll < 0) return i;
   }
-  return DOOR;
+  return DOOR - 1;
 }
 
 export function spinGrid(rng: Rng, force?: BonusForce): Grid { // TEST-BUTTONS
   const grid: Grid = [];
   for (let c = 0; c < COLS; c++) {
     const column: number[] = [];
-    for (let r = 0; r < ROWS; r++) column.push(drawSymbol(rng, c));
-    if (force !== undefined && DOOR_REELS.includes(c)) column[1] = DOOR; // TEST-BUTTONS
+    for (let r = 0; r < ROWS; r++) column.push(drawSymbol(rng));
+    if (DOOR_REELS.includes(c) && rng() < DOOR_REEL_CHANCE) column[Math.floor(rng() * ROWS)] = DOOR;
+    if (force !== undefined && DOOR_REELS.includes(c)) { // TEST-BUTTONS
+      for (let r = 0; r < ROWS; r++) if (column[r] === DOOR) column[r] = drawSymbol(rng); // TEST-BUTTONS
+      column[1] = DOOR; // TEST-BUTTONS
+    } // TEST-BUTTONS
     grid.push(column);
   }
   return grid;
@@ -156,11 +165,13 @@ export const JACKPOT_NAMES = ['Mini', 'Minor', 'Major', 'Grand'];
 export const JACKPOT_MULTS = [12, 55, 275];
 /** Each spin at a bet level grows that level's Minor and Major by this many bets (the Mini stays fixed). */
 export const JACKPOT_GROWTH = [0, 0.015, 0.03];
-const JACKPOT_WEIGHTS = [3, 0.8, 0.2];
-
-export const COIN_VALUES: [number, number][] = [
-  [4, 30], [5, 26], [8, 16], [10, 12], [15, 7], [40, 6], [80, 3],
-];
+/**
+ * The opening coins are small; the coins landing on a respin carry the big values and every jackpot,
+ * so a bonus builds up as it goes. Weights tuned by simulation: same average bonus as one shared table.
+ */
+export const OPENING_COIN_VALUES: [number, number][] = [[4, 30], [5, 26], [8, 16], [10, 12], [15, 7]];
+export const RESPIN_COIN_VALUES: [number, number][] = [[8, 16], [10, 12], [15, 7], [40, 16], [80, 8]];
+const RESPIN_JACKPOT_WEIGHTS = [7.5, 2.8, 0.7];
 
 export type Coin = { kind: 'value'; mult: number } | { kind: 'jackpot'; tier: number };
 
@@ -181,11 +192,12 @@ export interface BonusResult {
   grand: boolean;
 }
 
-function drawCoin(rng: Rng, jackpotTier: number): Coin {
-  const jackpots = JACKPOT_WEIGHTS.slice(0, Math.min(jackpotTier + 1, 3));
-  const total = COIN_VALUES.reduce((s, [, w]) => s + w, 0) + jackpots.reduce((s, w) => s + w, 0);
+function drawCoin(rng: Rng, jackpotTier: number, opening: boolean): Coin {
+  const values = opening ? OPENING_COIN_VALUES : RESPIN_COIN_VALUES;
+  const jackpots = opening ? [] : RESPIN_JACKPOT_WEIGHTS.slice(0, Math.min(jackpotTier + 1, 3));
+  const total = values.reduce((s, [, w]) => s + w, 0) + jackpots.reduce((s, w) => s + w, 0);
   let roll = rng() * total;
-  for (const [mult, w] of COIN_VALUES) {
+  for (const [mult, w] of values) {
     roll -= w;
     if (roll < 0) return { kind: 'value', mult };
   }
@@ -214,9 +226,9 @@ export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpot
     [order[i], order[j]] = [order[j], order[i]];
   }
   const first = order.slice(0, START_COINS);
-  for (const i of first) cells[i] = drawCoin(rng, level.jackpotTier);
+  for (const i of first) cells[i] = drawCoin(rng, level.jackpotTier, true);
   if (forceTier !== undefined && forceTier < 3) cells[first[0]] = { kind: 'jackpot', tier: forceTier }; // TEST-BUTTONS
-  if (forceTier === 3) for (const i of order) cells[i] ??= drawCoin(rng, level.jackpotTier); // TEST-BUTTONS: Grand fills the grid
+  if (forceTier === 3) for (const i of order) cells[i] ??= drawCoin(rng, level.jackpotTier, false); // TEST-BUTTONS: Grand fills the grid
   const steps: BonusStep[] = [{ cells: [...cells], fresh: forceTier === 3 ? order : first, respinsLeft: RESPINS }]; // TEST-BUTTONS
 
   let left = RESPINS;
@@ -225,7 +237,7 @@ export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpot
     const fresh: number[] = [];
     for (let i = 0; i < CELLS; i++) {
       if (cells[i] === null && rng() < LAND_CHANCE) {
-        cells[i] = drawCoin(rng, level.jackpotTier);
+        cells[i] = drawCoin(rng, level.jackpotTier, false);
         fresh.push(i);
       }
     }

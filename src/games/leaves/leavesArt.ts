@@ -79,14 +79,14 @@ function leafPath(g: G, shape: number): void {
   }
 }
 
-/** A leaf sprite of LEAF_SIZE units, cached by shape, colour and wetness. */
-export function leafSprite(shape: number, color: string, wet: boolean): HTMLCanvasElement {
-  const key = `${shape}|${color}|${wet}`;
+/** A leaf sprite of LEAF_SIZE units, cached by shape and colour. */
+export function leafSprite(shape: number, color: string): HTMLCanvasElement {
+  const key = `${shape}|${color}`;
   const cached = sprites.get(key);
   if (cached) return cached;
   const [canvas, g] = sharpCanvas(LEAF_SIZE, LEAF_SIZE);
   g.translate(LEAF_SIZE / 2, LEAF_SIZE / 2 - 1);
-  const base = wet ? shade(color, 0.62) : color;
+  const base = color;
   const fill = g.createLinearGradient(-4, -9, 4, 5);
   fill.addColorStop(0, shade(base, 1.14));
   fill.addColorStop(1, shade(base, 0.84));
@@ -118,12 +118,6 @@ export function leafSprite(shape: number, color: string, wet: boolean): HTMLCanv
   g.moveTo(0, 4);
   g.lineTo(0.5, 7.5);
   g.stroke();
-  if (wet) {
-    g.fillStyle = 'rgb(255 255 255 / 0.55)';
-    g.beginPath();
-    g.ellipse(-2, -4, 1.6, 0.9, -0.6, 0, Math.PI * 2);
-    g.fill();
-  }
   sprites.set(key, canvas);
   return canvas;
 }

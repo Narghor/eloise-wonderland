@@ -3,8 +3,9 @@ import { el, topBar, type BackLink } from '../../../dom';
 import { bet, chips, noteWin, pay } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
-  playBonusTrigger, playBookOpen, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
+  playBonusTrigger, playBookOpen, playGambleLose, playGambleWin, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
+  keepScreenOn,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -29,10 +30,15 @@ const FREE_WIN_PAUSE_MS = 1700;
 const FREE_COUNTED_PAUSE_MS = 2500;
 const HELP_GLYPHS = ['10', 'J', 'Q', 'K', 'A', '🧪', '🔮', '🦉', '👸'];
 
+/** How long the gamble card keeps everyone waiting before it turns over. */
+const GAMBLE_SUSPENSE_MS = 800;
+
 export function renderLuna(root: HTMLElement): () => void {
   armSoundUnlock();
   const timers = new Set<number>();
   let disposed = false;
+  /** Set while a bonus plays: lets the screen sleep again. */
+  let releaseScreen: (() => void) | null = null;
   const wait = (ms: number) =>
     new Promise<void>((resolve) => {
       const id = window.setTimeout(() => {
@@ -44,6 +50,8 @@ export function renderLuna(root: HTMLElement): () => void {
 
   let betIndex = 0;
   let busy = false;
+  /** The gamble card is turning over: no new guess until it shows. */
+  let revealing = false;
   let lines: WinLinesHandle | null = null;
   let gamble: { amount: number; stake: number; steps: number } | null = null;
 
@@ -295,6 +303,7 @@ export function renderLuna(root: HTMLElement): () => void {
     }
     clearBoard();
     screen.classList.add('luna-in-feature');
+    releaseScreen = keepScreenOn();
     setMessage(fresh ? '' : 'Les tours gratuits reprennent !', fresh ? '' : 'luna-big');
 
     const played = feature.spins.slice(0, pending.next);
@@ -308,6 +317,7 @@ export function renderLuna(root: HTMLElement): () => void {
       el('div', { class: 'luna-fs-box' }, el('span', { text: 'Tours' }), spinsValue),
       el('div', { class: 'luna-fs-box' }, el('span', { text: 'Symbole' }), specialBox),
       el('div', { class: 'luna-fs-box' }, el('span', { text: 'Gain' }), totalValue),
+      el('p', { class: 'luna-fs-hint', text: `📖 ${RETRIGGER_BOOKS} nouveaux livres d’un coup = +${RETRIGGER_SPINS} tours gratuits` }),
     );
     let sticky = new Set<string>(last && last.added === 0 ? last.sticky : []);
     paintSticky(sticky);
@@ -378,6 +388,8 @@ export function renderLuna(root: HTMLElement): () => void {
     await showBigWin(document.body, totalChips, stake, totalChips >= stake * 20 ? 'ELOISE RAYONNE !' : 'TOURS GRATUITS');
     featureBar.replaceChildren();
     screen.classList.remove('luna-in-feature');
+    releaseScreen?.();
+    releaseScreen = null;
   }
 
   function paintSticky(sticky: Set<string>): void {
@@ -461,6 +473,8 @@ export function renderLuna(root: HTMLElement): () => void {
 
   function endGamble(): void {
     gamble = null;
+    revealing = false;
+    collectButton.disabled = false;
     doubleButton.hidden = true;
     gamblePanel.hidden = true;
     gambleCard.className = 'luna-card luna-card-back';
@@ -487,30 +501,56 @@ export function renderLuna(root: HTMLElement): () => void {
   }
 
   function guess(red: boolean): void {
-    if (!gamble || !canGamble(gamble.amount, gamble.stake, gamble.steps)) return;
+    if (!gamble || revealing || !canGamble(gamble.amount, gamble.stake, gamble.steps)) return;
     if (!bet(gamble.amount)) return;
     gamble.steps++;
     const suits = ['♥', '♦', '♠', '♣'];
     const suit = suits[Math.floor(Math.random() * 4)];
     const isRed = suit === '♥' || suit === '♦';
-    gambleCard.className = `luna-card luna-card-face ${isRed ? 'luna-card-red' : 'luna-card-black'}`;
-    gambleCard.textContent = suit;
-    if (isRed === red) {
+    const won = isRed === red;
+    // The chips are settled now, so leaving mid-reveal loses nothing; only the show waits.
+    if (won) {
       gamble.amount *= 2;
       pay(gamble.amount);
-      playSmallWin();
-      burst(gamblePanel, 14, 'coins');
+    }
+    revealing = true;
+    redButton.disabled = true;
+    blackButton.disabled = true;
+    collectButton.disabled = true;
+    gambleInfo.textContent = 'La carte se retourne…';
+    gambleCard.className = 'luna-card luna-card-back luna-card-tense';
+    const stopSuspense = playSuspense(GAMBLE_SUSPENSE_MS);
+    timers.add(window.setTimeout(() => {
+      stopSuspense();
+      revealing = false;
+      collectButton.disabled = false;
+      gambleCard.className = `luna-card luna-card-face ${isRed ? 'luna-card-red' : 'luna-card-black'} ${won ? 'luna-card-win' : 'luna-card-lose'}`;
+      gambleCard.textContent = suit;
+      showGuess(won);
+    }, GAMBLE_SUSPENSE_MS));
+  }
+
+  function showGuess(won: boolean): void {
+    if (!gamble) return;
+    if (won) {
+      playGambleWin();
+      burst(gamblePanel, 18, 'coins');
+      gambleAmount.classList.remove('luna-gamble-pop');
+      void gambleAmount.offsetWidth;
+      gambleAmount.classList.add('luna-gamble-pop');
       const left = GAMBLE_MAX_STEPS - gamble.steps;
       paintGamble(canGamble(gamble.amount, gamble.stake, gamble.steps)
         ? `Gagné ! Encore ${left} essai${left > 1 ? 's' : ''} possible${left > 1 ? 's' : ''}.`
         : 'Gagné ! Plafond atteint, encaisse.');
       setMessage(`Doublé : ${gamble.amount} jetons`, 'luna-win-text');
     } else {
-      playLose();
+      playGambleLose();
+      shake(gamblePanel, 1);
       setMessage('Perdu… la carte était de l’autre couleur.');
       gamble.amount = 0;
       gambleInfo.textContent = 'Perdu ! Le gain est parti.';
       redButton.disabled = true;
+      collectButton.disabled = true;
       blackButton.disabled = true;
       timers.add(window.setTimeout(() => { endGamble(); refresh(); }, 1400));
     }
@@ -540,6 +580,7 @@ export function renderLuna(root: HTMLElement): () => void {
 
   return () => {
     disposed = true;
+    releaseScreen?.();
     lines?.clear();
     document.querySelectorAll('.luna-intro').forEach((n) => n.remove());
     for (const id of timers) {

@@ -372,6 +372,21 @@ export function playRespinMiss(): void {
   noise(0.14, 0.08, 0.15, 500);
 }
 
+/** Double-or-nothing won: a coin clink, then a quick climbing run that lands on a bright chord. */
+export function playGambleWin(): void {
+  tone(C_MAJOR[7] * 2, 0, 0.08, 'sine', 0.12);
+  [0, 2, 4, 5, 7].forEach((n, i) => tone(C_MAJOR[n], 0.06 + i * 0.05, 0.12, 'square', 0.1));
+  [4, 7].forEach((n) => tone(C_MAJOR[n] * 2, 0.34, 0.5, 'triangle', 0.12));
+  noise(0.3, 0.15, 0.1, 5000);
+}
+
+/** Double-or-nothing lost: a sad "wah-wah" sliding down. */
+export function playGambleLose(): void {
+  tone(392, 0, 0.28, 'sawtooth', 0.07, 370);
+  tone(349, 0.3, 0.28, 'sawtooth', 0.07, 330);
+  tone(311, 0.6, 0.6, 'sawtooth', 0.07, 233);
+}
+
 /** Dull buzz for a losing spin (kept very quiet). */
 export function playLose(): void {
   tone(200, 0, 0.18, 'triangle', 0.08, 150);

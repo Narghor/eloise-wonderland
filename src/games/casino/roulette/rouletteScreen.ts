@@ -4,8 +4,12 @@ import { bet, chips, pay } from '../chips';
 import { WHEEL_ORDER, colorOf, drawNumber, payout, totalStake, type BetId, type Bets } from './rouletteLogic';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const CHIP_VALUES = [1, 5, 25, 100, 500, 1000];
+const CHIP_VALUES = [1, 5, 25, 100, 500, 1000, 10000];
+/** "10k" fits on a chip, "10000" does not. */
+const chipLabel = (value: number): string => (value >= 10000 ? `${value / 1000}k` : String(value));
 const SPIN_MS = 4000;
+/** Time for the page to scroll back up to the wheel before it turns. */
+const SCROLL_MS = 700;
 const HISTORY_SIZE = 12;
 const SLICE = 360 / 37;
 
@@ -94,7 +98,7 @@ export function renderRoulette(root: HTMLElement): () => void {
 
   // --- controls
   const chipButtons = CHIP_VALUES.map((value) => {
-    const b = el('button', { class: 'rl-chip', type: 'button', text: String(value) });
+    const b = el('button', { class: 'rl-chip', type: 'button', text: chipLabel(value), 'aria-label': `${value} jetons` });
     b.addEventListener('click', () => {
       chipValue = value;
       refresh();
@@ -149,16 +153,7 @@ export function renderRoulette(root: HTMLElement): () => void {
     }
     spinning = true;
     lastBets = new Map(bets);
-    // On a phone the table pushes the wheel off screen: bring it back into view.
-    svg.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const n = drawNumber();
-    const index = WHEEL_ORDER.indexOf(n);
-    // Wheel turns clockwise, ball counter-clockwise; ball rests at the top, pocket brought under it.
-    const pocketTarget = -index * SLICE;
-    wheelAngle = wheelAngle - (wheelAngle % 360) + 720 + pocketTarget + 360;
-    ballAngle = ballAngle - (ballAngle % 360) - 1440;
-    wheel.style.transform = `rotate(${wheelAngle}deg)`;
-    ballGroup.style.transform = `rotate(${ballAngle}deg)`;
     message.textContent = 'Les jeux sont faits, rien ne va plus...';
     refresh();
     settle = () => {
@@ -172,6 +167,20 @@ export function renderRoulette(root: HTMLElement): () => void {
       spinning = false;
       refresh();
     };
+    // On a phone the table pushes the wheel off screen: scroll back to the very top first, then turn.
+    const scrolled = window.scrollY > 4;
+    if (scrolled) window.scrollTo({ top: 0, behavior: 'smooth' });
+    timer = window.setTimeout(() => turnWheel(n), scrolled ? SCROLL_MS : 0);
+  }
+
+  function turnWheel(n: number): void {
+    const index = WHEEL_ORDER.indexOf(n);
+    // Wheel turns clockwise, ball counter-clockwise; ball rests at the top, pocket brought under it.
+    const pocketTarget = -index * SLICE;
+    wheelAngle = wheelAngle - (wheelAngle % 360) + 720 + pocketTarget + 360;
+    ballAngle = ballAngle - (ballAngle % 360) - 1440;
+    wheel.style.transform = `rotate(${wheelAngle}deg)`;
+    ballGroup.style.transform = `rotate(${ballAngle}deg)`;
     timer = window.setTimeout(() => {
       timer = undefined;
       settle?.();

@@ -44,7 +44,44 @@ function sparkle(g: G, x: number, y: number, r: number): void {
 }
 
 /** Each drawing is centred on (0, 0) in a box of about 22 units, ground at y = 8. */
+/** A five-pointed leaf like a sweetgum's, with veins from the stem to each point. */
+function starLeaf(g: G, r: number, colors: string[]): void {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 === 0 ? r : r * 0.48;
+    g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  g.closePath();
+  const grad = g.createLinearGradient(-r, -r, r, r);
+  colors.forEach((c, i) => grad.addColorStop(i / (colors.length - 1), c));
+  g.fillStyle = grad;
+  g.fill();
+  g.strokeStyle = shade(colors[colors.length - 1], 0.7);
+  g.lineWidth = 0.8;
+  g.stroke();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    line(g, 'rgb(255 255 255 / 0.55)', 0.6, [0, 1, Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75]);
+  }
+  line(g, '#8a5a2a', 1.2, [0, 1, 1, r * 0.95]);
+}
+
 const DRAW: Record<string, (g: G) => void> = {
+  star(g) {
+    starLeaf(g, 9, ['#fff4a8', '#ffd23f', '#e0a400']);
+    sparkle(g, 7, -7, 2.6);
+  },
+  megastar(g) {
+    const glow = g.createRadialGradient(0, 0, 2, 0, 0, 12);
+    glow.addColorStop(0, 'rgb(255 240 160 / 0.9)');
+    glow.addColorStop(1, 'rgb(255 180 220 / 0)');
+    disc(g, 0, 0, 12, glow);
+    starLeaf(g, 10.5, ['#fff6c8', '#ffb3d9', '#c99bff', '#ffd23f']);
+    sparkle(g, 8, -8, 3);
+    sparkle(g, -9, -3, 2.2);
+    sparkle(g, 6, 8, 1.8);
+  },
   acorn(g) {
     ball(g, 0, 2, 6, '#c98a4a');
     g.fillStyle = '#7a4e2c';

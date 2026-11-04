@@ -5,6 +5,7 @@ import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playLose, playReelStop, playMedusaAwake, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
+  keepScreenOn,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -55,6 +56,8 @@ export function renderOlympus(root: HTMLElement): () => void {
   armSoundUnlock();
   const timers = new Set<number>();
   let disposed = false;
+  /** Set while a bonus plays: lets the screen sleep again. */
+  let releaseScreen: (() => void) | null = null;
   const wait = (ms: number) =>
     new Promise<void>((resolve) => {
       const id = window.setTimeout(() => {
@@ -308,6 +311,7 @@ export function renderOlympus(root: HTMLElement): () => void {
 
     clearLines();
     screen.classList.add('oly-in-feature');
+    releaseScreen = keepScreenOn();
     setMessage(fresh ? '' : 'Les tours gratuits reprennent !', fresh ? '' : 'oly-big');
     const played = feature.spins.slice(0, pending.next);
     let total = played.reduce((sum, s) => sum + chipsFor(s.mult, stake), 0);
@@ -367,10 +371,12 @@ export function renderOlympus(root: HTMLElement): () => void {
     noteWin(LOBBY_ID, totalChips, stake);
     refresh();
     setMessage(`Tours gratuits : ${totalChips} jetons`, 'oly-win-text');
-    await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'MEDUSA PAIE !' : 'TOURS GRATUITS', 'oly-bigwin');
+    await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'MEDUSA PAIE !' : 'TOURS GRATUITS', { themeClass: 'oly-bigwin' });
     featureBar.replaceChildren();
     machine.classList.remove('oly-flooded');
     screen.classList.remove('oly-in-feature');
+    releaseScreen?.();
+    releaseScreen = null;
   }
 
   /** The temples that triggered the feature blow up one by one, then the whole lair blazes gold. */
@@ -428,6 +434,7 @@ export function renderOlympus(root: HTMLElement): () => void {
 
   return () => {
     disposed = true;
+    releaseScreen?.();
     clearLines();
     document.querySelectorAll('.oly-intro').forEach((n) => n.remove());
     for (const id of timers) {

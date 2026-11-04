@@ -18,7 +18,7 @@ path.rl-green, .rl-pocket.rl-green { fill: #2e7d32; }
 .rl-hist.rl-black { background: #2b2228; }
 .rl-hist.rl-green { background: #2e7d32; }
 .rl-message { text-align: center; margin: 0; min-height: 1.4em; color: var(--ink); }
-.rl-chips { display: flex; gap: 8px; justify-content: center; }
+.rl-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .rl-chip { width: 48px; height: 48px; flex-shrink: 0; padding: 0; border-radius: 50%; border: 4px dashed #fff; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.8rem; letter-spacing: -0.03em; box-shadow: var(--shadow); cursor: pointer; }
 .rl-chip-active { background: var(--accent-strong); outline: 3px solid var(--ink); }
 .rl-table { display: flex; flex-direction: column; gap: 4px; background: #1f6b3a; padding: 6px; border-radius: var(--radius); }

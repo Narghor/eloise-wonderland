@@ -3,7 +3,7 @@ import { el, topBar } from '../../dom';
 import { addCoins, loadCompanion } from '../../companion/companionSave';
 import { loadHouse, saveHouse } from '../../house/houseSave';
 import { WALL_DECOS } from '../../house/houseStyle';
-import { armSoundUnlock, muteButton, playCompost, playRustle, playSmallWin } from '../casino/fx/sound';
+import { armSoundUnlock, muteButton, playBigWin, playCompost, playRustle, playSmallWin } from '../casino/fx/sound';
 import { timeOfDay } from '../fishing/fishingLogic';
 import { GROUND_TOP, H, LEAF_SIZE, SCALE, SHAPE_COUNT, W, drawBack, drawFront, leafSprite, sharpCanvas } from './leavesArt';
 import { thingSprite } from './leavesThings';
@@ -18,8 +18,15 @@ import {
   DECO_CHANCE,
   FALL_RATE,
   GOLDEN_CHANCE,
+  GOLDEN_GAUGE,
+  STAR_CHANCE,
+  MEGA_STAR_CHANCE,
+  THIEF_CHANCE,
+  THIEF_MS,
+  BUTTERFLY_MS,
+  BUTTERFLY_GAUGE_SHARE,
+  STAR_GAUGE_SHARE,
   GOLDEN_VALUE,
-  GOLDEN_WIND_SECONDS,
   GOLD_PER_COIN,
   LEAF_VALUE,
   LEVEL_GOAL,
@@ -44,7 +51,7 @@ import {
   type Treasure,
   type Zone,
 } from './leavesData';
-import { loadLeaves, saveLeaves } from './leavesSave';
+import { loadLeaves, saveLeaves, type BuriedThing } from './leavesSave';
 
 // -----------------------------------------------
 // LES FEUILLES: rake the places clean while the trees keep dropping leaves
@@ -56,8 +63,6 @@ interface Leaf {
   cos: number;
   sin: number;
   sprite: HTMLCanvasElement;
-  /** Wet leaves need two passes; the first one dries them. */
-  wet: boolean;
   shape: number;
   color: string;
   golden: boolean;
@@ -77,7 +82,7 @@ interface Hidden {
   x: number;
   y: number;
   icon: string;
-  kind: 'treasure' | 'deco' | 'hedgehog';
+  kind: 'treasure' | 'deco' | 'hedgehog' | 'star' | 'megastar';
   treasure?: Treasure;
   decoId?: string;
 }
@@ -109,7 +114,6 @@ export function renderLeaves(root: HTMLElement): () => void {
   let fallDebt = 0;
   /** Falling pauses for a breath after a place is cleaned. */
   let calmUntil = 0;
-  let goldenUntil = 0;
   let nextGust = 0;
   let nextEvent = 0;
   let sparks: { x: number; y: number; t: number }[] = [];
@@ -139,6 +143,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   const coinsView = el('span', { class: 'coin-pill' });
   const basketFill = el('span', {});
   const basketText = el('span', { class: 'leaves-basket-text' });
+  const goldenFill = el('span', {});
+  const goldenText = el('span', { class: 'leaves-golden-text' });
   const compost = el('button', { class: 'button', type: 'button', text: '🍂 Au compost' });
   const zoneTitle = el('strong', { class: 'leaves-zone-title' });
   const zoneLevel = el('select', { class: 'leaves-zone-level', 'aria-label': 'Niveau joué' });
@@ -160,6 +166,7 @@ export function renderLeaves(root: HTMLElement): () => void {
       el('div', { class: 'leaves-head' }, el('div', { class: 'leaves-title-row' }, zoneTitle, zoneLevel), el('div', { class: 'leaves-clean' }, el('span', { class: 'leaves-clean-bar' }, cleanFill), cleanText)),
       stage,
       el('div', { class: 'leaves-basket' }, el('span', { class: 'leaves-basket-bar' }, basketFill), basketText, compost),
+      el('div', { class: 'leaves-golden', title: 'Chaque feuille dorée remplit la jauge, une feuille étoile cachée la fait bondir : pleine, le prochain tapis tombe tout doré.' }, el('span', { class: 'leaves-golden-bar' }, goldenFill), goldenText),
       status,
       zoneTabs,
       el('h2', { class: 'leaves-section', text: 'Améliorations' }),
@@ -190,15 +197,14 @@ export function renderLeaves(root: HTMLElement): () => void {
   const progress = () => Math.max(0, state().carpets * carpet() + carpet() - leaves.length);
   const isOpen = (i: number) => i === 0 || save.zones[ZONES[i - 1].id].cleared >= OPEN_AT_LEVEL;
 
-  function makeLeaf(x: number, y: number): Leaf {
+  function makeLeaf(x: number, y: number, allGolden = false): Leaf {
     const roll = Math.random();
-    const rare = roll < RARE_CHANCE * luck() ? pickRare() : null;
-    const golden = !rare && (roll < (RARE_CHANCE + GOLDEN_CHANCE) * luck() || now() < goldenUntil);
-    const wet = !rare && !golden && Math.random() < zone.wet;
+    const rare = !allGolden && roll < RARE_CHANCE * luck() ? pickRare() : null;
+    const golden = allGolden || (!rare && roll < (RARE_CHANCE + GOLDEN_CHANCE) * luck());
     const shape = Math.floor(Math.random() * SHAPE_COUNT);
     const color = rare?.color ?? (golden ? '#ffd700' : zone.palette[Math.floor(Math.random() * zone.palette.length)]);
     const angle = Math.random() * Math.PI * 2;
-    return { x, y, cos: Math.cos(angle), sin: Math.sin(angle), sprite: leafSprite(shape, color, wet), wet, shape, color, golden, rare };
+    return { x, y, cos: Math.cos(angle), sin: Math.sin(angle), sprite: leafSprite(shape, color), shape, color, golden, rare };
   }
 
   function pickRare(): RareLeaf {
@@ -218,17 +224,28 @@ export function renderLeaves(root: HTMLElement): () => void {
     flyers = [];
     critterLayer.replaceChildren();
     // An empty saved ground means the last carpet was cleared: a fresh one waits.
-    spreadCarpet(state.left > 0 ? Math.min(carpet(), state.left) : carpet());
+    if (state.left > 0) spreadCarpet(Math.min(carpet(), state.left), state.hidden);
+    else spreadCarpet(carpet());
     state.at = Date.now();
     banner.className = 'leaves-banner';
     paintLevels();
     paint();
   }
 
-  /** Lays a carpet: the whole ground covered evenly, plus small piles a pass or two can clear. */
-  function spreadCarpet(count: number): void {
+  /**
+   * Lays a carpet: the whole ground covered evenly, plus small piles a pass or two can clear.
+   * `buried`: what was left under the carpet before, put back instead of burying a fresh set.
+   */
+  function spreadCarpet(count: number, buried: BuriedThing[] | null = null): void {
     leaves = [];
     hidden = [];
+    const fresh = !buried;
+    if (fresh && save.goldenNext) {
+      save.goldenNext = false;
+      state().golden = true;
+      announceGoldenCarpet();
+    }
+    const allGolden = state().golden;
     const piles = Math.floor((count * 0.15) / PILE_SIZE);
     const even = count - piles * PILE_SIZE;
     // A jittered grid covers the ground with no bare patches.
@@ -241,16 +258,47 @@ export function renderLeaves(root: HTMLElement): () => void {
       const j = Math.floor(Math.random() * (i + 1));
       [cells[i], cells[j]] = [cells[j], cells[i]];
     }
-    for (const c of cells.slice(0, even)) leaves.push(makeLeaf(Math.min(W - 4, c.x + Math.random() * cell), Math.min(H - 8, c.y + Math.random() * cell)));
+    for (const c of cells.slice(0, even)) leaves.push(makeLeaf(Math.min(W - 4, c.x + Math.random() * cell), Math.min(H - 8, c.y + Math.random() * cell), allGolden));
     for (let p = 0; p < piles; p++) {
       const c = randomSpot();
-      for (let i = 0; i < PILE_SIZE; i++) leaves.push(makeLeaf(c.x + (Math.random() - 0.5) * 16, Math.min(H - 8, Math.max(top, c.y + (Math.random() - 0.5) * 12))));
-      if (p === 0 && Math.random() < 0.45) hidden.push({ x: c.x, y: c.y, icon: '🦔', kind: 'hedgehog' });
+      for (let i = 0; i < PILE_SIZE; i++) leaves.push(makeLeaf(c.x + (Math.random() - 0.5) * 16, Math.min(H - 8, Math.max(top, c.y + (Math.random() - 0.5) * 12)), allGolden));
+      if (p === 0 && !buried && Math.random() < 0.45) hidden.push({ x: c.x, y: c.y, icon: '🦔', kind: 'hedgehog' });
     }
-    hideTreasures();
+    if (buried) restoreBuried(buried);
+    else hideTreasures();
     save.zones[zone.id].left = leaves.length;
+    storeHidden();
     saveLeaves(save);
     layerDirty = true;
+  }
+
+  function storeHidden(): void {
+    state().hidden = hidden.map((h) => ({ x: h.x, y: h.y, kind: h.kind, ...(h.treasure ? { id: h.treasure.id } : h.decoId ? { id: h.decoId } : {}) }));
+  }
+
+  /** Puts back what was still buried, each under a few leaves moved onto it (the carpet was spread anew). */
+  function restoreBuried(buried: BuriedThing[]): void {
+    hidden = [];
+    for (const b of buried) {
+      const treasure = b.kind === 'treasure' ? TREASURES.find((t) => t.id === b.id) : undefined;
+      if (b.kind === 'treasure' && !treasure) continue;
+      if (b.kind === 'deco' && !WALL_DECOS.some((d) => d.id === b.id)) continue;
+      hidden.push({ x: b.x, y: b.y, icon: treasure?.icon ?? (b.kind === 'deco' ? '🎁' : b.kind === 'star' ? '🌟' : b.kind === 'megastar' ? '🌟✨' : '🦔'), kind: b.kind, treasure, decoId: b.kind === 'deco' ? b.id : undefined });
+    }
+    const covered = (h: Hidden) => leaves.some((l) => Math.abs(l.x - h.x) < 9 && Math.abs(l.y - h.y) < 9);
+    const spare = leaves.filter((l) => !hidden.some((h) => Math.abs(l.x - h.x) < 9 && Math.abs(l.y - h.y) < 9));
+    for (const h of hidden) {
+      for (let k = 0; k < 3 && !covered(h) && spare.length > 0; k++) {
+        const leaf = spare.splice(Math.floor(Math.random() * spare.length), 1)[0];
+        leaf.x = h.x + (Math.random() - 0.5) * 8;
+        leaf.y = h.y + (Math.random() - 0.5) * 8;
+      }
+    }
+    // Too few leaves left to hide them all: what stays bare is simply found.
+    for (const h of hidden.filter((x) => !covered(x))) {
+      hidden.splice(hidden.indexOf(h), 1);
+      find(h);
+    }
   }
 
   /** Buries the treasures of this level under the leaves. */
@@ -272,6 +320,8 @@ export function renderLeaves(root: HTMLElement): () => void {
       const treasure = buried.find((t) => (roll -= t.weight * (t.gold >= 30 ? luck() : 1)) < 0) ?? buried[0];
       hidden.push({ ...s, icon: treasure.icon, kind: 'treasure', treasure });
     }
+    if (!state().golden && Math.random() < STAR_CHANCE) hidden.push({ ...randomSpot(), icon: '🌟', kind: 'star' });
+    if (!state().golden && Math.random() < MEGA_STAR_CHANCE) hidden.push({ ...randomSpot(), icon: '🌟✨', kind: 'megastar' });
   }
 
   // -----------------------------------------------
@@ -289,14 +339,6 @@ export function renderLeaves(root: HTMLElement): () => void {
     let touched: Leaf | null = null;
     for (const leaf of leaves) if (dist(leaf) <= TOUCH_REACH && (!touched || dist(leaf) < dist(touched))) touched = leaf;
     if (!touched) return;
-    if (touched.wet) {
-      // A wet leaf sticks: the first tap only loosens it.
-      touched.wet = false;
-      touched.sprite = leafSprite(touched.shape, touched.color, false);
-      layerDirty = true;
-      sparks.push({ x: touched.x, y: touched.y, t: 0 });
-      return;
-    }
     const room = BASKET_SIZE(save.levels.basket) - save.basket;
     if (room <= 0) {
       status.textContent = 'Le panier est plein ! Vide-le au compost pour continuer.';
@@ -305,7 +347,7 @@ export function renderLeaves(root: HTMLElement): () => void {
     const target = touched;
     const reach = GRAB_REACH(save.levels.rake);
     const near = leaves
-      .filter((leaf) => leaf !== target && !leaf.wet && Math.hypot(leaf.x - target.x, leaf.y - target.y) <= reach)
+      .filter((leaf) => leaf !== target && Math.hypot(leaf.x - target.x, leaf.y - target.y) <= reach)
       .sort((a, b) => Math.hypot(a.x - target.x, a.y - target.y) - Math.hypot(b.x - target.x, b.y - target.y));
     const taken = [target, ...near].slice(0, Math.min(room, GRAB(save.levels.rake)));
     const gone = new Set(taken);
@@ -330,10 +372,12 @@ export function renderLeaves(root: HTMLElement): () => void {
   function collect(leaf: Leaf): void {
     save.basket++;
     const zoneValue = 1 + LEVEL_VALUE * (level() - 1) + ORNAMENT_VALUE * state().ornaments.length;
-    const golden = now() < goldenUntil ? 2 : 1;
-    save.basketGold += (leaf.golden ? GOLDEN_VALUE : 1) * zoneValue * golden;
+    save.basketGold += (leaf.golden ? GOLDEN_VALUE : 1) * zoneValue;
     flyers.push({ x: leaf.x, y: leaf.y, color: leaf.color, t: 0 });
-    if (leaf.golden) pop(leaf.x, leaf.y, `+${GOLDEN_VALUE}`, 'is-gold');
+    if (leaf.golden && !state().golden) {
+      pop(leaf.x, leaf.y, `+${GOLDEN_VALUE}`, 'is-gold');
+      fillGoldenGauge();
+    }
     if (leaf.rare) {
       const isNew = !save.herbarium[leaf.rare.id];
       save.herbarium[leaf.rare.id] = (save.herbarium[leaf.rare.id] ?? 0) + 1;
@@ -356,9 +400,21 @@ export function renderLeaves(root: HTMLElement): () => void {
   }
 
   function find(h: Hidden): void {
+    storeHidden();
+    if (h.treasure && Math.random() < THIEF_CHANCE) {
+      thief(h.treasure, h.x, h.y);
+      saveLeaves(save);
+      return;
+    }
     playSmallWin();
     pop(h.x, h.y, h.icon, 'is-find');
-    if (h.kind === 'hedgehog') {
+    if (h.kind === 'megastar') {
+      status.textContent = '🌟✨ Une MÉGA feuille étoile ! La jauge dorée est pleine d’un coup !';
+      fillGoldenGauge(Math.max(0, goldenTarget() - save.goldenGauge));
+    } else if (h.kind === 'star') {
+      status.textContent = '🌟 Une feuille étoile ! La jauge dorée fait un bond.';
+      fillGoldenGauge(Math.ceil(goldenTarget() * STAR_GAUGE_SHARE));
+    } else if (h.kind === 'hedgehog') {
       meet('hedgehog');
       save.gold += 25;
       status.textContent = '🦔 Un hérisson dormait sous le tas ! Il te remercie de l’avoir découvert : +25 feuilles d’or.';
@@ -369,20 +425,47 @@ export function renderLeaves(root: HTMLElement): () => void {
       saveHouse(house);
       status.textContent = `🎁 Une déco pour la maison : ${deco.name} ! Elle t’attend dans « Décos murales ».`;
     } else if (h.treasure) {
-      const t = h.treasure;
-      const isNew = !save.treasures[t.id];
-      save.treasures[t.id] = (save.treasures[t.id] ?? 0) + 1;
-      save.gold += t.gold;
-      status.textContent = `${t.icon} ${isNew ? 'Nouvelle trouvaille' : 'Trouvé'} : ${t.name} ! +${t.gold} feuilles d’or. ${isNew ? t.note : ''}`;
+      creditTreasure(h.treasure, 1);
     }
     saveLeaves(save);
     refreshCollection();
     paint();
   }
 
+  /** A golden leaf picked on an ordinary carpet: the gauge fills, and once full the next carpet is golden. */
+  const goldenTarget = () => GOLDEN_GAUGE(carpet());
+
+  function fillGoldenGauge(amount = 1): void {
+    if (save.goldenNext) return;
+    save.goldenGauge += amount;
+    if (save.goldenGauge >= goldenTarget()) {
+      save.goldenGauge = 0;
+      save.goldenNext = true;
+      banner.textContent = '🌟 Le prochain tapis sera doré ! 🌟';
+      banner.className = 'leaves-banner is-on is-gold';
+      later(3000, () => (banner.className = 'leaves-banner'));
+      playSmallWin();
+    }
+    paintGoldenGauge();
+  }
+
+  function announceGoldenCarpet(): void {
+    banner.textContent = '🌟 Tapis doré ! 🌟';
+    banner.className = 'leaves-banner is-on is-gold';
+    later(3500, () => (banner.className = 'leaves-banner'));
+    playBigWin(1);
+    for (let i = 0; i < 12; i++) sparks.push({ x: Math.random() * W, y: GROUND_TOP + Math.random() * (H - GROUND_TOP), t: Math.random() * 0.5 });
+  }
+
+  function paintGoldenGauge(): void {
+    goldenFill.style.width = `${save.goldenNext ? 100 : Math.min(100, (save.goldenGauge / goldenTarget()) * 100)}%`;
+    goldenText.textContent = state().golden ? '🌟 Tapis doré !' : save.goldenNext ? '🌟 Prochain tapis doré' : `🌟 ${Math.min(save.goldenGauge, goldenTarget())}/${goldenTarget()}`;
+  }
+
   /** The ground is spotless: a small win, then the wind lays the next carpet (or the level is done). */
   function carpetCleared(): void {
     const s = state();
+    s.golden = false;
     s.carpets++;
     if (s.carpets >= CARPETS(level())) {
       s.carpets = 0;
@@ -493,7 +576,7 @@ export function renderLeaves(root: HTMLElement): () => void {
 
   function update(dt: number, t: number): void {
     if (t > calmUntil) {
-      fallDebt += dt * FALL_RATE * (t < goldenUntil ? 3 : 1);
+      fallDebt += dt * FALL_RATE;
       while (fallDebt >= 1) {
         fallDebt--;
         dropLeaf(false);
@@ -518,22 +601,14 @@ export function renderLeaves(root: HTMLElement): () => void {
     }
     if (flyers.length > 0) flyers = flyers.filter((f) => (f.t += dt * 2.4) < 1);
     if (sparks.length > 0) sparks = sparks.filter((s) => (s.t += dt * 3) < 1);
-    if (t > goldenUntil && banner.classList.contains('is-gold')) banner.className = 'leaves-banner';
   }
 
   function randomEvent(): void {
-    const options: (() => void)[] = [() => critter('squirrel'), () => critter('robin'), () => critter('ladybug'), goldenWind];
-    if (zone.wet >= 0.1) options.push(() => critter('snail'));
+    const options: (() => void)[] = [() => critter('squirrel'), () => critter('robin'), () => critter('ladybug'), butterfly, butterfly];
+    if (zone.snails) options.push(() => critter('snail'));
     if (time === 'dusk') options.push(() => critter('fox'));
     if (time === 'night') options.push(() => critter('firefly'), () => critter('firefly'));
     options[Math.floor(Math.random() * options.length)]();
-  }
-
-  function goldenWind(): void {
-    goldenUntil = now() + GOLDEN_WIND_SECONDS * 1000;
-    banner.textContent = '🌟 Vent doré ! Les feuilles valent double';
-    banner.className = 'leaves-banner is-on is-gold';
-    for (let i = 0; i < 10; i++) dropLeaf(true);
   }
 
   /** A little creature shows up; touching it before it leaves adds it to the album. */
@@ -561,6 +636,81 @@ export function renderLeaves(root: HTMLElement): () => void {
     });
     critterLayer.append(node);
     later(running ? 5000 : 7000, () => node.remove());
+  }
+
+  function creditTreasure(t: Treasure, times: number): void {
+    const isNew = !save.treasures[t.id];
+    save.treasures[t.id] = (save.treasures[t.id] ?? 0) + 1;
+    save.gold += t.gold * times;
+    const what = times > 1
+      ? `${t.icon} ${t.name} rattrapé : +${t.gold * times} feuilles d’or (×${times}) !`
+      : `${t.icon} ${isNew ? 'Nouvelle trouvaille' : 'Trouvé'} : ${t.name} ! +${t.gold} feuilles d’or.`;
+    status.textContent = `${what} ${isNew ? t.note : ''}`;
+  }
+
+  /** A squirrel snatches the treasure just found and runs for the nearest edge: caught in time, it pays twice. */
+  function thief(t: Treasure, x: number, y: number): void {
+    const toLeft = x < W / 2;
+    const node = el(
+      'button',
+      { class: `leaves-critter leaves-thief${toLeft ? '' : ' is-right'}`, type: 'button', 'aria-label': `Écureuil qui file avec ${t.name}`, style: `left:${(x / W) * 100}%;top:${(y / H) * 100}%` },
+      el('span', { class: 'leaves-thief-body', text: '🐿️' }),
+      el('span', { class: 'leaves-thief-loot', text: t.icon }),
+    );
+    status.textContent = `🐿️ Un écureuil file avec ${t.icon} ${t.name} ! Attrape-le vite !`;
+    node.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      node.remove();
+      meet('squirrel');
+      creditTreasure(t, 2);
+      playSmallWin();
+      pop(x, y, '🐿️✨', 'is-find');
+      saveLeaves(save);
+      refreshCollection();
+      paint();
+    });
+    critterLayer.append(node);
+    node
+      .animate([{ left: `${(x / W) * 100}%` }, { left: toLeft ? '-12%' : '112%' }], { duration: THIEF_MS, easing: 'ease-in' })
+      .finished.then(() => {
+        if (!node.isConnected) return;
+        node.remove();
+        status.textContent = `L’écureuil s’est enfui avec ${t.icon} ${t.name}… Plus vite la prochaine fois !`;
+      })
+      .catch(() => {});
+  }
+
+  /** The golden butterfly zigzags across the place: touch it before it is gone. */
+  function butterfly(): void {
+    const info = CRITTERS.find((c) => c.id === 'butterfly')!;
+    const fromLeft = Math.random() < 0.5;
+    const points = [{ x: fromLeft ? -0.08 : 1.08, y: 0.35 + Math.random() * 0.4 }];
+    for (let i = 1; i <= 5; i++) points.push({ x: fromLeft ? i / 6 : 1 - i / 6, y: 0.25 + Math.random() * 0.6 });
+    points.push({ x: fromLeft ? 1.08 : -0.08, y: 0.3 + Math.random() * 0.4 });
+    const node = el('button', { class: 'leaves-critter leaves-butterfly', type: 'button', 'aria-label': info.name, text: info.icon });
+    node.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      const box = node.getBoundingClientRect();
+      const stageBox = critterLayer.getBoundingClientRect();
+      node.remove();
+      meet('butterfly');
+      playSmallWin();
+      pop(((box.left + box.width / 2 - stageBox.left) / stageBox.width) * W, ((box.top - stageBox.top) / stageBox.height) * H, '🦋✨', 'is-find');
+      if (save.goldenNext) {
+        save.gold += 50;
+        status.textContent = `🦋 ${info.name} attrapé ! La jauge est déjà pleine : +50 feuilles d’or.`;
+      } else {
+        status.textContent = `🦋 ${info.name} attrapé ! La jauge dorée monte.`;
+        fillGoldenGauge(Math.ceil(goldenTarget() * BUTTERFLY_GAUGE_SHARE));
+      }
+      saveLeaves(save);
+      paint();
+    });
+    critterLayer.append(node);
+    node
+      .animate(points.map((p) => ({ left: `${p.x * 100}%`, top: `${p.y * 100}%` })), { duration: BUTTERFLY_MS, easing: 'ease-in-out' })
+      .finished.then(() => node.remove())
+      .catch(() => {});
   }
 
   function meet(id: CritterId): void {
@@ -681,6 +831,7 @@ export function renderLeaves(root: HTMLElement): () => void {
     compost.disabled = save.basket === 0;
     zoneTitle.textContent = zone.name;
     paintClean();
+    paintGoldenGauge();
     const today = new Date().toISOString().slice(0, 10);
     const taken = save.coinsDay === today ? save.coinsTaken : 0;
     const possible = Math.min(DAILY_COINS - taken, Math.floor(save.gold / GOLD_PER_COIN));
