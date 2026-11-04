@@ -1,4 +1,5 @@
 import { el } from '../../../dom';
+import { formatChips } from '../chips';
 
 // -----------------------------------------------
 // PAYTABLE / RULES HELPERS (shapes, not percentages)
@@ -50,7 +51,7 @@ export function payoutTable(entries: PayoutEntry[], stake?: number): HTMLElement
   for (const entry of entries) {
     const lines = entry.counts.map((count, i) => {
       const m = entry.multipliers[i];
-      const chips = stake !== undefined ? ` = ${Math.floor(m * stake)} jetons` : '';
+      const chips = stake !== undefined ? ` = ${formatChips(Math.floor(m * stake))} jetons` : '';
       return el('li', {}, el('b', { text: `${count} ${entry.glyph}` }), ` → ${formatMultiplier(m)} × mise`, el('span', { class: 'fx-payout-chips', text: chips }));
     });
     list.append(el('div', { class: 'fx-payout' }, el('p', { class: 'fx-payout-name', text: `${entry.glyph} ${entry.name}` }), el('ul', {}, ...lines)));

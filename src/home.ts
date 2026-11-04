@@ -5,7 +5,7 @@ import { creatureCanvas } from './creatures/creatureCanvas';
 import { loadGarden } from './creatures/garden';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
-import { loadCasino } from './games/casino/chips';
+import { loadCasino, formatChips } from './games/casino/chips';
 import { loadHouse } from './house/houseSave';
 import { FISH } from './games/fishing/fishingData';
 import { loadFishing } from './games/fishing/fishingSave';
@@ -210,7 +210,7 @@ function casinoCard(): HTMLElement {
       'span',
       { class: 'game-card-text' },
       el('strong', { text: 'Casino' }),
-      el('span', { class: 'chip-pill', text: `${loadCasino().chips} jetons` }),
+      el('span', { class: 'chip-pill', text: `${formatChips(loadCasino().chips)} jetons` }),
     ),
   );
 }

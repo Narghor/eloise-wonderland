@@ -1,6 +1,6 @@
 import './slots.css';
 import { el, topBar } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot, formatChips } from '../chips';
 
 /** This machine's key in the casino lobby, which shows its best win. */
 const LOBBY_ID = 'sous';
@@ -178,7 +178,7 @@ export function renderSlots(root: HTMLElement): () => void {
       }));
       lines = drawWinLines(reels, cells, paths, (i) => {
         const win = result.wins[i];
-        detail.textContent = `Ligne ${win.line + 1} : ${SYMBOLS[win.symbol].glyph.repeat(win.count)} = ${win.amount} jetons`;
+        detail.textContent = `Ligne ${win.line + 1} : ${SYMBOLS[win.symbol].glyph.repeat(win.count)} = ${formatChips(win.amount)} jetons`;
       });
       if (result.wins.length > 1) detail.textContent = `${result.wins.length} lignes gagnantes !`;
       message.className = `slots-message slots-message-win${tier > 0 ? ' slots-message-big' : ''}`;
@@ -188,14 +188,14 @@ export function renderSlots(root: HTMLElement): () => void {
       if (tier > 0) {
         lights.setMode('big');
         shake(machine, tier >= 2 ? 3 : 2);
-        message.textContent = `+${result.total} jetons${suffix}`;
+        message.textContent = `+${formatChips(result.total)} jetons${suffix}`;
         await showBigWin(document.body, result.total, stake);
       } else {
         lights.setMode('win');
         playSmallWin();
         if (multiple >= 2) shake(machine, 1);
         burst(machine, Math.min(30, 6 + Math.round(multiple * 4)), 'coins');
-        skipCount = countUp(message, result.total, Math.min(1500, 400 + multiple * 200), (n) => `+${n} jetons${n === result.total ? suffix : ''}`);
+        skipCount = countUp(message, result.total, Math.min(1500, 400 + multiple * 200), (n) => `+${formatChips(n)} jetons${n === result.total ? suffix : ''}`);
       }
     } else {
       lights.setMode('idle');

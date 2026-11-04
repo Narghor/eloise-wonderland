@@ -1,6 +1,6 @@
 import './blackjack.css';
 import { el, topBar } from '../../../dom';
-import { bet, chips, pay } from '../chips';
+import { bet, chips, pay, formatChips } from '../chips';
 import { Round, Shoe, isBlackjack, totalLabel, type Card, type HandResult } from './blackjackLogic';
 import { openTips } from './blackjackTips';
 
@@ -250,7 +250,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
     else if (net === 0) title = 'Égalité';
     else title = dealerBj ? 'Blackjack du croupier' : 'Perdu';
     const kind = net > 0 ? 'bj-banner-win' : net === 0 ? 'bj-banner-push' : 'bj-banner-lose';
-    const amount = net > 0 ? `+${net} jetons` : net === 0 ? 'Mise rendue' : `${net} jetons`;
+    const amount = net > 0 ? `+${formatChips(net)} jetons` : net === 0 ? 'Mise rendue' : `${formatChips(net)} jetons`;
     return el(
       'div',
       { class: `bj-banner ${kind}`, role: 'status' },
@@ -273,7 +273,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
         'div',
         { class: 'bj-chips' },
         ...CHIP_VALUES.map((v) => {
-          const b = el('button', { class: `bj-chip bj-chip-${v}`, type: 'button', text: chipLabel(v), 'aria-label': `${v} jetons` });
+          const b = el('button', { class: `bj-chip bj-chip-${v}`, type: 'button', text: chipLabel(v), 'aria-label': `${formatChips(v)} jetons` });
           b.disabled = pending + v > left;
           b.addEventListener('click', () => {
             pending += v;

@@ -64,6 +64,11 @@ function saveCasino(save: CasinoSave): void {
   writeGame(GAME_ID, save);
 }
 
+/** A chip count as players read it: "1 250 000", spaced every three digits. */
+export function formatChips(amount: number): string {
+  return Math.floor(amount).toLocaleString('fr-FR');
+}
+
 export function chips(): number {
   return loadCasino().chips;
 }

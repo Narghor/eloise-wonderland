@@ -67,7 +67,13 @@ interface Leaf {
   color: string;
   golden: boolean;
   rare: RareLeaf | null;
+  /** While a new carpet falls: when this leaf starts falling (ms), and how far left or right it drifts. */
+  fall?: { at: number; drift: number };
 }
+
+/** A new carpet comes down from the trees, left to right with the wind, in this long. */
+const CARPET_FALL_MS = 1600;
+const LEAF_FALL_MS = 650;
 
 interface Falling {
   leaf: Leaf;
@@ -114,6 +120,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   let fallDebt = 0;
   /** Falling pauses for a breath after a place is cleaned. */
   let calmUntil = 0;
+  /** A new carpet is still coming down: no picking, the leaves are drawn one by one. */
+  let fallingUntil = 0;
   let nextGust = 0;
   let nextEvent = 0;
   let sparks: { x: number; y: number; t: number }[] = [];
@@ -265,7 +273,10 @@ export function renderLeaves(root: HTMLElement): () => void {
       if (p === 0 && !buried && Math.random() < 0.45) hidden.push({ x: c.x, y: c.y, icon: '🦔', kind: 'hedgehog' });
     }
     if (buried) restoreBuried(buried);
-    else hideTreasures();
+    else {
+      hideTreasures();
+      letCarpetFall();
+    }
     save.zones[zone.id].left = leaves.length;
     storeHidden();
     saveLeaves(save);
@@ -299,6 +310,15 @@ export function renderLeaves(root: HTMLElement): () => void {
       hidden.splice(hidden.indexOf(h), 1);
       find(h);
     }
+  }
+
+  /** The carpet just spread comes down from the trees, swept left to right by the wind. */
+  function letCarpetFall(): void {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const start = now();
+    for (const leaf of leaves) leaf.fall = { at: start + (leaf.x / W) * (CARPET_FALL_MS - LEAF_FALL_MS) * (0.75 + Math.random() * 0.25), drift: (Math.random() - 0.3) * 40 };
+    fallingUntil = start + CARPET_FALL_MS;
+    for (let i = 0; i < 4; i++) later(i * 350, () => playRustle());
   }
 
   /** Buries the treasures of this level under the leaves. */
@@ -484,7 +504,7 @@ export function renderLeaves(root: HTMLElement): () => void {
   function nextCarpet(): void {
     later(1600, () => {
       for (let i = 0; i < 30; i++) dropLeaf(true);
-      later(1400, () => {
+      later(700, () => {
         if (leaves.length === 0) spreadCarpet(carpet());
         paint();
       });
@@ -526,6 +546,7 @@ export function renderLeaves(root: HTMLElement): () => void {
 
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
+    if (now() < fallingUntil) return;
     pick(point(event));
     save.zones[zone.id].left = leaves.length;
     save.zones[zone.id].at = Date.now();
@@ -740,6 +761,21 @@ export function renderLeaves(root: HTMLElement): () => void {
     drawTurned(layerCtx, leaf.sprite, leaf.x, leaf.y, leaf.cos, leaf.sin, LEAF_SIZE);
   }
 
+  /** Each leaf drops from above the trees to its spot, drifting a little, and fades in as it falls. */
+  function drawFallingCarpet(t: number): void {
+    for (const leaf of leaves) {
+      const p = leaf.fall ? Math.min(1, Math.max(0, (t - leaf.fall.at) / LEAF_FALL_MS)) : 1;
+      if (p <= 0) continue;
+      const ease = 1 - (1 - p) * (1 - p);
+      const from = -20 - leaf.y * 0.15;
+      const x = leaf.x + (leaf.fall?.drift ?? 0) * (1 - ease);
+      const y = from + (leaf.y - from) * ease;
+      ctx.globalAlpha = Math.min(1, p * 2.5);
+      drawTurned(ctx, leaf.sprite, x, y, leaf.cos, leaf.sin, LEAF_SIZE * (1 + (1 - ease) * 0.4));
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function redrawLayer(): void {
     layerCtx.clearRect(0, 0, W, H);
     for (const leaf of leaves) stamp(leaf);
@@ -750,10 +786,19 @@ export function renderLeaves(root: HTMLElement): () => void {
     const dt = Math.min(0.05, (t - lastTime) / 1000);
     lastTime = t;
     update(dt, t);
-    if (layerDirty) redrawLayer();
+    const carpetFalling = t < fallingUntil;
+    if (!carpetFalling && fallingUntil > 0) {
+      fallingUntil = 0;
+      for (const leaf of leaves) leaf.fall = undefined;
+      layerDirty = true;
+    }
+    if (layerDirty && !carpetFalling) redrawLayer();
     ctx.drawImage(back, 0, 0, W, H);
-    for (const h of hidden) ctx.drawImage(thingSprite(h.treasure?.id ?? h.kind, h.icon), h.x - 12, h.y - 12, 24, 24);
-    ctx.drawImage(layer, 0, 0, W, H);
+    if (carpetFalling) drawFallingCarpet(t);
+    else {
+      for (const h of hidden) ctx.drawImage(thingSprite(h.treasure?.id ?? h.kind, h.icon), h.x - 12, h.y - 12, 24, 24);
+      ctx.drawImage(layer, 0, 0, W, H);
+    }
     for (const o of ORNAMENTS) if (state().ornaments.includes(o.id)) ctx.drawImage(thingSprite(o.id, o.icon, 36), o.x - 18, o.y - 18, 36, 36);
     // Falling leaves: a shadow where they will land, and bigger the higher they are.
     for (const f of falling) {
@@ -779,10 +824,13 @@ export function renderLeaves(root: HTMLElement): () => void {
       ctx.fillRect(x - 3, y - 3, 6, 6);
     }
     ctx.globalAlpha = 1;
-    // Rare and golden leaves glint.
+    // Rare and golden leaves glint (on a golden carpet, one leaf in eight is enough).
     const glint = 0.5 + 0.5 * Math.sin(t / 180);
-    for (const leaf of leaves) {
+    const allGolden = state().golden;
+    for (let i = 0; i < leaves.length && !carpetFalling; i++) {
+      const leaf = leaves[i];
       if (!leaf.rare && !leaf.golden) continue;
+      if (allGolden && i % 8 !== 0) continue;
       ctx.fillStyle = `rgb(255 255 220 / ${0.35 + glint * 0.5})`;
       ctx.fillRect(leaf.x - 1, leaf.y - 7, 2, 2);
       ctx.fillRect(leaf.x + 5, leaf.y - 1, 2, 2);
@@ -914,13 +962,16 @@ export function renderLeaves(root: HTMLElement): () => void {
     upgradesView.replaceChildren(
       ...UPGRADES.map((u) => {
         const lvl = save.levels[u.id];
-        const maxed = lvl >= u.max;
+        const maxed = !u.endless && lvl >= u.max;
         const cost = u.cost(lvl);
+        const past = u.endless && lvl >= u.max ? u.endless : null;
+        // A renamed endless upgrade (the blower) counts its own levels from 1.
+        const shownLevel = past && past.name !== u.name ? lvl - u.max + 1 : lvl + 1;
         const button = el(
           'button',
           { class: 'leaves-upgrade', type: 'button' },
-          el('span', { class: 'leaves-upgrade-icon', text: u.icon }),
-          el('strong', { text: `${u.name} · niv. ${lvl + 1}` }),
+          el('span', { class: 'leaves-upgrade-icon', text: past?.icon ?? u.icon }),
+          el('strong', { text: `${past?.name ?? u.name} · niv. ${shownLevel}` }),
           el('small', { text: maxed ? `${u.describe(lvl)} · au maximum` : `${u.describe(lvl)} → ${u.describe(lvl + 1)}` }),
           el('span', { class: 'leaves-upgrade-cost', text: maxed ? '✓' : `🍂 ${cost.toLocaleString('fr-FR')}` }),
         );

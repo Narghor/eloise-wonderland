@@ -35,7 +35,7 @@ export const MAX_LEVEL = 10;
 export const OPEN_AT_LEVEL = 3;
 
 /** Each level adds this share of leaves on the ground and of leaf value. */
-export const LEVEL_LEAVES = 0.1;
+export const LEVEL_LEAVES = 0.25;
 export const LEVEL_VALUE = 0.1;
 
 /** A level is a run of carpets: clean the whole ground, the wind lays the next carpet. */
@@ -191,27 +191,45 @@ export interface Upgrade {
   max: number;
   cost(level: number): number;
   describe(level: number): string;
+  /** Past `max`, the upgrade keeps going forever, under this name. */
+  endless?: { name: string; icon: string };
 }
 
-export const BASKET_SIZE = (level: number) => 250 + level * 150;
-/** Leaves picked by one tap: the touched leaf, then its nearest neighbours. */
-export const GRAB = (level: number) => [1, 3, 5, 8, 12, 16, 20, 25, 30][level];
+/** Past an upgrade's classic levels, each step multiplies by `step`. */
+const beyond = (level: number, max: number, atMax: number, step: number) => atMax * step ** (level - max);
+
+export const BASKET_SIZE = (level: number) => (level <= 10 ? 250 + level * 150 : Math.round(beyond(level, 10, 1750, 1.3)));
+/** Leaves picked by one tap: the touched leaf, then its nearest neighbours. Past the gloves, the leaf blower. */
+export const GRAB = (level: number) => (level <= 8 ? [1, 3, 5, 8, 12, 16, 20, 25, 30][level] : Math.round(beyond(level, 8, 30, 1.3)));
 /** How far from the finger a tap still finds a leaf, and how far its neighbours may be. */
 export const TOUCH_REACH = 12;
-export const GRAB_REACH = (level: number) => 18 + level * 6;
+/** The blower's reach grows with the square root of its leaves: the leaves it promises are always within reach. */
+export const GRAB_REACH = (level: number) => (level <= 8 ? 18 + level * 6 : Math.round(66 * Math.sqrt(GRAB(level) / 30)));
 /** Below this many leaves left on a carpet, the last ones shine so nobody hunts for them. */
 export const LAST_LEAVES = 25;
 /** Leaves in each small pile of a carpet. */
 export const PILE_SIZE = 20;
-export const LEAF_VALUE = (level: number) => 1 + level * 0.25;
+export const LEAF_VALUE = (level: number) => (level <= 8 ? 1 + level * 0.25 : Math.round(beyond(level, 8, 3, 1.15) * 100) / 100);
 /** Multiplier on rare leaves, golden leaves and treasures. */
 export const LUCK = (level: number) => 1 + level * 0.25;
 
 export const UPGRADES: Upgrade[] = [
-  { id: 'basket', name: 'Panier', icon: '🧺', max: 10, cost: (l) => Math.round(1200 * 1.85 ** l), describe: (l) => `${BASKET_SIZE(l)} feuilles` },
-  // Kept as 'rake' in saves: it is the gloves now.
-  { id: 'rake', name: 'Gants', icon: '🧤', max: 8, cost: (l) => (l === 0 ? 500 : Math.round(2100 * 2.08 ** l)), describe: (l) => `${GRAB(l)} feuille${GRAB(l) > 1 ? 's' : ''} par toucher` },
-  { id: 'value', name: 'Compost', icon: '🌱', max: 8, cost: (l) => Math.round(4500 * 1.95 ** l), describe: (l) => `×${LEAF_VALUE(l).toLocaleString('fr-FR')} feuille d’or par feuille` },
+  {
+    id: 'basket', name: 'Panier', icon: '🧺', max: 10, endless: { name: 'Panier', icon: '🧺' },
+    cost: (l) => Math.round(l < 10 ? 1200 * 1.85 ** l : beyond(l, 9, 1200 * 1.85 ** 9, 1.35)),
+    describe: (l) => `${BASKET_SIZE(l).toLocaleString('fr-FR')} feuilles`,
+  },
+  // Kept as 'rake' in saves: the gloves, then the leaf blower.
+  {
+    id: 'rake', name: 'Gants', icon: '🧤', max: 8, endless: { name: 'Souffleur', icon: '🌬️' },
+    cost: (l) => (l === 0 ? 500 : Math.round(l < 8 ? 2100 * 2.08 ** l : beyond(l, 7, 2100 * 2.08 ** 7, 1.35))),
+    describe: (l) => `${GRAB(l).toLocaleString('fr-FR')} feuille${GRAB(l) > 1 ? 's' : ''} par toucher`,
+  },
+  {
+    id: 'value', name: 'Compost', icon: '🌱', max: 8, endless: { name: 'Compost', icon: '🌱' },
+    cost: (l) => Math.round(l < 8 ? 4500 * 1.95 ** l : beyond(l, 7, 4500 * 1.95 ** 7, 1.4)),
+    describe: (l) => `×${LEAF_VALUE(l).toLocaleString('fr-FR')} feuille d’or par feuille`,
+  },
   { id: 'luck', name: 'Trèfle', icon: '🍀', max: 6, cost: (l) => Math.round(9000 * 2.2 ** l), describe: (l) => `chance ×${LUCK(l).toLocaleString('fr-FR')} (raretés, trésors)` },
 ];
 

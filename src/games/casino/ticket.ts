@@ -1,7 +1,7 @@
 import './ticket.css';
 import { el } from '../../dom';
 import { type Difficulty, difficultyName } from '../../difficulty';
-import { pay } from './chips';
+import { pay, formatChips } from './chips';
 import { CASINO_TEST_BUTTONS } from './fx/testMode'; // TEST-BUTTONS
 
 // -----------------------------------------------
@@ -55,7 +55,7 @@ function scratchCard(amount: number, difficulty: Difficulty): HTMLElement {
   const skip = el('button', { class: 'ticket-skip', type: 'button', text: 'Ignorer' });
   const card = el(
     'div',
-    { class: 'ticket', role: 'group', 'aria-label': `Ticket casino : ${amount} jetons` },
+    { class: 'ticket', role: 'group', 'aria-label': `Ticket casino : ${formatChips(amount)} jetons` },
     el('small', { class: 'ticket-title', text: `TICKET CASINO · ${difficultyName(difficulty).toUpperCase()}` }),
     zone,
     el('a', { class: 'ticket-link', href: '#/casino', text: 'Jetons ajoutés à ton solde du casino' }),

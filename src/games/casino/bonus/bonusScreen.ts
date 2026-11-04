@@ -1,6 +1,6 @@
 import './bonus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, winJackpot } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, winJackpot, formatChips } from '../chips';
 import {
   armSoundUnlock, burst, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
   playCoinLand, playDoorOpen, playRespinMiss, playTallyNote, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
@@ -148,7 +148,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   function refresh(): void {
     const lv = level();
     balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
-    betLabel.textContent = `${lv.bet} jetons`;
+    betLabel.textContent = `${formatChips(lv.bet)} jetons`;
     JACKPOT_NAMES.forEach((_, tier) => {
       const locked = tier > lv.jackpotTier;
       const value = tier < 3 ? jackpotsNow(lv)[tier] : grandPrize(jackpot(MACHINE_ID), lv.bet);
@@ -233,7 +233,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     }));
     lines = drawWinLines(grid, cells, paths, (i) => {
       const w = wins[i];
-      detail.textContent = `Ligne ${w.line + 1} : ${SYMBOLS[w.symbol].glyph.repeat(w.count)} = ${Math.round(w.mult * stake)} jetons`;
+      detail.textContent = `Ligne ${w.line + 1} : ${SYMBOLS[w.symbol].glyph.repeat(w.count)} = ${formatChips(Math.round(w.mult * stake))} jetons`;
     });
     if (wins.length > 1) detail.textContent = `${wins.length} lignes gagnantes !`;
     const multiple = won / stake;
@@ -308,7 +308,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       el('div', { class: 'bonus-celebrate-sub', text: 'HOLD & SPIN' }),
       el('div', { text: `Chaque pièce qui tombe = des jetons pour toi !` }),
       el('div', { text: `${START_COINS} pièces pour commencer. Chaque nouvelle pièce remet ${RESPINS} relances.` }),
-      el('div', { text: `Pièces de ${lv.bet * MIN_COIN} à ${lv.bet * MAX_COIN} jetons` }),
+      el('div', { text: `Pièces de ${formatChips(lv.bet * MIN_COIN)} à ${formatChips(lv.bet * MAX_COIN)} jetons` }),
       el('div', { class: 'bonus-small-light', text: `Jackpots : ${JACKPOT_NAMES.slice(0, lv.jackpotTier + 1).join(', ')}` }),
     );
     banner.querySelector('.bonus-celebrate-door')!.innerHTML = TREASURE_DOOR;
@@ -569,7 +569,7 @@ function rules(lv: BetLevel): HTMLElement[] {
     ),
     el('h3', { class: 'bonus-paytable-title', text: `Les ${LINES.length} lignes` }),
     paylineDiagrams(LINES, ROWS),
-    el('h3', { class: 'bonus-paytable-title', text: `Gains par ligne (mise ${lv.bet})` }),
+    el('h3', { class: 'bonus-paytable-title', text: `Gains par ligne (mise ${formatChips(lv.bet)})` }),
     payoutTable(entries, lv.bet),
     rulesBlock(
       'La porte 🚪',

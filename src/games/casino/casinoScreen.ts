@@ -1,7 +1,7 @@
 import './casino.css';
 import { el, topBar } from '../../dom';
 import { loadCompanion } from '../../companion/companionSave';
-import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, hideSentGift, loadCasino, pay, redeemGift, sendGift } from './chips';
+import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, hideSentGift, loadCasino, pay, redeemGift, sendGift, formatChips } from './chips';
 import { decodeGift } from './giftCode';
 import { burst, playBonusTrigger } from './fx';
 import { renderSlots } from './slots/slotsScreen';
@@ -57,11 +57,11 @@ function renderLobby(root: HTMLElement): void {
     packs.append(button);
   }
 
-  const record = el('span', { class: 'casino-record', text: `Record : ${save.record} jetons` });
+  const record = el('span', { class: 'casino-record', text: `Record : ${formatChips(save.record)} jetons` });
   const bank = el(
     'section',
     { class: 'casino-bank' },
-    el('strong', { class: 'casino-balance', text: `${save.chips} jetons` }),
+    el('strong', { class: 'casino-balance', text: `${formatChips(save.chips)} jetons` }),
     record,
   );
   // Secret: holding the record line for 3 s gives 1000 chips.
@@ -118,7 +118,7 @@ function renderLobby(root: HTMLElement): void {
           { class: 'casino-cashier' },
           el('h2', { text: 'Guichet' }),
           el('p', {
-            text: `Tu as ${coins} 🪙. Une pièce donne ${CHIPS_PER_COIN} jetons. Les jetons ne redeviennent jamais des pièces.`,
+            text: `Tu as ${coins} 🪙. Une pièce donne ${formatChips(CHIPS_PER_COIN)} jetons. Les jetons ne redeviennent jamais des pièces.`,
           }),
           packs,
           el('p', {

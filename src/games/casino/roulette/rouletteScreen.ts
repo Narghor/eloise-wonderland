@@ -1,6 +1,6 @@
 import './roulette.css';
 import { el, topBar } from '../../../dom';
-import { bet, chips, pay } from '../chips';
+import { bet, chips, pay, formatChips } from '../chips';
 import { WHEEL_ORDER, colorOf, drawNumber, payout, totalStake, type BetId, type Bets } from './rouletteLogic';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -98,7 +98,7 @@ export function renderRoulette(root: HTMLElement): () => void {
 
   // --- controls
   const chipButtons = CHIP_VALUES.map((value) => {
-    const b = el('button', { class: 'rl-chip', type: 'button', text: chipLabel(value), 'aria-label': `${value} jetons` });
+    const b = el('button', { class: 'rl-chip', type: 'button', text: chipLabel(value), 'aria-label': `${formatChips(value)} jetons` });
     b.addEventListener('click', () => {
       chipValue = value;
       refresh();
@@ -162,7 +162,7 @@ export function renderRoulette(root: HTMLElement): () => void {
       pay(won);
       history = [n, ...history].slice(0, HISTORY_SIZE);
       const name = n === 0 ? 'zéro' : colorOf(n) === 'red' ? 'rouge' : 'noir';
-      message.textContent = won > 0 ? `${n} ${name} : tu gagnes ${won} jetons !` : `${n} ${name} : perdu cette fois.`;
+      message.textContent = won > 0 ? `${n} ${name} : tu gagnes ${formatChips(won)} jetons !` : `${n} ${name} : perdu cette fois.`;
       bets.clear();
       spinning = false;
       refresh();
@@ -196,7 +196,7 @@ export function renderRoulette(root: HTMLElement): () => void {
     }
     chipButtons.forEach((b, i) => b.classList.toggle('rl-chip-active', CHIP_VALUES[i] === chipValue));
     const stake = totalStake(bets);
-    stakeLabel.textContent = `Mise totale : ${stake} jetons`;
+    stakeLabel.textContent = `Mise totale : ${formatChips(stake)} jetons`;
     spinButton.disabled = spinning || stake === 0;
     clearButton.disabled = spinning || stake === 0;
     repeatButton.disabled = spinning || lastBets.size === 0;

@@ -1,6 +1,6 @@
 import './olympus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, noteWin, pay } from '../chips';
+import { bet, chips, noteWin, pay, formatChips } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playLose, playReelStop, playMedusaAwake, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
@@ -133,7 +133,7 @@ export function renderOlympus(root: HTMLElement): () => void {
 
   function refresh(): void {
     balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
-    betLabel.textContent = `${currentBet()} jetons`;
+    betLabel.textContent = `${formatChips(currentBet())} jetons`;
     minus.disabled = busy || betIndex === 0;
     plus.disabled = busy || betIndex === BETS.length - 1;
     spinButton.disabled = busy || chips() < currentBet();
@@ -361,7 +361,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     const totalChips = chipsFor(feature.mult, stake);
     // Sessions saved before the floor existed have no topUp field.
     if ((feature.topUp ?? 0) > 0 && totalChips > total) {
-      setMessage(`Minimum garanti : +${totalChips - total} jetons`, 'oly-big');
+      setMessage(`Minimum garanti : +${formatChips(totalChips - total)} jetons`, 'oly-big');
       const from = total;
       countUp(totalValue, totalChips - total, 800, (n) => `${from + n}`);
       await wait(1600);
@@ -370,7 +370,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     savePending(null);
     noteWin(LOBBY_ID, totalChips, stake);
     refresh();
-    setMessage(`Tours gratuits : ${totalChips} jetons`, 'oly-win-text');
+    setMessage(`Tours gratuits : ${formatChips(totalChips)} jetons`, 'oly-win-text');
     await showBigWin(document.body, totalChips, stake, totalChips >= stake * 10 ? 'MEDUSA PAIE !' : 'TOURS GRATUITS', { themeClass: 'oly-bigwin' });
     featureBar.replaceChildren();
     machine.classList.remove('oly-flooded');

@@ -1,6 +1,6 @@
 import './luna.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, noteWin, pay } from '../chips';
+import { bet, chips, noteWin, pay, formatChips } from '../chips';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playBookOpen, playGambleLose, playGambleWin, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
@@ -132,7 +132,7 @@ export function renderLuna(root: HTMLElement): () => void {
 
   function refresh(): void {
     balance.textContent = `${chips().toLocaleString('fr-FR')} jetons`;
-    betLabel.textContent = `${currentBet()} jetons`;
+    betLabel.textContent = `${formatChips(currentBet())} jetons`;
     const locked = busy || gamble !== null && !gamblePanel.hidden;
     minus.disabled = locked || betIndex === 0;
     plus.disabled = locked || betIndex === BETS.length - 1;
@@ -376,7 +376,7 @@ export function renderLuna(root: HTMLElement): () => void {
     const totalChips = chipsFor(feature.mult, stake);
     // Sessions saved before the floor existed have no topUp field.
     if ((feature.topUp ?? 0) > 0 && totalChips > total) {
-      setMessage(`Minimum garanti : +${totalChips - total} jetons`, 'luna-win-text');
+      setMessage(`Minimum garanti : +${formatChips(totalChips - total)} jetons`, 'luna-win-text');
       const from = total;
       countUp(totalValue, totalChips - total, 800, (n) => `${from + n}`);
       await wait(1600);
@@ -384,7 +384,7 @@ export function renderLuna(root: HTMLElement): () => void {
     }
     noteWin(LOBBY_ID, totalChips, stake);
     refresh();
-    setMessage(`Tours gratuits : ${totalChips} jetons`, 'luna-win-text');
+    setMessage(`Tours gratuits : ${formatChips(totalChips)} jetons`, 'luna-win-text');
     await showBigWin(document.body, totalChips, stake, totalChips >= stake * 20 ? 'ELOISE RAYONNE !' : 'TOURS GRATUITS');
     featureBar.replaceChildren();
     screen.classList.remove('luna-in-feature');
@@ -467,7 +467,7 @@ export function renderLuna(root: HTMLElement): () => void {
   function offerGamble(amount: number, stake: number): void {
     if (!canGamble(amount, stake, 0)) return;
     gamble = { amount, stake, steps: 0 };
-    doubleButton.textContent = `Doubler ${amount} jetons ?`;
+    doubleButton.textContent = `Doubler ${formatChips(amount)} jetons ?`;
     doubleButton.hidden = false;
   }
 
@@ -492,7 +492,7 @@ export function renderLuna(root: HTMLElement): () => void {
 
   function paintGamble(info: string): void {
     if (!gamble) return;
-    gambleAmount.textContent = `${gamble.amount} jetons`;
+    gambleAmount.textContent = `${formatChips(gamble.amount)} jetons`;
     gambleInfo.textContent = info;
     const can = canGamble(gamble.amount, gamble.stake, gamble.steps);
     redButton.disabled = !can;
@@ -542,7 +542,7 @@ export function renderLuna(root: HTMLElement): () => void {
       paintGamble(canGamble(gamble.amount, gamble.stake, gamble.steps)
         ? `Gagné ! Encore ${left} essai${left > 1 ? 's' : ''} possible${left > 1 ? 's' : ''}.`
         : 'Gagné ! Plafond atteint, encaisse.');
-      setMessage(`Doublé : ${gamble.amount} jetons`, 'luna-win-text');
+      setMessage(`Doublé : ${formatChips(gamble.amount)} jetons`, 'luna-win-text');
     } else {
       playGambleLose();
       shake(gamblePanel, 1);
@@ -559,7 +559,7 @@ export function renderLuna(root: HTMLElement): () => void {
   redButton.addEventListener('click', () => guess(true));
   blackButton.addEventListener('click', () => guess(false));
   collectButton.addEventListener('click', () => {
-    if (gamble && gamble.amount > 0) setMessage(`Encaissé : ${gamble.amount} jetons`, 'luna-win-text');
+    if (gamble && gamble.amount > 0) setMessage(`Encaissé : ${formatChips(gamble.amount)} jetons`, 'luna-win-text');
     endGamble();
     refresh();
   });

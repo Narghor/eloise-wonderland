@@ -62,7 +62,7 @@ export function loadLeaves(): LeavesSave {
   const levels = {} as Record<UpgradeId, number>;
   for (const u of UPGRADES) {
     const value = rec(data.levels)[u.id];
-    levels[u.id] = isCount(value) ? Math.min(u.max, value) : 0;
+    levels[u.id] = isCount(value) ? (u.endless ? value : Math.min(u.max, value)) : 0;
   }
   const zones: Record<string, ZoneState> = {};
   for (const z of ZONES) {
