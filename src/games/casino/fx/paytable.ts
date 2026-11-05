@@ -60,6 +60,7 @@ export function payoutTable(entries: PayoutEntry[], stake?: number): HTMLElement
 }
 
 /** A titled rules block: short sentences, each one a rule. */
-export function rulesBlock(title: string, ...items: (string | Node)[]): HTMLElement {
-  return el('section', { class: 'fx-rules' }, el('h3', { text: title }), el('ul', {}, ...items.map((item) => el('li', {}, item))));
+export function rulesBlock(title: string | (string | Node)[], ...items: (string | Node)[]): HTMLElement {
+  const heading = typeof title === 'string' ? [title] : title;
+  return el('section', { class: 'fx-rules' }, el('h3', {}, ...heading), el('ul', {}, ...items.map((item) => el('li', {}, item))));
 }

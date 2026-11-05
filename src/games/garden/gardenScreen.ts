@@ -1,7 +1,8 @@
 import './garden.css';
 import { el, topBar } from '../../dom';
-import { isColored, type Creature } from '../../creatures/creature';
-import { creatureCanvas } from '../../creatures/creatureCanvas';
+import { isColored } from '../../pictures/pixelPicture';
+import type { Creature } from '../../creatures/creature';
+import { pictureCanvas } from '../../pictures/pictureCanvas';
 import { loadGarden } from '../../creatures/garden';
 
 export function renderGarden(root: HTMLElement): () => void {
@@ -38,7 +39,7 @@ export function renderGarden(root: HTMLElement): () => void {
     const tile = el(
       'button',
       { class: colored ? 'garden-tile' : 'garden-tile is-pending', type: 'button' },
-      creatureCanvas(creature, 84),
+      pictureCanvas(creature, 84),
       el('span', { class: 'garden-tile-name', text: creature.name }),
     );
     if (creature.rarity) {
@@ -79,7 +80,7 @@ function creatureDialog(): { element: HTMLDialogElement; show(creature: Creature
   return {
     element,
     show(creature: Creature) {
-      portrait.replaceChildren(creatureCanvas(creature, 200));
+      portrait.replaceChildren(pictureCanvas(creature, 200));
       name.textContent = creature.name;
       const date = `Apparue le ${new Date(creature.bornAt).toLocaleDateString('fr-FR')}`;
       born.textContent = creature.stars === undefined ? date : `${starsText(creature.stars)} · ${date}`;

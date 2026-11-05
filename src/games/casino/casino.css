@@ -170,6 +170,11 @@
   transition: opacity 0.5s, transform 0.5s;
 }
 
+.casino-gift-lines {
+  display: grid;
+  gap: 2px;
+}
+
 .casino-gift-toast.is-leaving {
   opacity: 0;
   transform: translate(-50%, -20px);

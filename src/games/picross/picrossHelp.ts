@@ -4,7 +4,7 @@ export const PICROSS_HELP: Help = {
   id: 'picross',
   title: 'Comment jouer au Picross',
   steps: [
-    ['Le but : noircir les bonnes cases pour faire apparaître la petite bête cachée dans la grille.'],
+    ['Le but : noircir les bonnes cases pour faire apparaître le dessin caché dans la grille : une petite bête pour ton jardin, ou un modèle pour ton carnet de Pixel art.'],
     [
       'Les chiffres devant une ligne (et au-dessus d’une colonne) donnent la longueur des blocs de cases noires, dans l’ordre. « 3 1 » veut dire : un bloc de 3, au moins une case vide, puis un bloc de 1.',
       lineDiagram('3 1', '###.#.'),

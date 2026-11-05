@@ -9,8 +9,9 @@ import { MAX_GIFT, decodeGift, encodeGift, randomNonce } from './giftCode';
 // Chips never turn back into coins: the only bridge is coins -> chips.
 
 const GAME_ID = 'casino';
-const STARTING_CHIPS = 1000;
 export const DAILY_GIFT = 5000;
+/** Given once to every player, old or new; set it to null at the next update to end the offer. */
+export const ONE_TIME_GIFT: { id: string; chips: number } | null = { id: 'welcome-2026-11', chips: 10000 };
 export const CHIPS_PER_COIN = 10;
 const JACKPOT_SEED = 5000;
 
@@ -28,12 +29,15 @@ export interface CasinoSave {
   usedGifts: number[];
   /** Last codes created here, newest first, so a closed page never loses one. */
   sentGifts: string[];
+  /** Ids of the one-time gifts already given. */
+  claimedGifts: string[];
 }
 
 export function loadCasino(): CasinoSave {
   const raw = readGame(GAME_ID);
   if (typeof raw !== 'object' || raw === null) {
-    return { chips: STARTING_CHIPS, record: STARTING_CHIPS, refilledOn: todayKey(), jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [] };
+    // A new player has no day counted yet: the daily gift is their starting balance.
+    return { chips: 0, record: 0, refilledOn: '', jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [], claimedGifts: [] };
   }
   const data = raw as Record<string, unknown>;
   const chips = isCount(data.chips) ? data.chips : 0;
@@ -45,6 +49,7 @@ export function loadCasino(): CasinoSave {
     bestWins: readAmounts(data.bestWins),
     usedGifts: Array.isArray(data.usedGifts) ? data.usedGifts.filter((nonce): nonce is number => isCount(nonce)) : [],
     sentGifts: Array.isArray(data.sentGifts) ? data.sentGifts.filter((code): code is string => typeof code === 'string') : [],
+    claimedGifts: Array.isArray(data.claimedGifts) ? data.claimedGifts.filter((id): id is string => typeof id === 'string') : [],
   };
 }
 
@@ -94,15 +99,22 @@ export function pay(amount: number): void {
 export function claimDailyGift(): number {
   const save = loadCasino();
   const today = todayKey();
-  if (save.refilledOn === today) {
-    // A brand-new player starts with the day already counted: persist it, or tomorrow would see no date.
-    if (readGame(GAME_ID) == null) saveCasino(save);
-    return 0;
-  }
+  if (save.refilledOn === today) return 0;
   save.chips += DAILY_GIFT;
   save.refilledOn = today;
   saveCasino(save);
   return DAILY_GIFT;
+}
+
+/** Gives the current one-time gift if this player never got it. Returns the chips given (0 otherwise). */
+export function claimOneTimeGift(): number {
+  if (!ONE_TIME_GIFT) return 0;
+  const save = loadCasino();
+  if (save.claimedGifts.includes(ONE_TIME_GIFT.id)) return 0;
+  save.chips += ONE_TIME_GIFT.chips;
+  save.claimedGifts.push(ONE_TIME_GIFT.id);
+  saveCasino(save);
+  return ONE_TIME_GIFT.chips;
 }
 
 /** Spends companion coins for chips. One way only. Returns false when the coins are missing. */

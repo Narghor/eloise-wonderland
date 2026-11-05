@@ -553,6 +553,22 @@ a {
   background: #e8763a;
 }
 
+.game-card-icon.is-pixel-art {
+  background: #fdeede;
+}
+
+.game-card-icon.is-pixel-art span.is-on {
+  background: #e5455a;
+}
+
+.game-card-icon.is-coloring-book {
+  background: #e9f2ff;
+}
+
+.game-card-icon.is-coloring-book span.is-on {
+  background: #4a90e2;
+}
+
 .game-card-icon.is-potions {
   width: 69px;
   height: 69px;
@@ -821,6 +837,10 @@ a {
 
 .companion-canvas {
   display: block;
+  image-rendering: pixelated;
+}
+
+.picture-canvas {
   image-rendering: pixelated;
 }
 

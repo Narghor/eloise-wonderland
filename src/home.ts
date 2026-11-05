@@ -1,8 +1,10 @@
 import { el } from './dom';
 import { exportSave, importSave, readGame } from './save';
-import { isColored } from './creatures/creature';
-import { creatureCanvas } from './creatures/creatureCanvas';
+import { isColored } from './pictures/pixelPicture';
+import { pictureCanvas } from './pictures/pictureCanvas';
 import { loadGarden } from './creatures/garden';
+import { loadNotebook } from './pictures/notebook';
+import { loadBook } from './games/coloringBook/bookSave';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
 import { loadCasino, formatChips } from './games/casino/chips';
@@ -13,7 +15,7 @@ import { ZONES } from './games/leaves/leavesData';
 import { loadLeaves } from './games/leaves/leavesSave';
 import { loadAquarium } from './games/aquarium/aquariumSave';
 import { loadOrigami } from './games/origami/origamiSave';
-import { grantDailyGift } from './games/casino/casinoScreen';
+import { grantCasinoGifts } from './games/casino/casinoScreen';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
 // -----------------------------------------------
@@ -86,9 +88,9 @@ function levelInProgress(entry: GameEntry): { number: number | null } | null {
 // -----------------------------------------------
 
 export function renderHome(root: HTMLElement): () => void {
-  grantDailyGift();
+  grantCasinoGifts();
   const sections = SECTIONS.map(({ title, games }) =>
-    homeSection(title, games.map((id) => gameTile(GAMES[id])), title === 'Création' ? [gardenTile(), origamiTile()] : []),
+    homeSection(title, games.map((id) => gameTile(GAMES[id])), title === 'Création' ? [gardenTile(), pixelArtTile(), coloringBookTile(), origamiTile()] : []),
   );
   root.append(
     el(
@@ -154,12 +156,34 @@ function gardenTile(): HTMLElement {
   const pending = creatures.filter((creature) => !isColored(creature)).length;
   const lastColored = creatures.filter(isColored).at(-1);
   const icon = lastColored
-    ? el('span', { class: 'game-card-icon is-creature', 'aria-hidden': 'true' }, creatureCanvas(lastColored, 53))
+    ? el('span', { class: 'game-card-icon is-creature', 'aria-hidden': 'true' }, pictureCanvas(lastColored, 53))
     : pixelIcon(['00100', '01110', '10101', '01110', '01010'], 'is-garden');
   let progress = 'Coloriage';
   if (pending > 0) progress = `${pending} à colorier`;
   else if (creatures.length > 0) progress = creatures.length === 1 ? '1 petite bête' : `${creatures.length} petites bêtes`;
   return tile('#/jardin', icon, 'Le Jardin', progress);
+}
+
+function pixelArtTile(): HTMLElement {
+  const drawings = loadNotebook();
+  const pending = drawings.filter((drawing) => !isColored(drawing)).length;
+  const lastColored = drawings.filter(isColored).at(-1);
+  const icon = lastColored
+    ? el('span', { class: 'game-card-icon is-creature', 'aria-hidden': 'true' }, pictureCanvas(lastColored, 53))
+    : pixelIcon(['01110', '10101', '11111', '10001', '01110'], 'is-pixel-art');
+  let progress = 'À découvrir';
+  if (pending > 0) progress = `${pending} à colorier`;
+  else if (drawings.length > 0) progress = drawings.length === 1 ? '1 dessin' : `${drawings.length} dessins`;
+  return tile('#/pixel', icon, 'Pixel art', progress);
+}
+
+function coloringBookTile(): HTMLElement {
+  const book = loadBook();
+  const icon = pixelIcon(['00011', '00111', '01110', '11100', '11000'], 'is-coloring-book');
+  let progress = 'À découvrir';
+  if (book.pages.model || book.pages.free) progress = 'En cours';
+  else if (book.pagesDone > 0) progress = book.pagesDone === 1 ? '1 coloriage' : `${book.pagesDone} coloriages`;
+  return tile('#/coloriage', icon, 'Coloriage', progress);
 }
 
 function origamiTile(): HTMLElement {

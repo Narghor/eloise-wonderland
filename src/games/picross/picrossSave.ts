@@ -12,6 +12,8 @@ export interface InProgress {
   elapsedMs: number;
   /** Day of the daily challenge this grid is. */
   challenge?: string;
+  /** The hand-drawn model this grid draws; none for a creature. */
+  modelId?: string;
 }
 
 export interface PicrossSave {
@@ -54,6 +56,7 @@ function isInProgress(value: unknown): value is InProgress {
     size > 0 &&
     typeof candidate.elapsedMs === 'number' &&
     (candidate.challenge === undefined || isDayKey(candidate.challenge)) &&
+    (candidate.modelId === undefined || typeof candidate.modelId === 'string') &&
     isSquareGrid(candidate.solution, size, (cell) => typeof cell === 'boolean') &&
     isSquareGrid(candidate.marks, size, (cell) => cell === Mark.None || cell === Mark.Fill || cell === Mark.Cross)
   );

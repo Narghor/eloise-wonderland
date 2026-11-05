@@ -22,3 +22,15 @@ export const TREASURE_DOOR = `<svg viewBox="0 3 100 100" class="bonus-door-art" 
 <path d="M50 63.5 l1.2 3 -1.2 6 -1.2 -6 z" fill="#fff3a8"/>
 <path d="M44 12 l2 -6 2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 z" fill="#fff" opacity=".9"/>
 </svg>`;
+
+/** Self-contained door for places without BONUS_DEFS on the page (the lobby). */
+export const DOOR_ICON = BONUS_DEFS + TREASURE_DOOR;
+
+/** The door at text size, inside a title or a sentence; needs BONUS_DEFS on the page. */
+export function inlineDoor(): HTMLElement {
+  const door = document.createElement('span');
+  door.className = 'bonus-door-inline';
+  door.setAttribute('aria-hidden', 'true');
+  door.innerHTML = TREASURE_DOOR;
+  return door;
+}

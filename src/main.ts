@@ -26,6 +26,8 @@ import { renderFishing } from './games/fishing/fishingScreen';
 import { renderLeaves } from './games/leaves/leavesScreen';
 import { renderAquarium } from './games/aquarium/aquariumScreen';
 import { renderOrigami } from './games/origami/origamiScreen';
+import { renderPixelArt } from './games/pixel/pixelScreen';
+import { renderColoringBook } from './games/coloringBook/bookScreen';
 import { requestPersistentStorage } from './save';
 import { watchForUpdates } from './update';
 
@@ -60,6 +62,8 @@ const routes: Record<string, Screen> = {
   feuilles: renderLeaves,
   aquarium: renderAquarium,
   origami: renderOrigami,
+  pixel: renderPixelArt,
+  coloriage: renderColoringBook,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

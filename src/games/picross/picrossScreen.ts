@@ -1,13 +1,17 @@
 import './picross.css';
 import { el, topBar } from '../../dom';
-import { createCreature, difficultyForSize } from '../../creatures/creature';
+import { createCreature } from '../../creatures/creature';
+import { difficultyForSize } from '../../pictures/pixelPicture';
 import { addCreature } from '../../creatures/garden';
 import { helpSlot, openHelpOnFirstVisit } from '../../help';
 import { difficultyName } from '../../difficulty';
 import { levelReward } from '../../companion/reward';
 import { navigate } from '../../navigation';
 import { PICROSS_HELP } from './picrossHelp';
-import { generatePuzzle, puzzleFrom, type Puzzle } from './generator';
+import { drawGrid, puzzleFrom, type Puzzle } from './generator';
+import { findModel } from '../../pictures/pixelModels';
+import { EMPTY_CELL, modelSize, type PixelModel } from '../../pictures/pixelModel';
+import { addModelDrawing, discoveredModels } from '../../pictures/notebook';
 import { clueOf, sameClue } from './lines';
 import { Mark, emptyMarks, loadPicross, savePicross, type InProgress, type PicrossSave } from './picrossSave';
 
@@ -25,7 +29,7 @@ export function startPicrossChallenge(day: string): void {
   if (save.current && save.current.marks.some((row) => row.some((mark) => mark !== Mark.None))) {
     if (!confirm('Le défi remplace ta grille de Picross en cours. On y va ?')) return;
   }
-  save.current = { solution: generatePuzzle(CHALLENGE_SIZE).solution, marks: emptyMarks(CHALLENGE_SIZE), elapsedMs: 0, challenge: day };
+  save.current = { ...drawGrid(CHALLENGE_SIZE, discoveredModels()), marks: emptyMarks(CHALLENGE_SIZE), elapsedMs: 0, challenge: day };
   savePicross(save);
   navigate('#/picross');
 }
@@ -44,7 +48,7 @@ export function renderPicross(root: HTMLElement): () => void {
   };
   const startNew = (size: number) => {
     leaveGame();
-    save.current = { solution: generatePuzzle(size).solution, marks: emptyMarks(size), elapsedMs: 0 };
+    save.current = { ...drawGrid(size, discoveredModels()), marks: emptyMarks(size), elapsedMs: 0 };
     savePicross(save);
     showGame(save.current);
   };
@@ -399,30 +403,51 @@ class PicrossGame {
     const key = String(this.size);
     this.save.solvedBySize[key] = (this.save.solvedBySize[key] ?? 0) + 1;
     const time = formatTime(this.state.elapsedMs);
-    const creature = createCreature(this.state.solution);
-    addCreature(creature);
+    const prize = this.claimPrize();
     this.save.current = null;
     savePicross(this.save);
     const reward = levelReward(null, difficultyForSize(this.size), this.state.challenge);
-
-    this.board.style.setProperty('--reveal-color', creature.palette[0]);
     this.board.classList.add('is-solved');
 
-    const color = el('a', { class: 'button', href: `#/colorier/${creature.id}` }, 'La colorier');
     const again = el('button', { class: 'button button-secondary', type: 'button' }, 'Nouvelle grille');
     again.addEventListener('click', () => this.actions.newGrid(this.size));
     const otherSize = el('button', { class: 'button button-secondary', type: 'button' }, 'Changer de taille');
     otherSize.addEventListener('click', () => this.actions.changeSize());
     this.controls.replaceChildren(
       el('p', { class: 'win-message' }, el('strong', { text: 'Bravo !' }), ` Grille terminée en ${time}.`),
-      el(
-        'p',
-        { class: 'win-creature' },
-        creature.rarity ? '✨ Une bête RARE est apparue : ' : 'Une petite bête est apparue : ',
-        el('strong', { text: creature.name }),
-      ),
+      el('p', { class: 'win-creature' }, ...prize.message),
       reward,
-      el('div', { class: 'button-row' }, color, again, otherSize),
+      el('div', { class: 'button-row' }, prize.colorLink, again, otherSize),
+    );
+  }
+
+  /** A model grid adds its drawing to the notebook; any other grid makes a creature for the garden. */
+  private claimPrize(): { message: (string | Node)[]; colorLink: HTMLElement } {
+    const model = this.state.modelId ? findModel(this.state.modelId) : undefined;
+    if (model && modelSize(model) === this.size) {
+      const drawing = addModelDrawing(model, 'picross');
+      this.revealModel(model);
+      return {
+        message: ['Un dessin rejoint ton carnet : ', el('strong', { text: model.name })],
+        colorLink: el('a', { class: 'button', href: `#/pixel/${drawing.id}` }, 'Le colorier'),
+      };
+    }
+    const creature = createCreature(this.state.solution);
+    addCreature(creature);
+    this.board.style.setProperty('--reveal-color', creature.palette[0]);
+    return {
+      message: [creature.rarity ? '✨ Une bête RARE est apparue : ' : 'Une petite bête est apparue : ', el('strong', { text: creature.name })],
+      colorLink: el('a', { class: 'button', href: `#/colorier/${creature.id}` }, 'La colorier'),
+    };
+  }
+
+  /** Each filled cell takes its colour in the model; a cell of another solution takes the main colour. */
+  private revealModel(model: PixelModel): void {
+    this.board.style.setProperty('--reveal-color', model.colors[0]);
+    model.rows.forEach((row, r) =>
+      [...row].forEach((char, c) => {
+        if (char !== EMPTY_CELL) this.cells[r][c].style.setProperty('--reveal-color', model.colors[Number(char)]);
+      }),
     );
   }
 

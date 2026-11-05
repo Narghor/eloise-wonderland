@@ -9,7 +9,7 @@ import {
   keepScreenOn,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
-import { BONUS_DEFS, TREASURE_DOOR } from './bonusArt';
+import { BONUS_DEFS, TREASURE_DOOR, inlineDoor } from './bonusArt';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import {
   BET_LEVELS,
@@ -101,14 +101,14 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   const machine = el(
     'div',
     { class: 'bonus-machine' },
-    el('div', { class: 'bonus-plaque', text: '🚪 Porte aux Jackpots 🚪' }),
+    el('div', { class: 'bonus-plaque' }, inlineDoor(), ' Porte aux Jackpots ', inlineDoor()),
     jackpotsView,
     totalView,
     respinsView,
     reelWindow,
   );
   const lights = marquee(machine, 10);
-  const message = el('div', { class: 'bonus-message', role: 'status', text: '🚪 sur les rouleaux 1, 3 et 5 = bonus !' });
+  const message = el('div', { class: 'bonus-message', role: 'status' }, inlineDoor(), ' sur les rouleaux 1, 3 et 5 = bonus !');
   const detail = el('div', { class: 'bonus-detail' });
 
   const betLabel = el('span', { class: 'bonus-bet-value' });
@@ -572,7 +572,7 @@ function rules(lv: BetLevel): HTMLElement[] {
     el('h3', { class: 'bonus-paytable-title', text: `Gains par ligne (mise ${formatChips(lv.bet)})` }),
     payoutTable(entries, lv.bet),
     rulesBlock(
-      'La porte 🚪',
+      ['La porte ', inlineDoor()],
       'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 106, quelle que soit la mise).',
       `Tu commences avec ${START_COINS} pièces et ${RESPINS} relances. Chaque nouvelle pièce reste bloquée et remet les relances à ${RESPINS}.`,
       `Les ${START_COINS} pièces de départ valent de ${MIN_COIN} à ${MAX_OPENING_COIN} × ta mise. Celles qui tombent pendant les relances valent bien plus, jusqu’à ${MAX_COIN} × ta mise, et ce sont elles qui portent les jackpots.`,

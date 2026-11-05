@@ -1,7 +1,7 @@
 import './casino.css';
 import { el, topBar } from '../../dom';
 import { loadCompanion } from '../../companion/companionSave';
-import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, hideSentGift, loadCasino, pay, redeemGift, sendGift, formatChips } from './chips';
+import { CHIPS_PER_COIN, DAILY_GIFT, bestWin, buyChips, claimDailyGift, claimOneTimeGift, hideSentGift, loadCasino, pay, redeemGift, sendGift, formatChips } from './chips';
 import { decodeGift } from './giftCode';
 import { burst, playBonusTrigger } from './fx';
 import { renderSlots } from './slots/slotsScreen';
@@ -10,13 +10,14 @@ import { renderOlympus } from './olympus/olympusScreen';
 import { renderLuna } from './luna/lunaScreen';
 import { ELOISE_ICON } from './luna/lunaArt';
 import { MEDUSA_ICON } from './olympus/olympusArt';
+import { DOOR_ICON } from './bonus/bonusArt';
 import { renderBlackjack } from './blackjack/blackjackScreen';
 import { renderRoulette } from './roulette/rouletteScreen';
 
 /** `iconSvg` (trusted inline SVG) replaces the emoji `icon` in the lobby. */
 const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: string; iconSvg?: string; title: string; hint: string }> = {
   sous: { render: renderSlots, icon: '🍒', title: 'Machine à sous', hint: '5 rouleaux, jackpot progressif' },
-  porte: { render: renderBonusSlot, icon: '🚪', title: 'Machine à porte', hint: 'Décroche le bonus, plus la mise est haute, mieux il paie' },
+  porte: { render: renderBonusSlot, icon: '🚪', iconSvg: DOOR_ICON, title: 'Machine à porte', hint: 'Décroche le bonus, plus la mise est haute, mieux il paie' },
   olympe: { render: renderOlympus, icon: '🐍', iconSvg: MEDUSA_ICON, title: 'Le Regard de Medusa', hint: 'Presque rien sans les temples, tout avec les tours gratuits' },
   eloise: { render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book', hint: '3 livres = 10 tours gratuits avec un symbole qui remplit les rouleaux' },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
@@ -27,7 +28,7 @@ const COIN_PACKS = [1, 10, 50, 100];
 
 /** `#/casino` shows the lobby, `#/casino/<game>` a table. */
 export function renderCasino(root: HTMLElement, params: string[]): () => void {
-  grantDailyGift();
+  grantCasinoGifts();
   const game = GAMES[params[0] ?? ''];
   if (game) return game.render(root);
   renderLobby(root);
@@ -199,12 +200,12 @@ function giftSection(root: HTMLElement, balance: number, sentGifts: string[]): H
   );
 }
 
-function showGiftToast(message: string): void {
+function showGiftToast(...messages: string[]): void {
   const toast = el(
     'div',
     { class: 'casino-gift-toast', role: 'status' },
     el('span', { 'aria-hidden': 'true', text: '🎁' }),
-    el('strong', { text: message }),
+    el('span', { class: 'casino-gift-lines' }, ...messages.map((message) => el('strong', { text: message }))),
   );
   document.body.append(toast);
   burst(toast, 28, 'coins');
@@ -213,9 +214,12 @@ function showGiftToast(message: string): void {
   window.setTimeout(() => toast.remove(), 4000);
 }
 
-/** Grants the daily gift on the first visit of the day and celebrates it with a toast. */
-export function grantDailyGift(): void {
-  const given = claimDailyGift();
-  if (given === 0) return;
-  showGiftToast(`Cadeau du jour : +${given.toLocaleString('fr-FR')} jetons`);
+/** Grants the one-time gift and the daily gift when they are due, and celebrates them in one toast. */
+export function grantCasinoGifts(): void {
+  const messages: string[] = [];
+  const welcome = claimOneTimeGift();
+  if (welcome > 0) messages.push(`Cadeau de bienvenue : +${formatChips(welcome)} jetons !`);
+  const daily = claimDailyGift();
+  if (daily > 0) messages.push(`Cadeau du jour : +${formatChips(daily)} jetons`);
+  if (messages.length > 0) showGiftToast(...messages);
 }

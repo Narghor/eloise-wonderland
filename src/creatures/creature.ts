@@ -1,32 +1,10 @@
-import type { Difficulty } from '../difficulty';
+import { OUTSIDE, newPictureId, type PixelPicture } from '../pictures/pixelPicture';
 import { STEPS_4 } from './shape';
 
-export interface Creature {
-  id: string;
-  name: string;
-  size: number;
-  /** One string per row: '.' outside the creature, otherwise the palette index ('0'-'9'). */
-  pixels: string[];
-  /** Hex colours, in colouring order: the number shown to the player is index + 1. */
-  palette: string[];
-  /** One string per row: '0' unpainted, '1' painted right, 'a', 'b'... painted with the wrong colour 0, 1... */
-  painted: string[];
+export interface Creature extends PixelPicture {
   bornAt: string;
-  /** Cells painted wrong or touched outside the creature while colouring it. */
-  mistakes?: number;
-  /** 0-3, set once the creature is fully coloured. */
-  stars?: number;
   /** Rare creatures: golden, or a rainbow body. */
   rarity?: Rarity;
-}
-
-export const OUTSIDE = '.';
-const WRONG_BASE = 'a'.charCodeAt(0);
-
-/** The Picross size is its difficulty, for the grid and for colouring the creature it gives. */
-export function difficultyForSize(size: number): Difficulty {
-  if (size <= 5) return 0;
-  return size <= 10 ? 2 : 4;
 }
 
 // -----------------------------------------------
@@ -71,7 +49,7 @@ export function createCreature(shape: boolean[][]): Creature {
 
   const usedRoles = ROLE_ORDER.filter((role) => roles.some((row) => row.includes(role)));
   return {
-    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    id: newPictureId(),
     name: randomName(),
     size,
     pixels: roles.map((row) => row.map((role) => (role === null ? OUTSIDE : String(usedRoles.indexOf(role)))).join('')),
@@ -147,37 +125,4 @@ function hslToHex(hue: number, saturation: number, lightness: number): string {
     return Math.round(value * 255).toString(16).padStart(2, '0');
   };
   return `#${channel(0)}${channel(8)}${channel(4)}`;
-}
-
-// -----------------------------------------------
-// READING
-// -----------------------------------------------
-
-/** Palette index of a pixel, or -1 outside the creature. */
-export function colorIndexAt(creature: Creature, row: number, col: number): number {
-  const char = creature.pixels[row][col];
-  return char === OUTSIDE ? -1 : Number(char);
-}
-
-/** Palette index the player painted this pixel with, or -1 when unpainted. */
-export function paintedColorAt(creature: Creature, row: number, col: number): number {
-  const char = creature.painted[row][col];
-  if (char === '0') return -1;
-  return char === '1' ? colorIndexAt(creature, row, col) : char.charCodeAt(0) - WRONG_BASE;
-}
-
-/** The `painted` character for a pixel whose right colour is `right`, painted with `painted` (-1: none). */
-export function paintedChar(right: number, painted: number): string {
-  if (painted < 0) return '0';
-  return painted === right ? '1' : String.fromCharCode(WRONG_BASE + painted);
-}
-
-export function isPaintedChar(char: string, colorCount: number): boolean {
-  return char === '0' || char === '1' || (char >= 'a' && char.charCodeAt(0) - WRONG_BASE < colorCount);
-}
-
-export function isColored(creature: Creature): boolean {
-  return creature.pixels.every((row, r) =>
-    [...row].every((char, c) => char === OUTSIDE || creature.painted[r][c] === '1'),
-  );
 }

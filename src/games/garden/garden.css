@@ -59,8 +59,8 @@
   box-shadow: var(--shadow), 0 0 0 2px #c9a7f0;
 }
 
-.garden-tile.is-gold .creature-canvas,
-.garden-tile.is-rainbow .creature-canvas {
+.garden-tile.is-gold .picture-canvas,
+.garden-tile.is-rainbow .picture-canvas {
   animation: rare-shimmer 2.4s ease-in-out infinite;
 }
 
@@ -86,10 +86,6 @@
   font-size: 0.8rem;
   color: #e0a32e;
   letter-spacing: 1px;
-}
-
-.creature-canvas {
-  image-rendering: pixelated;
 }
 
 .garden-empty {
