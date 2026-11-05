@@ -28,6 +28,7 @@ import { renderAquarium } from './games/aquarium/aquariumScreen';
 import { renderOrigami } from './games/origami/origamiScreen';
 import { renderPixelArt } from './games/pixel/pixelScreen';
 import { renderColoringBook } from './games/coloringBook/bookScreen';
+import { renderCatNap } from './games/catNap/napScreen';
 import { requestPersistentStorage } from './save';
 import { watchForUpdates } from './update';
 
@@ -64,6 +65,7 @@ const routes: Record<string, Screen> = {
   origami: renderOrigami,
   pixel: renderPixelArt,
   coloriage: renderColoringBook,
+  elomew: renderCatNap,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

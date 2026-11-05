@@ -11,7 +11,7 @@ import { MAX_GIFT, decodeGift, encodeGift, randomNonce } from './giftCode';
 const GAME_ID = 'casino';
 export const DAILY_GIFT = 5000;
 /** Given once to every player, old or new; set it to null at the next update to end the offer. */
-export const ONE_TIME_GIFT: { id: string; chips: number } | null = { id: 'welcome-2026-11', chips: 10000 };
+export const ONE_TIME_GIFT: { id: string; chips: number } | null = null;
 export const CHIPS_PER_COIN = 10;
 const JACKPOT_SEED = 5000;
 

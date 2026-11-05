@@ -1,0 +1,181 @@
+.nap-screen {
+  min-height: 100dvh;
+}
+
+.nap-menu {
+  display: grid;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.nap-menu-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  background: #ffd1dc;
+}
+
+.nap-menu-icon .nap-cat {
+  width: 48px;
+  height: 48px;
+}
+
+.nap-menu-note {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.nap-mistakes {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.nap-mistakes.has-mistakes {
+  color: #d9433f;
+}
+
+/* ----------------------------------------------- */
+/* BOARD                                           */
+/* ----------------------------------------------- */
+
+.nap-board-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* The room's wooden floor around the cushions. */
+.nap-frame {
+  padding: 12px;
+  border-radius: 20px;
+  background: repeating-linear-gradient(90deg, #c98d5c 0 40px, #b97c4c 40px 42px, #d39a69 42px 82px, #b97c4c 82px 84px);
+  box-shadow: inset 0 0 0 4px #8a5733, 0 8px 20px rgb(80 40 20 / 0.35);
+}
+
+.nap-board {
+  --cell: 48px;
+  display: grid;
+  grid-template-columns: repeat(var(--size), var(--cell));
+  grid-auto-rows: var(--cell);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgb(60 20 40 / 0.35);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A cushion cell: its fabric runs on from its neighbours, with a soft tufted shade on top. */
+.nap-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(ellipse at 50% 40%, transparent 55%, rgb(90 43 74 / 0.2) 100%) 0 0 / 100% 100%,
+    var(--fabric) calc(var(--cell) * var(--col) * -1) calc(var(--cell) * var(--row) * -1) / var(--fabric-tile) var(--fabric-tile),
+    var(--fabric-base);
+  color: #8a5a6e;
+  cursor: pointer;
+}
+
+/* Thick seams where the cushion changes, and white stitches just inside them. */
+.nap-cell.edge-top { border-top: 3px solid #4a2c3f; }
+.nap-cell.edge-bottom { border-bottom: 3px solid #4a2c3f; }
+.nap-cell.edge-left { border-left: 3px solid #4a2c3f; }
+.nap-cell.edge-right { border-right: 3px solid #4a2c3f; }
+
+.nap-cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 0 dashed rgb(255 255 255 / 0.9);
+  pointer-events: none;
+}
+
+.nap-cell.edge-top::before { top: 3px; border-top-width: 2px; }
+.nap-cell.edge-bottom::before { bottom: 3px; border-bottom-width: 2px; }
+.nap-cell.edge-left::before { left: 3px; border-left-width: 2px; }
+.nap-cell.edge-right::before { right: 3px; border-right-width: 2px; }
+
+.nap-paw {
+  width: 44%;
+  height: 44%;
+  opacity: 0.85;
+}
+
+.nap-cell .nap-cat {
+  width: 86%;
+  height: 86%;
+}
+
+.nap-cell.just-placed .nap-cat {
+  animation: nap-settle 0.35s ease-out;
+}
+
+@keyframes nap-settle {
+  0% { transform: translateY(-30%) scale(0.6); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* A cat put in the wrong place: it shows up red, shakes and leaves. */
+.nap-ghost {
+  position: absolute;
+  inset: 7%;
+  animation: nap-leave 0.7s ease-in forwards;
+  filter: drop-shadow(0 0 4px rgb(229 57 70 / 0.9));
+}
+
+.nap-ghost .nap-cat {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes nap-leave {
+  0%, 40% { transform: translateX(0); opacity: 1; }
+  10%, 30% { transform: translateX(-8%); }
+  20% { transform: translateX(8%); }
+  100% { transform: translate(60%, -40%) rotate(20deg); opacity: 0; }
+}
+
+/* Asleep: a little "z" rises over every cat. */
+.nap-board.is-solved .nap-cell.has-cat::after {
+  content: 'z';
+  position: absolute;
+  top: 2%;
+  right: 12%;
+  color: #6b5a8e;
+  font-size: calc(var(--cell) * 0.3);
+  font-weight: 800;
+  animation: nap-z 2s ease-in-out infinite;
+}
+
+@keyframes nap-z {
+  0% { transform: translateY(20%); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: translateY(-40%); opacity: 0; }
+}
+
+.nap-controls {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 4px 16px 24px;
+}
+
+.nap-stars {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #e0a32e;
+  letter-spacing: 3px;
+}
+
+.nap-win {
+  margin: 0;
+  font-size: 1.1rem;
+}

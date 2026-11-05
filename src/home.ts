@@ -5,6 +5,8 @@ import { pictureCanvas } from './pictures/pictureCanvas';
 import { loadGarden } from './creatures/garden';
 import { loadNotebook } from './pictures/notebook';
 import { loadBook } from './games/coloringBook/bookSave';
+import { loadNap } from './games/catNap/napSave';
+import { sleepingCat } from './games/catNap/napArt';
 import { companionPortrait } from './companion/companionArt';
 import { loadCompanion } from './companion/companionSave';
 import { loadCasino, formatChips } from './games/casino/chips';
@@ -90,7 +92,7 @@ function levelInProgress(entry: GameEntry): { number: number | null } | null {
 export function renderHome(root: HTMLElement): () => void {
   grantCasinoGifts();
   const sections = SECTIONS.map(({ title, games }) =>
-    homeSection(title, games.map((id) => gameTile(GAMES[id])), title === 'Création' ? [gardenTile(), pixelArtTile(), coloringBookTile(), origamiTile()] : []),
+    homeSection(title, games.map((id) => gameTile(GAMES[id])), leadingTiles(title)),
   );
   root.append(
     el(
@@ -111,6 +113,13 @@ export function renderHome(root: HTMLElement): () => void {
     ),
   );
   return () => {};
+}
+
+/** Games outside the daily challenge rotation, shown first in their family. */
+function leadingTiles(title: string): HTMLElement[] {
+  if (title === 'Création') return [gardenTile(), pixelArtTile(), coloringBookTile(), origamiTile()];
+  if (title === 'Réflexion') return [catNapTile()];
+  return [];
 }
 
 function homeSection(title: string, tiles: HTMLElement[], leading: HTMLElement[]): HTMLElement {
@@ -184,6 +193,16 @@ function coloringBookTile(): HTMLElement {
   if (book.pages.model || book.pages.free) progress = 'En cours';
   else if (book.pagesDone > 0) progress = book.pagesDone === 1 ? '1 coloriage' : `${book.pagesDone} coloriages`;
   return tile('#/coloriage', icon, 'Coloriage', progress);
+}
+
+function catNapTile(): HTMLElement {
+  const nap = loadNap();
+  const icon = el('span', { class: 'game-card-icon is-cat-nap', 'aria-hidden': 'true' });
+  icon.innerHTML = sleepingCat(0);
+  let progress = 'À découvrir';
+  if (nap.current) progress = `Salon n°${nap.current.number} en cours`;
+  else if (nap.roomsDone > 0) progress = nap.roomsDone === 1 ? '1 salon' : `${nap.roomsDone} salons`;
+  return tile('#/elomew', icon, 'Elomew', progress);
 }
 
 function origamiTile(): HTMLElement {

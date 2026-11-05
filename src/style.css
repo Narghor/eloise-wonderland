@@ -561,6 +561,21 @@ a {
   background: #e5455a;
 }
 
+/* Same footprint as the 5 x 5 pixel icons (69 px). */
+.game-card-icon.is-cat-nap {
+  grid-template-columns: auto;
+  place-items: center;
+  width: 69px;
+  height: 69px;
+  padding: 4px;
+  background: #ffd1dc;
+}
+
+.game-card-icon.is-cat-nap .nap-cat {
+  width: 100%;
+  height: 100%;
+}
+
 .game-card-icon.is-coloring-book {
   background: #e9f2ff;
 }
