@@ -31,13 +31,19 @@
   color: var(--muted);
 }
 
-.nap-mistakes {
-  color: var(--muted);
-  font-weight: 600;
+.nap-lives {
+  display: flex;
+  gap: 2px;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
-.nap-mistakes.has-mistakes {
-  color: #d9433f;
+.nap-heart {
+  color: #e5455a;
+}
+
+.nap-heart.is-gone {
+  color: #dccbd3;
 }
 
 /* ----------------------------------------------- */
@@ -178,4 +184,20 @@
 .nap-win {
   margin: 0;
   font-size: 1.1rem;
+}
+
+/* Lost: the room shakes once and fades a little. */
+.nap-board.is-lost {
+  animation: nap-wake 0.5s ease-in-out;
+  opacity: 0.6;
+}
+
+@keyframes nap-wake {
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.nap-lost-hint {
+  margin: 0;
+  color: var(--muted);
 }

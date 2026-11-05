@@ -19,7 +19,12 @@ interface Change {
 
 interface NapActions {
   nextRoom(): void;
+  /** Plays the same room again from scratch. */
+  restartRoom(): void;
 }
+
+/** The third mistake wakes the cats up: the room starts over. */
+export const LIVES = 3;
 
 /** Zero mistakes is 3 stars, then one star less per mistake. */
 export function starsForMistakes(mistakes: number): number {
@@ -30,14 +35,15 @@ export class NapGame {
   private readonly size: number;
   private readonly board = el('div', { class: 'nap-board' });
   private readonly cells: HTMLElement[] = [];
-  private readonly mistakesEl = el('span', { class: 'nap-mistakes' });
+  private readonly livesEl = el('span', { class: 'nap-lives', 'aria-label': 'Vies' });
   private readonly controls = el('div', { class: 'nap-controls' });
   private readonly undoButton = el('button', { class: 'button button-secondary', type: 'button' }, '↶ Annuler');
   private readonly toolButtons = new Map<Mark, HTMLButtonElement>();
   private readonly undoStack: Change[][] = [];
   private tool: Mark = Mark.Cat;
   private stroke: { pointer: number; to: Mark; from: Mark; changes: Change[]; last: number } | null = null;
-  private solved = false;
+  /** Won, or lost on the last life: the board takes no more input. */
+  private over = false;
 
   constructor(
     root: HTMLElement,
@@ -52,13 +58,13 @@ export class NapGame {
       el(
         'div',
         { class: 'nap-screen' },
-        topBar(`Salon n°${nap.number} · ${difficultyName(nap.difficulty)}`, helpSlot(NAP_HELP, this.mistakesEl)),
+        topBar(`Salon n°${nap.number} · ${difficultyName(nap.difficulty)}`, helpSlot(NAP_HELP, this.livesEl)),
         el('div', { class: 'nap-board-wrap' }, el('div', { class: 'nap-frame' }, this.board)),
         this.controls,
         el('p', { class: 'hint-mouse', text: 'Clic droit : poser une croix.' }),
       ),
     );
-    this.refreshMistakes();
+    this.refreshLives();
     this.fitBoard();
 
     this.board.addEventListener('pointerdown', this.onPointerDown);
@@ -143,7 +149,7 @@ export class NapGame {
   // -----------------------------------------------
 
   private readonly onPointerDown = (event: PointerEvent): void => {
-    if (this.solved || this.stroke || (event.button !== 0 && event.button !== 2)) return;
+    if (this.over || this.stroke || (event.button !== 0 && event.button !== 2)) return;
     const cell = this.cellAt(event.clientX, event.clientY);
     if (cell < 0) return;
     event.preventDefault();
@@ -193,12 +199,13 @@ export class NapGame {
       this.cells[cell].classList.add('just-placed');
     } else {
       this.nap.mistakes++;
-      this.refreshMistakes();
+      this.refreshLives();
       this.flashMistake(cell);
       this.setMark(cell, Mark.Cross);
     }
     this.commit([{ cell, before }]);
     if (right && this.catsPlaced() === this.size) this.win();
+    else if (this.nap.mistakes >= LIVES) this.lose();
   }
 
   private flashMistake(cell: number): void {
@@ -232,14 +239,14 @@ export class NapGame {
   /** Takes marks back; a mistake stays counted. */
   private undo(): void {
     const changes = this.undoStack.pop();
-    if (!changes || this.solved) return;
+    if (!changes || this.over) return;
     for (let i = changes.length - 1; i >= 0; i--) this.setMark(changes[i].cell, changes[i].before);
     this.refreshUndo();
     saveNap(this.save);
   }
 
   private clearCrosses(): void {
-    if (this.solved) return;
+    if (this.over) return;
     const changes: Change[] = [];
     this.nap.marks.forEach((mark, cell) => {
       if (mark !== Mark.Cross) return;
@@ -273,14 +280,31 @@ export class NapGame {
     this.undoButton.disabled = this.undoStack.length === 0;
   }
 
-  private refreshMistakes(): void {
-    const mistakes = this.nap.mistakes;
-    this.mistakesEl.textContent = mistakes === 0 ? 'Aucune erreur' : mistakes === 1 ? '1 erreur' : `${mistakes} erreurs`;
-    this.mistakesEl.classList.toggle('has-mistakes', mistakes > 0);
+  /** One heart per life, the lost ones greyed. */
+  private refreshLives(): void {
+    const left = Math.max(0, LIVES - this.nap.mistakes);
+    this.livesEl.replaceChildren(...Array.from({ length: LIVES }, (_, i) => el('span', { class: i < left ? 'nap-heart' : 'nap-heart is-gone', text: '♥' })));
+    this.livesEl.setAttribute('aria-label', `${left} vie${left > 1 ? 's' : ''}`);
+  }
+
+  /** The room is saved back to its start at once: leaving the page does not dodge the restart. */
+  private lose(): void {
+    this.over = true;
+    this.board.classList.add('is-lost');
+    this.nap.marks.fill(Mark.None);
+    this.nap.mistakes = 0;
+    saveNap(this.save);
+    const again = el('button', { class: 'button', type: 'button' }, 'Recommencer le salon');
+    again.addEventListener('click', () => this.actions.restartRoom());
+    this.controls.replaceChildren(
+      el('p', { class: 'nap-win', text: 'Oh non, les chats se sont réveillés !' }),
+      el('p', { class: 'nap-lost-hint', text: `${LIVES} erreurs : le salon recommence à zéro.` }),
+      el('div', { class: 'button-row' }, again, el('a', { class: 'button button-secondary', href: '#/elomew' }, 'Menu')),
+    );
   }
 
   private win(): void {
-    this.solved = true;
+    this.over = true;
     this.board.classList.add('is-solved');
     const stars = starsForMistakes(this.nap.mistakes);
     const difficulty = this.nap.difficulty;

@@ -14,7 +14,7 @@ export function renderCatNap(root: HTMLElement, params: string[]): () => void {
   const save = loadNap();
   const current = save.current;
   if (params[0] === 'jouer' && current) {
-    const game = new NapGame(root, save, current, { nextRoom: () => startRoom(save) });
+    const game = new NapGame(root, save, current, { nextRoom: () => startRoom(save), restartRoom: () => navigate(PLAY_ROUTE) });
     return () => game.dispose();
   }
   renderMenu(root, save);

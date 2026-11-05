@@ -105,6 +105,18 @@ const page = {
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: last.x, y: last.y, button: 'left', clickCount: 1 });
     await sleep(150);
   },
+  /** The same with a finger: touch events, as a phone sends them. */
+  async swipe(points) {
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    const point = ({ x, y }) => [{ x, y, id: 1, radiusX: 8, radiusY: 8, force: 1 }];
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(points[0]) });
+    for (const p of points.slice(1)) {
+      await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: point(p) });
+      await sleep(16);
+    }
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sleep(200);
+  },
   async shot(name, fullPage = false) {
     const params = { format: 'png' };
     if (fullPage) {
