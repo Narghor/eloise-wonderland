@@ -17,6 +17,17 @@ interface Change {
   before: Mark;
 }
 
+/** A finger (or button) down on the board: a tap uses the tool, a slide draws crosses. */
+interface Press {
+  pointer: number;
+  start: number;
+  /** What a tap on the start cell does. */
+  tapTool: Mark;
+  lastPoint: { x: number; y: number };
+  /** Set once the finger leaves the start cell: every cell it crosses then gets the same change. */
+  stroke: { from: Mark; to: Mark; changes: Change[] } | null;
+}
+
 interface NapActions {
   nextRoom(): void;
   /** Plays the same room again from scratch. */
@@ -41,7 +52,7 @@ export class NapGame {
   private readonly toolButtons = new Map<Mark, HTMLButtonElement>();
   private readonly undoStack: Change[][] = [];
   private tool: Mark = Mark.Cat;
-  private stroke: { pointer: number; to: Mark; from: Mark; changes: Change[]; last: number } | null = null;
+  private press: Press | null = null;
   /** Won, or lost on the last life: the board takes no more input. */
   private over = false;
 
@@ -69,9 +80,9 @@ export class NapGame {
 
     this.board.addEventListener('pointerdown', this.onPointerDown);
     this.board.addEventListener('pointermove', this.onPointerMove);
-    this.board.addEventListener('pointerup', this.endStroke);
-    this.board.addEventListener('pointercancel', this.endStroke);
-    this.board.addEventListener('lostpointercapture', this.endStroke);
+    this.board.addEventListener('pointerup', this.onPointerUp);
+    this.board.addEventListener('pointercancel', this.cancelPress);
+    this.board.addEventListener('lostpointercapture', this.cancelPress);
     this.board.addEventListener('contextmenu', (event) => event.preventDefault());
     window.addEventListener('resize', this.fitBoard);
     openHelpOnFirstVisit(NAP_HELP);
@@ -149,44 +160,76 @@ export class NapGame {
   // -----------------------------------------------
 
   private readonly onPointerDown = (event: PointerEvent): void => {
-    if (this.over || this.stroke || (event.button !== 0 && event.button !== 2)) return;
+    if (this.over || this.press || (event.button !== 0 && event.button !== 2)) return;
     const cell = this.cellAt(event.clientX, event.clientY);
     if (cell < 0) return;
     event.preventDefault();
-    const tool = event.button === 2 ? Mark.Cross : this.tool;
-    if (tool === Mark.Cat) {
-      this.tryCat(cell);
-      return;
-    }
-    const from = this.nap.marks[cell];
-    if (from === Mark.Cat) return;
     this.board.setPointerCapture(event.pointerId);
-    this.stroke = { pointer: event.pointerId, from, to: from === Mark.Cross ? Mark.None : Mark.Cross, changes: [], last: cell };
-    this.applyStroke(cell);
+    this.press = {
+      pointer: event.pointerId,
+      start: cell,
+      tapTool: event.button === 2 ? Mark.Cross : this.tool,
+      lastPoint: { x: event.clientX, y: event.clientY },
+      stroke: null,
+    };
   };
 
-  /** A cross stroke goes on through every cell the finger crosses, setting or clearing like its first cell. */
+  /** Follows the finger in small steps, so a fast slide still marks every cell it crosses. */
   private readonly onPointerMove = (event: PointerEvent): void => {
-    const stroke = this.stroke;
-    if (!stroke || event.pointerId !== stroke.pointer) return;
-    const cell = this.cellAt(event.clientX, event.clientY);
-    if (cell < 0 || cell === stroke.last) return;
-    stroke.last = cell;
-    this.applyStroke(cell);
+    const press = this.press;
+    if (!press || event.pointerId !== press.pointer) return;
+    const from = press.lastPoint;
+    const step = this.board.getBoundingClientRect().width / this.size / 3;
+    const steps = Math.max(1, Math.ceil(Math.hypot(event.clientX - from.x, event.clientY - from.y) / step));
+    for (let i = 1; i <= steps; i++) {
+      const cell = this.cellAt(from.x + ((event.clientX - from.x) * i) / steps, from.y + ((event.clientY - from.y) * i) / steps);
+      if (cell >= 0 && (press.stroke || cell !== press.start)) this.slideOver(press, cell);
+    }
+    press.lastPoint = { x: event.clientX, y: event.clientY };
   };
 
-  private readonly endStroke = (event: PointerEvent): void => {
-    const stroke = this.stroke;
-    if (!stroke || event.pointerId !== stroke.pointer) return;
-    this.stroke = null;
-    this.commit(stroke.changes);
+  private readonly onPointerUp = (event: PointerEvent): void => {
+    const press = this.press;
+    if (!press || event.pointerId !== press.pointer) return;
+    this.press = null;
+    if (press.stroke) this.commit(press.stroke.changes);
+    else if (press.tapTool === Mark.Cat) this.tryCat(press.start);
+    else this.toggleCross(press.start);
   };
 
-  private applyStroke(cell: number): void {
-    const stroke = this.stroke!;
+  /** A cancelled press keeps the crosses it drew but never counts as a tap. */
+  private readonly cancelPress = (event: PointerEvent): void => {
+    const press = this.press;
+    if (!press || event.pointerId !== press.pointer) return;
+    this.press = null;
+    if (press.stroke) this.commit(press.stroke.changes);
+  };
+
+  /**
+   * The first cell left turns the press into a stroke: it adds crosses, or clears them when it
+   * starts on a cross. Cats are never touched.
+   */
+  private slideOver(press: Press, cell: number): void {
+    if (!press.stroke) {
+      const startMark = this.nap.marks[press.start];
+      const from = startMark !== Mark.Cat ? startMark : this.nap.marks[cell] === Mark.Cross ? Mark.Cross : Mark.None;
+      press.stroke = { from, to: from === Mark.Cross ? Mark.None : Mark.Cross, changes: [] };
+      this.applyStroke(press.stroke, press.start);
+    }
+    this.applyStroke(press.stroke, cell);
+  }
+
+  private applyStroke(stroke: NonNullable<Press['stroke']>, cell: number): void {
     if (this.nap.marks[cell] !== stroke.from) return;
     stroke.changes.push({ cell, before: stroke.from });
     this.setMark(cell, stroke.to);
+  }
+
+  private toggleCross(cell: number): void {
+    const before = this.nap.marks[cell];
+    if (before === Mark.Cat) return;
+    this.setMark(cell, before === Mark.Cross ? Mark.None : Mark.Cross);
+    this.commit([{ cell, before }]);
   }
 
   /** A cat only stays where one sleeps; anywhere else it is a mistake, and the cell gets its cross. */
