@@ -1,5 +1,6 @@
 import type { Look } from '../companion/companionSave';
 import { STORIES, type Story } from './houseStories';
+import { planks } from './houseStyle';
 
 // -----------------------------------------------
 // ROOMS
@@ -20,12 +21,12 @@ export interface Room {
 }
 
 export const ROOMS: Room[] = [
-  { id: 'living', name: 'Salon', floor: 0, price: 0, wall: 'repeating-linear-gradient(90deg, #fde8ef 0 22px, #fbdde8 22px 44px)', ground: '#e9c9a3' },
-  { id: 'kitchen', name: 'Cuisine', floor: 0, price: 0, wall: 'repeating-linear-gradient(0deg, #fff6e0 0 18px, #f6ead0 18px 20px)', ground: '#d9b48a' },
-  { id: 'cafe', name: 'Café', floor: 0, price: 0, wall: 'repeating-linear-gradient(90deg, #fbe3d0 0 26px, #f6d6bf 26px 28px)', ground: '#9a6a48' },
+  { id: 'living', name: 'Salon', floor: 0, price: 0, wall: 'repeating-linear-gradient(90deg, #fde8ef 0 22px, #fbdde8 22px 44px)', ground: planks('#e6c393', '#d0a873', '#f0d3a6') },
+  { id: 'kitchen', name: 'Cuisine', floor: 0, price: 0, wall: 'repeating-linear-gradient(0deg, #fff6e0 0 18px, #f6ead0 18px 20px)', ground: planks('#d9b48a', '#c09a6e', '#e6c59f') },
+  { id: 'cafe', name: 'Café', floor: 0, price: 0, wall: 'repeating-linear-gradient(90deg, #fbe3d0 0 26px, #f6d6bf 26px 28px)', ground: planks('#9a6a48', '#7f5438', '#ad7d5a') },
   { id: 'garden', name: 'Jardin', floor: 0, price: 0, wall: 'linear-gradient(#cdefff, #e8f8ff)', ground: '#9ed98a' },
-  { id: 'bedroom', name: 'Chambre', floor: 1, price: 250, wall: 'repeating-linear-gradient(90deg, #e6e0ff 0 30px, #ddd5fb 30px 32px)', ground: '#c9a68a' },
-  { id: 'library', name: 'Bibliothèque', floor: 1, price: 500, wall: 'linear-gradient(#e7f3e4, #d6ead1)', ground: '#b88f6e' },
+  { id: 'bedroom', name: 'Chambre', floor: 1, price: 250, wall: 'repeating-linear-gradient(90deg, #e6e0ff 0 30px, #ddd5fb 30px 32px)', ground: planks('#c9a68a', '#b08e72', '#d8b89e') },
+  { id: 'library', name: 'Bibliothèque', floor: 1, price: 500, wall: 'linear-gradient(#e7f3e4, #d6ead1)', ground: planks('#b88f6e', '#9c7656', '#c8a080') },
   { id: 'greenhouse', name: 'Serre', floor: 1, price: 350, wall: 'repeating-linear-gradient(90deg, #e9fbf0 0 26px, #cdeedd 26px 28px)', ground: '#a7cf8f' },
 ];
 

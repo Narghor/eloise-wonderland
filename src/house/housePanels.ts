@@ -539,7 +539,7 @@ function decorPart(ctx: PanelContext, room: RoomId): HTMLElement[] {
       'button',
       { class: `house-decor-spot${current ? '' : ' is-empty'}${picking ? ' is-active' : ''}`, type: 'button' },
       ...(current
-        ? [spriteCanvas(FURNITURE_ART[current], 2), el('strong', { text: furnitureName(current) }), el('small', { text: `Pose : ${POSES[pieceOf(current).pose].name}` })]
+        ? [spriteCanvas(FURNITURE_ART[current], 1.2), el('strong', { text: furnitureName(current) }), el('small', { text: `Pose : ${POSES[pieceOf(current).pose].name}` })]
         : [el('b', { text: '+' }), el('small', { text: 'Emplacement libre' })]),
     );
     button.addEventListener('click', () => {
@@ -556,7 +556,7 @@ function decorPart(ctx: PanelContext, room: RoomId): HTMLElement[] {
       const button = el(
         'button',
         { class: 'house-seed', type: 'button' },
-        spriteCanvas(FURNITURE_ART[piece.id], 1.6),
+        spriteCanvas(FURNITURE_ART[piece.id], 1),
         el('span', { text: piece.name }),
         el('small', {}, ...(owned ? [save.placed[room][spot] === piece.id ? 'posé ici' : 'à toi'] : [price(piece.price)])),
       );

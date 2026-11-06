@@ -23,9 +23,20 @@ export const WALLPAPERS: Finish[] = [
   { id: 'wall-lilac-check', name: 'Damier lilas', price: 120, css: 'repeating-conic-gradient(#e7defa 0 25%, #f5f0ff 0 50%) 0 0 / 28px 28px' },
 ];
 
+/** Wooden planks on the furniture's pixel grid: a seam, a lit edge, staggered joints. */
+export function planks(wood: string, seam: string, light: string): string {
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='22' height='8' shape-rendering='crispEdges'>` +
+    `<rect width='22' height='8' fill='${wood}'/>` +
+    `<rect width='22' height='1' fill='${seam}'/><rect y='1' width='22' height='1' fill='${light}'/>` +
+    `<rect y='4' width='22' height='1' fill='${seam}'/><rect y='5' width='22' height='1' fill='${light}'/>` +
+    `<rect y='1' width='1' height='3' fill='${seam}'/><rect x='11' y='5' width='1' height='3' fill='${seam}'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 0 0 / 79.2px 28.8px, ${wood}`;
+}
+
 export const FLOORS: Finish[] = [
-  { id: 'floor-light-wood', name: 'Parquet clair', price: 50, css: 'repeating-linear-gradient(90deg, #e8c99a 0 30px, #dcb984 30px 32px)' },
-  { id: 'floor-dark-wood', name: 'Parquet foncé', price: 60, css: 'repeating-linear-gradient(90deg, #8a5a3c 0 30px, #7a4e33 30px 32px)' },
+  { id: 'floor-light-wood', name: 'Parquet clair', price: 50, css: planks('#ecd1a6', '#d6b585', '#f6e2c0') },
+  { id: 'floor-dark-wood', name: 'Parquet foncé', price: 60, css: planks('#8a5a3c', '#6e4630', '#9c6b4b') },
   { id: 'floor-tiles', name: 'Carrelage', price: 80, css: 'repeating-conic-gradient(#ffffff 0 25%, #dfe6ee 0 50%) 0 0 / 24px 24px' },
   { id: 'floor-pink-carpet', name: 'Moquette rose', price: 70, css: '#f3b6c9' },
   { id: 'floor-grass', name: 'Gazon', price: 60, css: 'repeating-linear-gradient(90deg, #8fd17a 0 6px, #84c56f 6px 12px)' },

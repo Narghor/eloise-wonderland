@@ -1,7 +1,8 @@
 import { el } from '../dom';
 import { companionCanvas } from '../companion/companionArt';
 import { loadCompanion } from '../companion/companionSave';
-import { FURNITURE_ART, GROWTH_ART, coinIcon, spriteCanvas } from './houseArt';
+import { FURNITURE_ART, GROWTH_ART, coinIcon, spriteCanvas, spriteImage } from './houseArt';
+import { GARDEN_FENCE, ROOM_DECOR } from './houseDecor';
 import { FURNITURE, POSES, ROOMS, SPOT_X, dish, plant, type Character, type PoseId, type RoomId } from './houseData';
 import { foodIcon } from './houseFoodArt';
 import { MINUTE_MS, availablePoses, character } from './houseLogic';
@@ -166,11 +167,15 @@ export class HouseScene {
       el('div', { class: 'house-room-ground', style: `background:${floor(style.floor)?.css ?? room.ground}` }),
       el('span', { class: 'house-room-name', text: room.name }),
     );
+    if (id === 'garden') element.append(el('div', { class: 'house-fence', style: `background-image:${spriteImage(GARDEN_FENCE)}` }));
+    for (const piece of ROOM_DECOR[id]) {
+      const place = piece.top !== undefined ? `top:${piece.top}%` : `bottom:${piece.bottom}%`;
+      element.append(el('div', { class: 'house-room-decor', style: `left:${piece.x}%;${place}` }, spriteCanvas(piece.sprite)));
+    }
     style.decos.forEach((decoId, spot) => {
       const deco = wallDeco(decoId);
       if (deco) element.append(el('div', { class: `house-wall-deco${deco.animated ? ` is-${deco.animated}` : ''}`, style: `left:${WALL_DECO_X[spot]}%` }, spriteCanvas(deco.sprite)));
     });
-    if (id === 'living' || id === 'bedroom' || id === 'library') element.append(el('div', { class: 'house-window' }));
     this.save.placed[id].forEach((piece, spot) => {
       if (!piece) return;
       const holder = el('div', { class: `house-furniture is-${piece}${this.save.lost ? ' is-searchable' : ''}`, style: `left:${SPOT_X[spot] * 100}%` }, spriteCanvas(FURNITURE_ART[piece]));

@@ -237,6 +237,11 @@ export function renderBlackjack(root: HTMLElement): () => void {
         ),
       );
     }
+    table.append(tipsRow());
+  }
+
+  function tipsRow(): HTMLElement {
+    return el('div', { class: 'button-row' }, button('🎓 Conseils de pro', openTips, true, true));
   }
 
   function banner(r: Round): HTMLElement {
@@ -292,7 +297,7 @@ export function renderBlackjack(root: HTMLElement): () => void {
         }, pending > 0, true),
         ...(lastBet > 0 ? [button(`Rejouer la même mise (${lastBet})`, () => deal(lastBet), lastBet <= left, true)] : []),
       ),
-      el('div', { class: 'button-row' }, button('🎓 Conseils de pro', openTips, true, true)),
+      tipsRow(),
       el('p', {
         class: 'bj-rules',
         text: 'Sabot de 6 jeux · le croupier reçoit une seule carte et tire après toi · il reste sur 17 · blackjack payé 3 pour 2 · contre un blackjack du croupier, tu ne perds que ta mise de départ · pas d’assurance',
