@@ -47,17 +47,17 @@ const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: s
   },
   porte: {
     render: renderBonusSlot, icon: '🚪', iconSvg: DOOR_ICON, title: 'Machine à porte',
-    hint: 'Le bonus le plus fréquent. La pièce ×2 et les jackpots font les grands moments, et plus tu mises, mieux il paie.',
+    hint: 'Le bonus le plus fréquent, mais moins explosif.',
     profile: { bonus: 5, swings: 2, bonusEvery: `Bonus : 1 tour sur 105 · toujours au moins ×${BONUS_MIN_X} ta mise` },
   },
   olympe: {
     render: renderOlympus, icon: '🐍', iconSvg: MEDUSA_ICON, title: 'Le Regard de Medusa',
-    hint: 'Des rouleaux avares : tout se joue dans les tours gratuits. Avec 5 temples, souvent plus de 1 000 fois la mise. La plus explosive.',
+    hint: 'Des rouleaux avares : tout se joue dans les tours gratuits. La plus explosive.',
     profile: { bonus: 4, swings: 5, bonusEvery: `Bonus : 1 tour sur 150 · toujours au moins ×${MEDUSA_MIN_X} ta mise` },
   },
   eloise: {
     render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book',
-    hint: 'Les rouleaux paient souvent. Le bonus est plus rare, avec un symbole qui remplit l’écran.',
+    hint: 'Les rouleaux paient souvent. Le bonus est plus rare, mais peut grimper haut.',
     profile: { bonus: 3, swings: 3, bonusEvery: `Bonus : 1 tour sur 195 · toujours au moins ×${BOOK_MIN_X} ta mise` },
   },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
