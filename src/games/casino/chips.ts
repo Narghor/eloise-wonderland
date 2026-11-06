@@ -157,22 +157,29 @@ export function hideSentGift(code: string): void {
 
 export type RedeemResult = { ok: true; amount: number } | { ok: false; reason: 'invalid' | 'used' };
 
-/** A secret word typed in the code field: chips every time. Only its hash is kept here. */
-const SECRET_WORD_HASH = 3752608652;
-const SECRET_WORD_CHIPS = 10000;
+/**
+ * Secret words typed in the code field give chips every time. Only their hashes are kept here
+ * (the repository is public): hash of the word -> chips.
+ */
+const SECRET_WORDS: Record<number, number> = {
+  3752608652: 10000,
+  96946897: 100000,
+};
 
-function isSecretWord(text: string): boolean {
+/** Chips of a secret word, or 0. Case and surrounding spaces do not matter. */
+function secretWordChips(text: string): number {
   let hash = 2166136261;
   for (const char of `cheat:${text.trim().toUpperCase()}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-  return hash >>> 0 === SECRET_WORD_HASH;
+  return SECRET_WORDS[hash >>> 0] ?? 0;
 }
 
 export function redeemGift(code: string): RedeemResult {
-  if (isSecretWord(code)) {
+  const secret = secretWordChips(code);
+  if (secret > 0) {
     const save = loadCasino();
-    save.chips += SECRET_WORD_CHIPS;
+    save.chips += secret;
     saveCasino(save);
-    return { ok: true, amount: SECRET_WORD_CHIPS };
+    return { ok: true, amount: secret };
   }
   const gift = decodeGift(code);
   if (!gift) return { ok: false, reason: 'invalid' };
