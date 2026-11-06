@@ -9,6 +9,7 @@ import * as classic from '../src/games/casino/slots/slotsLogic';
 import * as door from '../src/games/casino/bonus/bonusLogic';
 import * as medusa from '../src/games/casino/olympus/olympusLogic';
 import * as luna from '../src/games/casino/luna/lunaLogic';
+import { NO_DROUGHT, stepDrought, type Drought } from '../src/games/casino/rescue';
 
 const SPINS = Number(process.argv[2] ?? 2_000_000);
 const FEATURES = Number(process.argv[3] ?? 200_000);
@@ -28,13 +29,17 @@ class Run {
   basePaid = 0;
   featurePaid = 0;
   jackpotPaid = 0;
+  rescuePaid = 0;
+  rescues = 0;
   hits = 0;
   features = 0;
   sumSquares = 0;
   bestX = 0;
   constructor(readonly bet: number) {}
-  spin(base: number, feature: number, jackpot: number): void {
-    const total = base + feature + jackpot;
+  spin(base: number, feature: number, jackpot: number, rescue = 0): void {
+    const total = base + feature + jackpot + rescue;
+    this.rescuePaid += rescue;
+    if (rescue > 0) this.rescues++;
     this.spins++;
     this.staked += this.bet;
     this.paid += total;
@@ -48,7 +53,7 @@ class Run {
   }
   report(label: string, extra = ''): string {
     const pct = (part: number) => `${((100 * part) / this.staked).toFixed(1)}`;
-    return `${label.padEnd(26)} RTP ${pct(this.paid).padStart(5)} %  (jeu ${pct(this.basePaid)} + bonus ${pct(this.featurePaid)} + jackpot ${pct(this.jackpotPaid)})  gain 1 tour/${(this.spins / this.hits).toFixed(1)}  bonus 1/${this.features ? Math.round(this.spins / this.features) : '-'}  ecart-type ${Math.sqrt(this.sumSquares / this.spins).toFixed(1)}x  meilleur ${Math.round(this.bestX)}x${extra}`;
+    return `${label.padEnd(26)} RTP ${pct(this.paid).padStart(5)} %  (jeu ${pct(this.basePaid)} + bonus ${pct(this.featurePaid)} + jackpot ${pct(this.jackpotPaid)} + aide ${pct(this.rescuePaid)})  gain 1 tour/${(this.spins / this.hits).toFixed(1)}  bonus 1/${this.features ? Math.round(this.spins / this.features) : '-'}  aide 1/${this.rescues ? Math.round(this.spins / this.rescues) : '-'}  ecart-type ${Math.sqrt(this.sumSquares / this.spins).toFixed(1)}x  meilleur ${Math.round(this.bestX)}x${extra}`;
   }
 }
 
@@ -107,6 +112,7 @@ function runDoor(level: door.BetLevel): { run: Run; grands: number; bonusXs: num
   const growing = [0, 0, 0];
   let grands = 0;
   const bonusXs: number[] = [];
+  let drought: Drought = NO_DROUGHT;
   for (let i = 0; i < SPINS; i++) {
     grandPool += level.bet * door.JACKPOT_FEED;
     for (let tier = 1; tier <= Math.min(2, level.jackpotTier); tier++) growing[tier] += level.bet * door.JACKPOT_GROWTH[tier];
@@ -114,6 +120,8 @@ function runDoor(level: door.BetLevel): { run: Run; grands: number; bonusXs: num
     const base = door.basePayout(door.lineWins(grid), level.bet);
     let feature = 0;
     let jackpot = 0;
+    const step = stepDrought(drought, level.bet, base, door.triggersBonus(grid), door.BONUS_EVERY, rng);
+    drought = step.drought;
     if (door.triggersBonus(grid)) {
       run.features++;
       const values = door.baseJackpots(level.bet).map((v, tier) => v + (door.JACKPOT_GROWTH[tier] > 0 ? Math.floor(growing[tier]) : 0));
@@ -128,7 +136,7 @@ function runDoor(level: door.BetLevel): { run: Run; grands: number; bonusXs: num
         grandPool = SEED_POOL;
       }
     }
-    run.spin(base, feature, jackpot);
+    run.spin(base, feature, jackpot, step.rescue?.chips ?? 0);
   }
   return { run, grands, bonusXs };
 }
@@ -140,16 +148,19 @@ function runDoor(level: door.BetLevel): { run: Run; grands: number; bonusXs: num
 function runMedusa(bet: number): Run {
   const rng = mulberry32(3000 + bet);
   const run = new Run(bet);
+  let drought: Drought = NO_DROUGHT;
   for (let i = 0; i < SPINS; i++) {
     const grid = medusa.spinGrid(rng, false);
     const base = medusa.chipsFor(medusa.winMult(medusa.lineWins(grid)), bet);
     let feature = 0;
     const scatters = medusa.scatterCount(grid);
+    const step = stepDrought(drought, bet, base, scatters >= medusa.MIN_SCATTERS, medusa.FREE_SPINS_EVERY, rng);
+    drought = step.drought;
     if (scatters >= medusa.MIN_SCATTERS) {
       run.features++;
       feature = medusa.chipsFor(medusa.playFreeSpins(rng, medusa.freeSpinsFor(scatters)).mult, bet);
     }
-    run.spin(base, feature, 0);
+    run.spin(base, feature, 0, step.rescue?.chips ?? 0);
   }
   return run;
 }
@@ -161,15 +172,18 @@ function runMedusa(bet: number): Run {
 function runLuna(bet: number): Run {
   const rng = mulberry32(4000 + bet);
   const run = new Run(bet);
+  let drought: Drought = NO_DROUGHT;
   for (let i = 0; i < SPINS; i++) {
     const result = luna.baseSpin(rng);
     const base = luna.chipsFor(result.mult, bet);
     let feature = 0;
+    const step = stepDrought(drought, bet, base, result.books >= luna.MIN_BOOKS, luna.FREE_SPINS_EVERY, rng);
+    drought = step.drought;
     if (result.books >= luna.MIN_BOOKS) {
       run.features++;
       feature = luna.chipsFor(luna.playFreeSpins(rng).mult, bet);
     }
-    run.spin(base, feature, 0);
+    run.spin(base, feature, 0, step.rescue?.chips ?? 0);
   }
   return run;
 }
@@ -180,7 +194,7 @@ function runLuna(bet: number): Run {
 
 const started = Date.now();
 out(`Simulation : ${SPINS.toLocaleString('fr-FR')} tours par ligne, ${FEATURES.toLocaleString('fr-FR')} bonus par distribution.`);
-out('RTP = part des mises rendue a la longue. "jeu" = gains des rouleaux, "bonus" = tours gratuits / Hold & Spin, "jackpot" = cagnottes.');
+out('RTP = part des mises rendue a la longue. "jeu" = gains des rouleaux, "bonus" = tours gratuits / Hold & Spin, "jackpot" = cagnottes, "aide" = coup de pouce apres une longue attente sans bonus.');
 out();
 
 if (wants('classic')) {

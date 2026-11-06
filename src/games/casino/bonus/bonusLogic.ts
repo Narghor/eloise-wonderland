@@ -156,6 +156,8 @@ export function grandPrize(pool: number, bet: number): number {
 export const START_COINS = 6;
 /** A bonus always pays at least this many times the bet. */
 export const BONUS_MIN_X = 30;
+/** Spins per bonus on average, measured by tools/casino-stats.mjs: measure again after changing the odds. */
+export const BONUS_EVERY = 105;
 export const RESPINS = 3;
 /** Chance per empty cell per respin to land a coin: often enough that most respins bring something. */
 export const LAND_CHANCE = 0.075;

@@ -351,6 +351,13 @@ export function playBookOpen(delay = 0): void {
   tone(C_MAJOR[7] * 4, delay + 0.85, 0.7, 'triangle', 0.06);
 }
 
+/** Something is coming after a lost spin: a soft swell and bell notes climbing, about 0.9 s. */
+export function playRescueHint(): void {
+  noise(0, 0.9, 0.08, 2500);
+  [0, 2, 4, 5, 7].forEach((n, i) => tone(C_MAJOR[n] * 2, i * 0.16, 0.45, 'sine', 0.05 + i * 0.012));
+  tone(C_MAJOR[0], 0, 0.9, 'triangle', 0.05, C_MAJOR[4]);
+}
+
 /** The suspense resolves well: a bright strike and a sparkling chord. */
 export function playSuspenseHit(): void {
   noise(0, 0.12, 0.35, 4000);

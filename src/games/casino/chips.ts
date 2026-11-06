@@ -2,6 +2,7 @@ import { readGame, writeGame } from '../../save';
 import { loadCompanion, saveCompanion } from '../../companion/companionSave';
 import { todayKey } from '../../daily/daily';
 import { MAX_GIFT, decodeGift, encodeGift, randomNonce } from './giftCode';
+import { NO_DROUGHT, stepDrought, type Drought, type Rescue } from './rescue';
 
 // -----------------------------------------------
 // CASINO CHIPS
@@ -31,13 +32,15 @@ export interface CasinoSave {
   sentGifts: string[];
   /** Ids of the one-time gifts already given. */
   claimedGifts: string[];
+  /** Wait since the last bonus, per machine id (see rescue.ts). */
+  droughts: Record<string, Drought>;
 }
 
 export function loadCasino(): CasinoSave {
   const raw = readGame(GAME_ID);
   if (typeof raw !== 'object' || raw === null) {
     // A new player has no day counted yet: the daily gift is their starting balance.
-    return { chips: 0, record: 0, refilledOn: '', jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [], claimedGifts: [] };
+    return { chips: 0, record: 0, refilledOn: '', jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [], claimedGifts: [], droughts: {} };
   }
   const data = raw as Record<string, unknown>;
   const chips = isCount(data.chips) ? data.chips : 0;
@@ -50,7 +53,19 @@ export function loadCasino(): CasinoSave {
     usedGifts: Array.isArray(data.usedGifts) ? data.usedGifts.filter((nonce): nonce is number => isCount(nonce)) : [],
     sentGifts: Array.isArray(data.sentGifts) ? data.sentGifts.filter((code): code is string => typeof code === 'string') : [],
     claimedGifts: Array.isArray(data.claimedGifts) ? data.claimedGifts.filter((id): id is string => typeof id === 'string') : [],
+    droughts: readDroughts(data.droughts),
   };
+}
+
+function readDroughts(value: unknown): Record<string, Drought> {
+  const droughts: Record<string, Drought> = {};
+  if (typeof value === 'object' && value !== null) {
+    for (const [id, entry] of Object.entries(value)) {
+      const d = entry as Partial<Drought> | null;
+      if (d && isCount(d.spins) && typeof d.lost === 'number' && Number.isFinite(d.lost)) droughts[id] = { spins: d.spins, lost: d.lost };
+    }
+  }
+  return droughts;
 }
 
 /** A saved { machine id: amount } map, keeping only the valid amounts. */
@@ -223,6 +238,23 @@ export function winJackpot(machineId: string, minimum = 0): number {
   save.chips += won;
   saveCasino(save);
   return won;
+}
+
+// -----------------------------------------------
+// RESCUE AFTER A LONG WAIT
+// -----------------------------------------------
+
+/**
+ * Counts one spin of a bonus machine (call it for every spin, bonus or not, once its outcome is
+ * known). Returns the rescue it brings, already paid, or null.
+ */
+export function trackDrought(machineId: string, stake: number, reelWin: number, bonus: boolean, bonusEvery: number, forceRescue = false): Rescue | null { // TEST-BUTTONS
+  const save = loadCasino();
+  const { drought, rescue } = stepDrought(save.droughts[machineId] ?? NO_DROUGHT, stake, reelWin, bonus, bonusEvery, Math.random, forceRescue); // TEST-BUTTONS
+  save.droughts[machineId] = drought;
+  if (rescue) save.chips += rescue.chips;
+  saveCasino(save);
+  return rescue;
 }
 
 // -----------------------------------------------

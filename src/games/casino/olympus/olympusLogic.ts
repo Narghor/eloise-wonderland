@@ -55,6 +55,8 @@ export const PAY_SCALE = 0.68;
 export const FREE_PAY_SCALE = 1.12;
 /** A feature always pays at least this many times the bet (topped up at the end). */
 export const FREE_SPINS_MIN_X = 30;
+/** Spins per free spins round on average, measured by tools/casino-stats.mjs: measure again after changing the odds. */
+export const FREE_SPINS_EVERY = 150;
 /** Safety cap on the spins of one feature, retriggers included. */
 export const MAX_FREE_SPINS = 500;
 

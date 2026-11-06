@@ -1,0 +1,135 @@
+/* Rescue scene (rescueScene.ts): builds on .fx-bigwin, revealed stage by stage. */
+/* Only transform and opacity animate, so phones keep up. */
+
+.fx-rescue { gap: 4px; padding: 16px; box-sizing: border-box; text-align: center; }
+.fx-rescue-door { background: radial-gradient(circle at 50% 35%, rgb(110 52 8 / 0.92) 0%, rgb(22 8 0 / 0.96) 70%); }
+.fx-rescue-medusa { background: radial-gradient(circle at 50% 35%, rgb(14 92 52 / 0.92) 0%, rgb(2 18 10 / 0.96) 70%); }
+.fx-rescue-book { background: radial-gradient(circle at 50% 35%, rgb(52 40 130 / 0.92) 0%, rgb(6 6 30 / 0.96) 70%); }
+
+.fx-rescue > .fx-rays { opacity: 0; animation: fx-spin-rays 9s linear infinite, fx-rescue-fade 1s ease-out 0.5s forwards; }
+.fx-rescue-medusa > .fx-rays { background: repeating-conic-gradient(rgb(140 255 180 / 0.2) 0 10deg, transparent 10deg 30deg); }
+.fx-rescue-book > .fx-rays { background: repeating-conic-gradient(rgb(200 190 255 / 0.2) 0 10deg, transparent 10deg 30deg); }
+
+/* A soft light behind the emblem. */
+.fx-rescue-glow {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  width: min(80vw, 380px);
+  aspect-ratio: 1;
+  margin-left: max(-40vw, -190px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 220 120 / 0.55) 0%, rgb(255 170 40 / 0.18) 45%, transparent 70%);
+  opacity: 0;
+  animation: fx-rescue-glow 1.2s ease-out 0.3s forwards;
+}
+.fx-rescue-medusa .fx-rescue-glow { background: radial-gradient(circle, rgb(170 255 190 / 0.5) 0%, rgb(255 215 90 / 0.2) 45%, transparent 70%); }
+.fx-rescue-book .fx-rescue-glow { background: radial-gradient(circle, rgb(230 220 255 / 0.55) 0%, rgb(150 120 255 / 0.2) 45%, transparent 70%); }
+
+/* ---- the emblem, one entrance per machine ---- */
+.fx-rescue-art { position: relative; width: min(42vw, 170px); aspect-ratio: 1; flex-shrink: 0; }
+.fx-rescue-art svg { width: 100%; height: 100%; display: block; }
+.fx-rescue-book .fx-rescue-art { width: min(60vw, 240px); aspect-ratio: 200 / 120; }
+
+/* The door: it grows in, then light pours out of its doorway. */
+.fx-rescue-door .fx-rescue-art { animation: fx-rescue-door-in 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.fx-rescue-door .fx-rescue-art::after {
+  content: '';
+  position: absolute;
+  left: 25%;
+  width: 50%;
+  top: 20%;
+  bottom: 4%;
+  border-radius: 50% 50% 0 0 / 30% 30% 0 0;
+  background: radial-gradient(ellipse at 50% 70%, #fffbe0 0%, #ffe27a 45%, rgb(255 190 40 / 0.6) 75%, transparent 100%);
+  transform: scaleX(0);
+  animation: fx-rescue-doorway 0.7s ease-out 0.6s forwards;
+}
+@keyframes fx-rescue-door-in {
+  0% { transform: translateY(40px) scale(0.2); opacity: 0; }
+  60% { transform: translateY(0) scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes fx-rescue-doorway { to { transform: scaleX(1); } }
+
+/* Medusa: a flash, then her head turns in with a jolt. */
+.fx-rescue-medusa::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #eaffef;
+  opacity: 0;
+  pointer-events: none;
+  animation: fx-rescue-flash 0.7s ease-out 0.15s;
+}
+.fx-rescue-medusa .fx-rescue-art { animation: fx-rescue-medusa-in 1s cubic-bezier(0.2, 1.4, 0.4, 1) 0.2s both; }
+@keyframes fx-rescue-flash { 0% { opacity: 0; } 20% { opacity: 0.85; } 100% { opacity: 0; } }
+@keyframes fx-rescue-medusa-in {
+  0% { transform: scale(0.3) rotate(-25deg); opacity: 0; }
+  55% { transform: scale(1.15) rotate(8deg); opacity: 1; }
+  75% { transform: scale(0.97) rotate(-3deg); }
+  100% { transform: none; }
+}
+
+/* The book: it rises from below, then opens wide. */
+.fx-rescue-book .fx-rescue-art { animation: fx-rescue-book-rise 0.8s cubic-bezier(0.2, 1.1, 0.4, 1) both, fx-rescue-book-open 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) 0.75s both; }
+@keyframes fx-rescue-book-rise { from { translate: 0 45vh; opacity: 0; } to { translate: 0 0; opacity: 1; } }
+@keyframes fx-rescue-book-open { from { transform: scaleX(0.15); } to { transform: scaleX(1); } }
+
+/* ---- the words, revealed stage by stage ---- */
+.fx-rescue-title,
+.fx-rescue-line,
+.fx-rescue-percent,
+.fx-rescue-amount,
+.fx-rescue-unit,
+.fx-rescue .fx-bigwin-hint { opacity: 0; }
+
+.fx-rescue-title {
+  margin: 10px 0 2px;
+  max-width: min(92vw, 520px);
+  font-size: clamp(1.6rem, 8vw, 2.6rem);
+  font-weight: 900;
+  line-height: 1.1;
+  text-wrap: balance;
+  color: #ffd23f;
+  text-shadow: 0 0 12px #ff8a3d, 0 3px 0 #6a2a00;
+}
+.fx-rescue-medusa .fx-rescue-title { color: #ffe27a; text-shadow: 0 0 12px #2fd17a, 0 3px 0 #0b4a24; }
+.fx-rescue-book .fx-rescue-title { color: #fff0b0; text-shadow: 0 0 12px #9b7bff, 0 3px 0 #2a1a6a; }
+
+.fx-rescue-line { margin: 0; max-width: min(88vw, 420px); text-wrap: balance; font-weight: 700; font-size: clamp(0.95rem, 4.2vw, 1.15rem); color: #fff3d6; }
+
+.fx-rescue-percent { font-weight: 900; color: #fff; line-height: 1; }
+.fx-rescue-percent b { font-size: clamp(3rem, 17vw, 4.8rem); font-variant-numeric: tabular-nums; display: inline-block; min-width: 1.3em; }
+.fx-rescue-percent span { font-size: clamp(1.6rem, 8vw, 2.4rem); }
+
+.fx-rescue-amount {
+  margin-top: 6px;
+  font-size: clamp(2.2rem, 12vw, 3.8rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #ffe08a;
+  text-shadow: 0 0 10px #ffb300, 0 3px 0 #5a3c00;
+}
+.fx-rescue-unit { font-weight: 700; color: #fff3d6; }
+
+.fx-rescue.is-title .fx-rescue-title { animation: fx-stamp 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.fx-rescue.is-percent .fx-rescue-gives,
+.fx-rescue.is-percent .fx-rescue-percent { animation: fx-rescue-rise 0.35s ease-out both; }
+.fx-rescue.is-landed .fx-rescue-percent b { animation: fx-rescue-land 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); color: #ffe08a; }
+.fx-rescue.is-landed .fx-rescue-of { animation: fx-rescue-rise 0.35s ease-out both; }
+.fx-rescue.is-amount .fx-rescue-amount,
+.fx-rescue.is-amount .fx-rescue-unit { animation: fx-rescue-rise 0.4s ease-out both; }
+.fx-rescue.is-done .fx-bigwin-hint { animation: fx-rescue-hint 0.4s ease-out forwards; }
+
+@keyframes fx-rescue-fade { to { opacity: 0.45; } }
+@keyframes fx-rescue-glow { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+@keyframes fx-rescue-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes fx-rescue-land { 0% { transform: scale(1); } 40% { transform: scale(1.45); } 100% { transform: scale(1); } }
+@keyframes fx-rescue-hint { to { opacity: 0.6; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-rescue *,
+  .fx-rescue::before { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+  .fx-rescue > .fx-rays { animation: fx-rescue-fade 0.01s forwards; }
+}

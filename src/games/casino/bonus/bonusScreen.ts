@@ -1,12 +1,13 @@
 import './bonus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, winJackpot, formatChips } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, trackDrought, winJackpot, formatChips } from '../chips';
+import type { Rescue } from '../rescue';
 import {
   armSoundUnlock, burst, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
   playCoinLand, playDoorOpen, playRespinMiss, playTallyNote, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, showBigWin, tapToSpin, winTier,
   winPop, igniteCells,
   type WinLinesHandle, type WinPath,
-  keepScreenOn,
+  keepScreenOn, showRescue, playRescueHint, RESCUE_HINT_MS, RESCUE_PAUSE_MS,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
 import { BONUS_DEFS, TREASURE_DOOR, inlineDoor } from './bonusArt';
@@ -14,6 +15,7 @@ import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTON
 import {
   BET_LEVELS,
   CELLS,
+  BONUS_EVERY,
   BONUS_MIN_X,
   OPENING_COIN_VALUES,
   RESPIN_COIN_VALUES,
@@ -138,6 +140,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     { label: 'Porte (bonus)', outcome: 'door' }, // TEST-BUTTONS
     { label: 'Bonus + ×2', outcome: 'x2' }, // TEST-BUTTONS
     ...JACKPOT_NAMES.map((name, tier) => ({ label: `Bonus + ${name}`, outcome: `${tier}` })), // TEST-BUTTONS
+    { label: 'Aide après une galère', outcome: 'rescue' }, // TEST-BUTTONS
   ])); // TEST-BUTTONS
   tapToSpin(machine, spinButton);
   const right = el('span', { class: 'bonus-top-right' }, balance, muteButton());
@@ -199,8 +202,9 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     refresh();
 
     const force = CASINO_TEST_BUTTONS ? takeForced<string>() : null; // TEST-BUTTONS
-    const forceTier = force !== null && force !== 'door' && force !== 'x2' ? Number(force) : undefined; // TEST-BUTTONS
-    const result = spinGrid(Math.random, force === null ? undefined : 'door'); // TEST-BUTTONS
+    const forceRescue = force === 'rescue'; // TEST-BUTTONS
+    const forceTier = force !== null && force !== 'door' && force !== 'x2' && !forceRescue ? Number(force) : undefined; // TEST-BUTTONS
+    const result = spinGrid(Math.random, force === null || forceRescue ? undefined : 'door'); // TEST-BUTTONS
     await animateReels(result);
     if (disposed) return;
 
@@ -217,18 +221,42 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       playLose();
       message.textContent = nearMiss(result) ? 'Presque ! Relance !' : 'Pas de chance, relance !';
     }
+    const rescue = trackDrought(LOBBY_ID, lv.bet, won, triggered, BONUS_EVERY, forceRescue); // TEST-BUTTONS
 
     if (triggered) {
       await wait(won > 0 ? 1200 : 300);
       const values = jackpotsNow(lv);
       await runBonus(playBonus(Math.random, lv, forceTier, values, force === 'x2'), lv, values); // TEST-BUTTONS
     }
+    if (rescue) await offerRescue(rescue);
     busy = false;
     const id = window.setTimeout(() => {
       if (!busy) lights.setMode('idle');
     }, 4000);
     timers.add(id);
     refresh();
+  }
+
+  /** The help after a long wait without a door, already paid: the machine only shows it. */
+  async function offerRescue(rescue: Rescue): Promise<void> {
+    await wait(RESCUE_HINT_MS);
+    playRescueHint();
+    await wait(RESCUE_PAUSE_MS - RESCUE_HINT_MS);
+    lines?.clear();
+    lines = null;
+    lights.setMode('big');
+    await showRescue(document.body, {
+      theme: 'door',
+      art: TREASURE_DOOR,
+      title: 'La porte a eu pitié de toi !',
+      gives: 'Elle te rend',
+      of: 'de ce que tu as perdu depuis ta dernière porte',
+      percent: rescue.percent,
+      amount: rescue.chips,
+      sound: () => playDoorOpen(0),
+    });
+    message.textContent = `Coup de pouce de la porte : +${formatChips(rescue.chips)} jetons !`;
+    message.className = 'bonus-message bonus-big';
   }
 
   async function celebrateBase(wins: ReturnType<typeof lineWins>, won: number, stake: number, triggered: boolean): Promise<void> {
@@ -629,7 +657,7 @@ function rules(lv: BetLevel): HTMLElement[] {
     payoutTable(entries, lv.bet),
     rulesBlock(
       ['La porte ', inlineDoor()],
-      'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 105, quelle que soit la mise).',
+      `Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur ${BONUS_EVERY}, quelle que soit la mise).`,
       `Tu commences avec ${START_COINS} pièces et ${RESPINS} relances. Chaque nouvelle pièce reste bloquée et remet les relances à ${RESPINS}.`,
       `Les ${START_COINS} pièces de départ valent de ${MIN_COIN} à ${MAX_OPENING_COIN} × ta mise. Celles qui tombent pendant les relances peuvent valoir jusqu’à ${MAX_COIN} × ta mise, et ce sont elles qui portent les jackpots.`,
       'La pièce violette ×2 peut tomber pendant les relances : elle double toutes les pièces déjà sur le plateau, jackpots compris. Plus le plateau est rempli, plus elle rapporte !',

@@ -4,4 +4,5 @@ import './fx.css';
 export * from './sound';
 export * from './effects';
 export * from './paytable';
+export * from './rescueScene';
 export * from './testMode'; // TEST-BUTTONS

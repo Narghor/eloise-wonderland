@@ -1,17 +1,18 @@
 import './luna.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, noteWin, pay, formatChips } from '../chips';
+import { bet, chips, noteWin, pay, trackDrought, formatChips } from '../chips';
+import type { Rescue } from '../rescue';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playBookOpen, playGambleLose, playGambleWin, playLose, playReelStop, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
-  keepScreenOn,
+  keepScreenOn, showRescue, playRescueHint, RESCUE_HINT_MS, RESCUE_PAUSE_MS,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
 import { LUNA_DEFS, OPEN_BOOK, SYMBOL_ART } from './lunaArt';
 import {
-  BETS, BOOK, BOOK_PAYS, FREE_SPINS, GAMBLE_CAP_X, GAMBLE_MAX_STEPS, LUNA, FREE_SPINS_MIN_X, MIN_BOOKS, PAYLINES, PAY_SCALE, RETRIGGER_BOOKS, RETRIGGER_SPINS, REELS, ROWS, SYMBOLS,
+  BETS, BOOK, BOOK_PAYS, FREE_SPINS, FREE_SPINS_EVERY, GAMBLE_CAP_X, GAMBLE_MAX_STEPS, LUNA, FREE_SPINS_MIN_X, MIN_BOOKS, PAYLINES, PAY_SCALE, RETRIGGER_BOOKS, RETRIGGER_SPINS, REELS, ROWS, SYMBOLS,
   baseSpin, canGamble, chipsFor, playFreeSpins, type FreeSpinsResult, type Grid, type LineWin, type LunaForce,
 } from './lunaLogic';
 
@@ -125,7 +126,7 @@ export function renderLuna(root: HTMLElement): () => void {
     tableHost,
   );
   screen.insertAdjacentHTML('afterbegin', LUNA_DEFS);
-  if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: '3 livres', outcome: 'books' }, { label: 'Symbole spécial Eloise', outcome: 'luna' }, { label: 'Gros gain', outcome: 'big' }])); // TEST-BUTTONS
+  if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: '3 livres', outcome: 'books' }, { label: 'Symbole spécial Eloise', outcome: 'luna' }, { label: 'Gros gain', outcome: 'big' }, { label: 'Aide après une galère', outcome: 'rescue' }])); // TEST-BUTTONS
   tapToSpin(machine, spinButton);
   root.replaceChildren(topBar('Eloise’s Book', el('span', { class: 'luna-top-right' }, balance, muteButton()), BACK_CASINO), screen);
 
@@ -165,8 +166,8 @@ export function renderLuna(root: HTMLElement): () => void {
     lights.setMode('spin');
     refresh();
 
-    const force = CASINO_TEST_BUTTONS ? takeForced<LunaForce>() : null; // TEST-BUTTONS
-    const result = baseSpin(Math.random, force ?? undefined);
+    const force = CASINO_TEST_BUTTONS ? takeForced<LunaForce | 'rescue'>() : null; // TEST-BUTTONS
+    const result = baseSpin(Math.random, force === 'rescue' ? undefined : force ?? undefined); // TEST-BUTTONS
     await animateReels(result.grid, false, new Set());
     if (disposed) return;
 
@@ -194,6 +195,7 @@ export function renderLuna(root: HTMLElement): () => void {
       setMessage('La lune se cache… relance !');
     }
     refresh();
+    const rescue = trackDrought(LOBBY_ID, stake, won, triggered, FREE_SPINS_EVERY, force === 'rescue'); // TEST-BUTTONS
 
     if (triggered) {
       const feature = playFreeSpins(Math.random, force === 'luna' ? LUNA : undefined);
@@ -205,11 +207,32 @@ export function renderLuna(root: HTMLElement): () => void {
       await runFreeSpins(pending, true);
       if (disposed) return;
     }
+    if (rescue) await offerRescue(rescue);
     busy = false;
     // The free spins win is banked: only a plain win can be doubled.
     if (!triggered) offerGamble(won, stake);
     timers.add(window.setTimeout(() => { if (!busy) lights.setMode('idle'); }, 4000));
     refresh();
+  }
+
+  /** The help after a long wait without free spins, already paid: the machine only shows it. */
+  async function offerRescue(rescue: Rescue): Promise<void> {
+    await wait(RESCUE_HINT_MS);
+    playRescueHint();
+    await wait(RESCUE_PAUSE_MS - RESCUE_HINT_MS);
+    clearBoard();
+    lights.setMode('big');
+    await showRescue(document.body, {
+      theme: 'book',
+      art: OPEN_BOOK,
+      title: 'Eloise t’offre un coup de pouce !',
+      gives: 'Elle te rend',
+      of: 'de ce que tu as perdu depuis tes derniers tours gratuits',
+      percent: rescue.percent,
+      amount: rescue.chips,
+      sound: () => playBookOpen(0),
+    });
+    setMessage(`Coup de pouce d’Eloise : +${formatChips(rescue.chips)} jetons !`);
   }
 
   function clearBoard(): void {

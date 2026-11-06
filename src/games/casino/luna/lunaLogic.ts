@@ -206,6 +206,8 @@ export interface FreeSpinsResult {
 
 /** A free spins round always pays at least this many times the bet. */
 export const FREE_SPINS_MIN_X = 30;
+/** Spins per free spins round on average, measured by tools/casino-stats.mjs: measure again after changing the odds. */
+export const FREE_SPINS_EVERY = 195;
 
 function pickSpecial(rng: Rng): number {
   const total = SPECIAL_WEIGHTS.reduce((a, b) => a + b, 0);

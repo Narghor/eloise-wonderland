@@ -1,11 +1,12 @@
 import './olympus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, noteWin, pay, formatChips } from '../chips';
+import { bet, chips, noteWin, pay, trackDrought, formatChips } from '../chips';
+import type { Rescue } from '../rescue';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
   playBonusTrigger, playLose, playReelStop, playMedusaAwake, playSmallWin, playSuspense, playSuspenseHit, playSuspenseMiss, playSpinLoop, rulesBlock, shake, shapeDiagram, showBigWin,
   tapToSpin, winTier, winPop, stampBanner, igniteCells, type WinLinesHandle,
-  keepScreenOn,
+  keepScreenOn, showRescue, playRescueHint, RESCUE_HINT_MS, RESCUE_PAUSE_MS,
 } from '../fx';
 import { BUZZ, buzz } from '../fx';
 import { CASINO_TEST_BUTTONS, takeForced, testBar } from '../fx'; // TEST-BUTTONS
@@ -13,6 +14,7 @@ import {
   BETS,
   COLS,
   FREE_SPINS_BY_SCATTERS,
+  FREE_SPINS_EVERY,
   FREE_SPINS_MIN_X,
   FREE_RETRIGGER_SPINS,
   LINES,
@@ -129,7 +131,7 @@ export function renderOlympus(root: HTMLElement): () => void {
     tableButton,
     tableHost,
   );
-  if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: '3 scatters', outcome: 'free3' }, { label: '5 scatters (100 tours)', outcome: 'free5' }, { label: 'Écran rempli de Medusa', outcome: 'flood' }])); // TEST-BUTTONS
+  if (CASINO_TEST_BUTTONS) tableButton.after(testBar([{ label: '3 scatters', outcome: 'free3' }, { label: '5 scatters (100 tours)', outcome: 'free5' }, { label: 'Écran rempli de Medusa', outcome: 'flood' }, { label: 'Aide après une galère', outcome: 'rescue' }])); // TEST-BUTTONS
   tapToSpin(machine, spinButton);
   root.replaceChildren(topBar('Le Regard de Medusa', el('span', { class: 'oly-top-right' }, balance, muteButton()), BACK_CASINO), screen);
   screen.insertAdjacentHTML('afterbegin', OLYMPUS_DEFS);
@@ -177,8 +179,8 @@ export function renderOlympus(root: HTMLElement): () => void {
     lights.setMode('spin');
     refresh();
 
-    const force = CASINO_TEST_BUTTONS ? takeForced<OlympusForce>() : null; // TEST-BUTTONS
-    const result = spinGrid(Math.random, false, force === 'flood' ? 'free3' : force ?? undefined); // TEST-BUTTONS
+    const force = CASINO_TEST_BUTTONS ? takeForced<OlympusForce | 'rescue'>() : null; // TEST-BUTTONS
+    const result = spinGrid(Math.random, false, force === 'flood' ? 'free3' : force === 'rescue' ? undefined : force ?? undefined); // TEST-BUTTONS
     await animateReels(result, false);
     if (disposed) return;
 
@@ -206,6 +208,7 @@ export function renderOlympus(root: HTMLElement): () => void {
       setMessage('Rien cette fois…');
     }
     refresh();
+    const rescue = trackDrought(LOBBY_ID, stake, won, scatters >= MIN_SCATTERS, FREE_SPINS_EVERY, force === 'rescue'); // TEST-BUTTONS
 
     if (scatters >= MIN_SCATTERS) {
       const startSpins = freeSpinsFor(scatters);
@@ -217,9 +220,30 @@ export function renderOlympus(root: HTMLElement): () => void {
       await wait(won > 0 ? 900 : 300);
       await runFreeSpins(pending, true);
     }
+    if (rescue) await offerRescue(rescue);
     busy = false;
     timers.add(window.setTimeout(() => { if (!busy) lights.setMode('idle'); }, 4000));
     refresh();
+  }
+
+  /** The help after a long wait without free spins, already paid: the machine only shows it. */
+  async function offerRescue(rescue: Rescue): Promise<void> {
+    await wait(RESCUE_HINT_MS);
+    playRescueHint();
+    await wait(RESCUE_PAUSE_MS - RESCUE_HINT_MS);
+    clearLines();
+    lights.setMode('big');
+    await showRescue(document.body, {
+      theme: 'medusa',
+      art: MEDUSA_HEAD,
+      title: 'Medusa a eu pitié de toi !',
+      gives: 'Elle te rend',
+      of: 'de ce que tu as perdu depuis tes derniers tours gratuits',
+      percent: rescue.percent,
+      amount: rescue.chips,
+      sound: () => playMedusaAwake(0),
+    });
+    setMessage(`Coup de pouce de Medusa : +${formatChips(rescue.chips)} jetons !`);
   }
 
   function clearLines(): void {

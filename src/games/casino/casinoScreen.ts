@@ -11,9 +11,9 @@ import { renderLuna } from './luna/lunaScreen';
 import { ELOISE_ICON } from './luna/lunaArt';
 import { MEDUSA_ICON } from './olympus/olympusArt';
 import { DOOR_ICON } from './bonus/bonusArt';
-import { BONUS_MIN_X } from './bonus/bonusLogic';
-import { FREE_SPINS_MIN_X as MEDUSA_MIN_X } from './olympus/olympusLogic';
-import { FREE_SPINS_MIN_X as BOOK_MIN_X } from './luna/lunaLogic';
+import { BONUS_EVERY, BONUS_MIN_X } from './bonus/bonusLogic';
+import { FREE_SPINS_EVERY as MEDUSA_EVERY, FREE_SPINS_MIN_X as MEDUSA_MIN_X } from './olympus/olympusLogic';
+import { FREE_SPINS_EVERY as BOOK_EVERY, FREE_SPINS_MIN_X as BOOK_MIN_X } from './luna/lunaLogic';
 import { renderBlackjack } from './blackjack/blackjackScreen';
 import { renderRoulette } from './roulette/rouletteScreen';
 
@@ -32,10 +32,11 @@ interface MachineProfile {
 
 /**
  * Shown once for the whole casino, never per machine: a per-machine figure would rank them and
- * send everyone to the highest. Ours give back 99 to 105 for 100 bet; a French casino's slots
+ * send everyone to the highest. Ours give back 102 to 110 for 100 bet (rescue included, see
+ * rescue.ts); a French casino's slots
  * about 92 on average (85 is the legal floor).
  */
-const OUR_PAYBACK = 100;
+const OUR_PAYBACK = 105;
 const REAL_CASINO_PAYBACK = 92;
 
 /** `iconSvg` (trusted inline SVG) replaces the emoji `icon` in the lobby. */
@@ -48,17 +49,17 @@ const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: s
   porte: {
     render: renderBonusSlot, icon: '🚪', iconSvg: DOOR_ICON, title: 'Machine à porte',
     hint: 'Le bonus le plus fréquent, mais moins explosif.',
-    profile: { bonus: 5, swings: 2, bonusEvery: `Bonus : 1 tour sur 105 · toujours au moins ×${BONUS_MIN_X} ta mise` },
+    profile: { bonus: 5, swings: 2, bonusEvery: `Bonus : 1 tour sur ${BONUS_EVERY} · toujours au moins ×${BONUS_MIN_X} ta mise` },
   },
   olympe: {
     render: renderOlympus, icon: '🐍', iconSvg: MEDUSA_ICON, title: 'Le Regard de Medusa',
     hint: 'Des rouleaux avares : tout se joue dans les tours gratuits. La plus explosive.',
-    profile: { bonus: 4, swings: 5, bonusEvery: `Bonus : 1 tour sur 150 · toujours au moins ×${MEDUSA_MIN_X} ta mise` },
+    profile: { bonus: 4, swings: 5, bonusEvery: `Bonus : 1 tour sur ${MEDUSA_EVERY} · toujours au moins ×${MEDUSA_MIN_X} ta mise` },
   },
   eloise: {
     render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book',
     hint: 'Les rouleaux paient souvent. Le bonus est plus rare, mais peut grimper haut.',
-    profile: { bonus: 3, swings: 3, bonusEvery: `Bonus : 1 tour sur 195 · toujours au moins ×${BOOK_MIN_X} ta mise` },
+    profile: { bonus: 3, swings: 3, bonusEvery: `Bonus : 1 tour sur ${BOOK_EVERY} · toujours au moins ×${BOOK_MIN_X} ta mise` },
   },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
   roulette: { render: renderRoulette, icon: '🎡', title: 'Roulette', hint: 'Européenne, un seul zéro' },
