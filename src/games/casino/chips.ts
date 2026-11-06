@@ -34,13 +34,15 @@ export interface CasinoSave {
   claimedGifts: string[];
   /** Wait since the last bonus, per machine id (see rescue.ts). */
   droughts: Record<string, Drought>;
+  /** The bet last chosen on each machine, per machine id. */
+  lastBets: Record<string, number>;
 }
 
 export function loadCasino(): CasinoSave {
   const raw = readGame(GAME_ID);
   if (typeof raw !== 'object' || raw === null) {
     // A new player has no day counted yet: the daily gift is their starting balance.
-    return { chips: 0, record: 0, refilledOn: '', jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [], claimedGifts: [], droughts: {} };
+    return { chips: 0, record: 0, refilledOn: '', jackpots: {}, bestWins: {}, usedGifts: [], sentGifts: [], claimedGifts: [], droughts: {}, lastBets: {} };
   }
   const data = raw as Record<string, unknown>;
   const chips = isCount(data.chips) ? data.chips : 0;
@@ -54,6 +56,7 @@ export function loadCasino(): CasinoSave {
     sentGifts: Array.isArray(data.sentGifts) ? data.sentGifts.filter((code): code is string => typeof code === 'string') : [],
     claimedGifts: Array.isArray(data.claimedGifts) ? data.claimedGifts.filter((id): id is string => typeof id === 'string') : [],
     droughts: readDroughts(data.droughts),
+    lastBets: readAmounts(data.lastBets),
   };
 }
 
@@ -238,6 +241,21 @@ export function winJackpot(machineId: string, minimum = 0): number {
   save.chips += won;
   saveCasino(save);
   return won;
+}
+
+// -----------------------------------------------
+// LAST BET PER MACHINE
+// -----------------------------------------------
+
+/** Index in `bets` of the bet last chosen on the machine, or 0 when it is not one of them (or never chosen). */
+export function lastBetIndex(machineId: string, bets: readonly number[]): number {
+  return Math.max(0, bets.indexOf(loadCasino().lastBets[machineId] ?? -1));
+}
+
+export function rememberBet(machineId: string, amount: number): void {
+  const save = loadCasino();
+  save.lastBets[machineId] = amount;
+  saveCasino(save);
 }
 
 // -----------------------------------------------

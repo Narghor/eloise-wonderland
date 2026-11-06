@@ -1,6 +1,6 @@
 import './luna.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, noteWin, pay, trackDrought, formatChips } from '../chips';
+import { bet, chips, noteWin, pay, trackDrought, formatChips, lastBetIndex, rememberBet } from '../chips';
 import type { Rescue } from '../rescue';
 import {
   armSoundUnlock, burst, countUp, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBigWin,
@@ -49,7 +49,7 @@ export function renderLuna(root: HTMLElement): () => void {
       timers.add(id);
     });
 
-  let betIndex = 0;
+  let betIndex = lastBetIndex(LOBBY_ID, BETS);
   let busy = false;
   /** The gamble card is turning over: no new guess until it shows. */
   let revealing = false;
@@ -147,8 +147,8 @@ export function renderLuna(root: HTMLElement): () => void {
     message.className = `luna-message${extra ? ` ${extra}` : ''}`;
   }
 
-  minus.addEventListener('click', () => { betIndex = Math.max(0, betIndex - 1); refresh(); });
-  plus.addEventListener('click', () => { betIndex = Math.min(BETS.length - 1, betIndex + 1); refresh(); });
+  minus.addEventListener('click', () => { betIndex = Math.max(0, betIndex - 1); rememberBet(LOBBY_ID, currentBet()); refresh(); });
+  plus.addEventListener('click', () => { betIndex = Math.min(BETS.length - 1, betIndex + 1); rememberBet(LOBBY_ID, currentBet()); refresh(); });
   tableButton.addEventListener('click', () => { tableHost.hidden = !tableHost.hidden; refresh(); });
   spinButton.addEventListener('click', () => void spin());
 

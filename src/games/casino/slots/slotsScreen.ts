@@ -1,6 +1,6 @@
 import './slots.css';
 import { el, topBar } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot, formatChips } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, winJackpot, formatChips, lastBetIndex, rememberBet } from '../chips';
 
 /** This machine's key in the casino lobby, which shows its best win. */
 const LOBBY_ID = 'sous';
@@ -20,7 +20,7 @@ const TICK_MS = 60;
 export function renderSlots(root: HTMLElement): () => void {
   armSoundUnlock();
   const timers: number[] = [];
-  let betIndex = 0;
+  let betIndex = lastBetIndex(LOBBY_ID, BET_LEVELS);
   let spinning = false;
   let lines: WinLinesHandle | null = null;
   let skipCount: (() => void) | null = null;
@@ -52,8 +52,8 @@ export function renderSlots(root: HTMLElement): () => void {
   const tableHost = el('div', { class: 'slots-paytable' });
   tableHost.hidden = true;
 
-  minus.addEventListener('click', () => { betIndex = Math.max(0, betIndex - 1); refresh(); });
-  plus.addEventListener('click', () => { betIndex = Math.min(BET_LEVELS.length - 1, betIndex + 1); refresh(); });
+  minus.addEventListener('click', () => { betIndex = Math.max(0, betIndex - 1); rememberBet(LOBBY_ID, BET_LEVELS[betIndex]); refresh(); });
+  plus.addEventListener('click', () => { betIndex = Math.min(BET_LEVELS.length - 1, betIndex + 1); rememberBet(LOBBY_ID, BET_LEVELS[betIndex]); refresh(); });
   tableButton.addEventListener('click', () => {
     tableHost.hidden = !tableHost.hidden;
     if (!tableHost.hidden) tableHost.replaceChildren(...paytable(BET_LEVELS[betIndex]));

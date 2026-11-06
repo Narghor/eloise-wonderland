@@ -1,6 +1,6 @@
 import './bonus.css';
 import { el, topBar, type BackLink } from '../../../dom';
-import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, trackDrought, winJackpot, formatChips } from '../chips';
+import { bet, chips, feedJackpot, jackpot, noteWin, pay, resetJackpot, trackDrought, winJackpot, formatChips, lastBetIndex, rememberBet } from '../chips';
 import type { Rescue } from '../rescue';
 import {
   armSoundUnlock, burst, drawWinLines, marquee, muteButton, payoutTable, paylineDiagrams, playBonusTrigger,
@@ -80,7 +80,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       timers.add(id);
     });
 
-  let levelIndex = 0;
+  let levelIndex = lastBetIndex(LOBBY_ID, BET_LEVELS.map((l) => l.bet));
   let busy = false;
   let lines: WinLinesHandle | null = null;
 
@@ -174,10 +174,12 @@ export function renderBonusSlot(root: HTMLElement): () => void {
 
   minus.addEventListener('click', () => {
     levelIndex = Math.max(0, levelIndex - 1);
+    rememberBet(LOBBY_ID, level().bet);
     refresh();
   });
   plus.addEventListener('click', () => {
     levelIndex = Math.min(BET_LEVELS.length - 1, levelIndex + 1);
+    rememberBet(LOBBY_ID, level().bet);
     refresh();
   });
   rulesButton.addEventListener('click', () => {
