@@ -25,7 +25,7 @@ export interface BetLevel {
   jackpotTier: number;
 }
 
-// Simulated RTP (4M spins, pool feed included): 94.8 / 95.7 / 96.4 / 96.6 by tier.
+// Simulated RTP (tools/casino-stats.mjs, 6M spins): 98.5 / 101 / 102.5 / 104 % for Mini / Minor / Major / Grand.
 export const BET_LEVELS: BetLevel[] = [
   { bet: 10, jackpotTier: 0 },
   { bet: 20, jackpotTier: 0 },
@@ -157,23 +157,32 @@ export const START_COINS = 6;
 /** A bonus always pays at least this many times the bet. */
 export const BONUS_MIN_X = 30;
 export const RESPINS = 3;
-/** Chance per empty cell per respin to land a coin. */
-export const LAND_CHANCE = 0.04;
+/** Chance per empty cell per respin to land a coin: often enough that most respins bring something. */
+export const LAND_CHANCE = 0.075;
+/** The last cells land far less often: a full board (the Grand) stays rare. */
+export const LAST_CELLS = 3;
+export const LAST_CELLS_LAND_CHANCE = 0.014;
+/** Share of the coins landing on a respin that are a x2: it doubles every coin already on the board. */
+export const DOUBLER_CHANCE = 0.05;
 
 export const JACKPOT_NAMES = ['Mini', 'Minor', 'Major', 'Grand'];
 /** Fixed jackpots in multiples of the bet (Grand is the progressive pool). */
 export const JACKPOT_MULTS = [12, 55, 275];
 /** Each spin at a bet level grows that level's Minor and Major by this many bets (the Mini stays fixed). */
-export const JACKPOT_GROWTH = [0, 0.015, 0.03];
+export const JACKPOT_GROWTH = [0, 0.005, 0.006];
 /**
- * The opening coins are small; the coins landing on a respin carry the big values and every jackpot,
- * so a bonus builds up as it goes. Weights tuned by simulation: same average bonus as one shared table.
+ * The opening coins are small; the coins landing on a respin carry the rare big values, every jackpot
+ * and the x2, so a bonus builds up as it goes. Tuned by simulation (tools/casino-stats.mjs).
  */
-export const OPENING_COIN_VALUES: [number, number][] = [[4, 30], [5, 26], [8, 16], [10, 12], [15, 7]];
-export const RESPIN_COIN_VALUES: [number, number][] = [[8, 16], [10, 12], [15, 7], [40, 16], [80, 8]];
-const RESPIN_JACKPOT_WEIGHTS = [7.5, 2.8, 0.7];
+export const OPENING_COIN_VALUES: [number, number][] = [[3, 30], [4, 28], [6, 20], [10, 11], [15, 5]];
+export const RESPIN_COIN_VALUES: [number, number][] = [[4, 22], [6, 16], [10, 10], [20, 7], [60, 2.2], [150, 0.7]];
+const RESPIN_JACKPOT_WEIGHTS = [3.75, 0.8, 0.12];
 
-export type Coin = { kind: 'value'; mult: number } | { kind: 'jackpot'; tier: number };
+/** `doubled`: how many x2 landed after this coin; it is worth 2^doubled times its face value. */
+export type Coin =
+  | { kind: 'value'; mult: number; doubled: number }
+  | { kind: 'jackpot'; tier: number; doubled: number }
+  | { kind: 'doubler' };
 
 export interface BonusStep {
   cells: (Coin | null)[];
@@ -199,13 +208,13 @@ function drawCoin(rng: Rng, jackpotTier: number, opening: boolean): Coin {
   let roll = rng() * total;
   for (const [mult, w] of values) {
     roll -= w;
-    if (roll < 0) return { kind: 'value', mult };
+    if (roll < 0) return { kind: 'value', mult, doubled: 0 };
   }
   for (let tier = 0; tier < jackpots.length; tier++) {
     roll -= jackpots[tier];
-    if (roll < 0) return { kind: 'jackpot', tier };
+    if (roll < 0) return { kind: 'jackpot', tier, doubled: 0 };
   }
-  return { kind: 'value', mult: 1 };
+  return { kind: 'value', mult: 1, doubled: 0 };
 }
 
 /** The fixed jackpots at their starting value, in chips, for this bet. */
@@ -215,10 +224,21 @@ export function baseJackpots(bet: number): number[] {
 
 /** `jackpots`: what Mini, Minor and Major are worth right now, in chips. */
 export function coinChips(coin: Coin, bet: number, jackpots = baseJackpots(bet)): number {
-  return coin.kind === 'value' ? coin.mult * bet : jackpots[coin.tier];
+  if (coin.kind === 'doubler') return 0;
+  return (coin.kind === 'value' ? coin.mult * bet : jackpots[coin.tier]) * 2 ** coin.doubled;
 }
 
-export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpots = baseJackpots(level.bet)): BonusResult { // TEST-BUTTONS
+/**
+ * Every coin on the board, doubled once more. New objects: the steps already recorded share the old
+ * ones and must keep showing the values from before the x2.
+ */
+function doubleBoard(cells: (Coin | null)[]): void {
+  cells.forEach((coin, i) => {
+    if (coin && coin.kind !== 'doubler') cells[i] = { ...coin, doubled: coin.doubled + 1 };
+  });
+}
+
+export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpots = baseJackpots(level.bet), forceDoubler = false): BonusResult { // TEST-BUTTONS
   const cells: (Coin | null)[] = new Array(CELLS).fill(null);
   const order = [...Array(CELLS).keys()];
   for (let i = order.length - 1; i > 0; i--) {
@@ -227,7 +247,7 @@ export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpot
   }
   const first = order.slice(0, START_COINS);
   for (const i of first) cells[i] = drawCoin(rng, level.jackpotTier, true);
-  if (forceTier !== undefined && forceTier < 3) cells[first[0]] = { kind: 'jackpot', tier: forceTier }; // TEST-BUTTONS
+  if (forceTier !== undefined && forceTier < 3) cells[first[0]] = { kind: 'jackpot', tier: forceTier, doubled: 0 }; // TEST-BUTTONS
   if (forceTier === 3) for (const i of order) cells[i] ??= drawCoin(rng, level.jackpotTier, false); // TEST-BUTTONS: Grand fills the grid
   const steps: BonusStep[] = [{ cells: [...cells], fresh: forceTier === 3 ? order : first, respinsLeft: RESPINS }]; // TEST-BUTTONS
 
@@ -235,11 +255,19 @@ export function playBonus(rng: Rng, level: BetLevel, forceTier?: number, jackpot
   let filled = forceTier === 3 ? CELLS : START_COINS; // TEST-BUTTONS
   while (left > 0 && filled < CELLS) {
     const fresh: number[] = [];
+    const landChance = CELLS - filled <= LAST_CELLS ? LAST_CELLS_LAND_CHANCE : LAND_CHANCE;
+    // TEST-BUTTONS: the first respin lands a x2 on the first empty cell.
+    const forcedCell = forceDoubler && steps.length === 1 ? cells.indexOf(null) : -1; // TEST-BUTTONS
+    // Cells land in board order, which is the order the screen reveals them: a x2 doubles the coins before it.
     for (let i = 0; i < CELLS; i++) {
-      if (cells[i] === null && rng() < LAND_CHANCE) {
+      if (cells[i] !== null || (i !== forcedCell && rng() >= landChance)) continue; // TEST-BUTTONS
+      if (i === forcedCell || rng() < DOUBLER_CHANCE) { // TEST-BUTTONS
+        doubleBoard(cells);
+        cells[i] = { kind: 'doubler' };
+      } else {
         cells[i] = drawCoin(rng, level.jackpotTier, false);
-        fresh.push(i);
       }
+      fresh.push(i);
     }
     filled += fresh.length;
     left = fresh.length > 0 ? RESPINS : left - 1;

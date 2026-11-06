@@ -96,7 +96,13 @@ export function renderOlympus(root: HTMLElement): () => void {
     el('div', { class: 'oly-colonnade' }, el('div', { class: 'oly-column', 'aria-hidden': 'true' }), sky, el('div', { class: 'oly-column', 'aria-hidden': 'true' })),
     el('div', { class: 'oly-stylobate' }),
   );
-  const machine = el('div', { class: 'oly-machine' }, featureBar, temple);
+  const machine = el(
+    'div',
+    { class: 'oly-machine' },
+    featureBar,
+    temple,
+    el('div', { class: 'casino-guarantee', text: `Tours gratuits : au moins ×${FREE_SPINS_MIN_X} ta mise` }),
+  );
   const lights = marquee(machine, 12);
   const message = el('div', { class: 'oly-message', role: 'status' });
   const intro = (): void => {

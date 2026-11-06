@@ -185,4 +185,12 @@
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
+.casino-gauges { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.casino-gauge b { color: #d6246e; font-weight: 400; letter-spacing: 1px; }
+.casino-gauge i { color: #ecd3df; font-style: normal; letter-spacing: 1px; }
+.casino-profile { display: block; margin-top: 2px; font-size: 0.78rem; color: var(--muted); }
+/* A bonus machine's guaranteed minimum, always shown under its reels. */
+.casino-guarantee { align-self: center; justify-self: center; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 6px auto 0; padding: 2px 12px; border-radius: 999px; background: rgb(0 0 0 / 0.35); color: #ffe27a; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-align: center; }
+.casino-kindness { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #eaf7ee; color: #2f4a38; font-size: 0.9rem; text-align: center; }
+.casino-kindness em { font-style: normal; font-weight: 700; color: #2e8b57; }
 .casino-best-win { display: block; margin-top: 2px; font-size: 0.8rem; font-weight: 700; color: #b8860b; }

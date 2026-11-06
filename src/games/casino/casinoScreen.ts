@@ -11,15 +11,55 @@ import { renderLuna } from './luna/lunaScreen';
 import { ELOISE_ICON } from './luna/lunaArt';
 import { MEDUSA_ICON } from './olympus/olympusArt';
 import { DOOR_ICON } from './bonus/bonusArt';
+import { BONUS_MIN_X } from './bonus/bonusLogic';
+import { FREE_SPINS_MIN_X as MEDUSA_MIN_X } from './olympus/olympusLogic';
+import { FREE_SPINS_MIN_X as BOOK_MIN_X } from './luna/lunaLogic';
 import { renderBlackjack } from './blackjack/blackjackScreen';
 import { renderRoulette } from './roulette/rouletteScreen';
 
+/**
+ * How a machine plays, as measured by tools/casino-stats.mjs on 06/11/2026: measure again after
+ * changing a machine's numbers.
+ */
+interface MachineProfile {
+  /** 1-5: how often the bonus comes. */
+  bonus: number;
+  /** 1-5: how rare and how big the big wins are. */
+  swings: number;
+  /** "Bonus : 1 tour sur 105". */
+  bonusEvery: string;
+}
+
+/**
+ * Shown once for the whole casino, never per machine: a per-machine figure would rank them and
+ * send everyone to the highest. Ours give back 99 to 105 for 100 bet; a French casino's slots
+ * about 92 on average (85 is the legal floor).
+ */
+const OUR_PAYBACK = 100;
+const REAL_CASINO_PAYBACK = 92;
+
 /** `iconSvg` (trusted inline SVG) replaces the emoji `icon` in the lobby. */
-const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: string; iconSvg?: string; title: string; hint: string }> = {
-  sous: { render: renderSlots, icon: '🍒', title: 'Machine à sous', hint: '5 rouleaux, jackpot progressif' },
-  porte: { render: renderBonusSlot, icon: '🚪', iconSvg: DOOR_ICON, title: 'Machine à porte', hint: 'Décroche le bonus, plus la mise est haute, mieux il paie' },
-  olympe: { render: renderOlympus, icon: '🐍', iconSvg: MEDUSA_ICON, title: 'Le Regard de Medusa', hint: 'Presque rien sans les temples, tout avec les tours gratuits' },
-  eloise: { render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book', hint: '3 livres = 10 tours gratuits avec un symbole qui remplit les rouleaux' },
+const GAMES: Record<string, { render: (root: HTMLElement) => () => void; icon: string; iconSvg?: string; title: string; hint: string; profile?: MachineProfile }> = {
+  sous: {
+    render: renderSlots, icon: '🍒', title: 'Machine à sous',
+    hint: 'Des petits gains très souvent. Le jackpot diamants est très rare, mais énorme.',
+    profile: { bonus: 1, swings: 1, bonusEvery: 'Jackpot : 1 tour sur 20 000' },
+  },
+  porte: {
+    render: renderBonusSlot, icon: '🚪', iconSvg: DOOR_ICON, title: 'Machine à porte',
+    hint: 'Le bonus le plus fréquent. La pièce ×2 et les jackpots font les grands moments, et plus tu mises, mieux il paie.',
+    profile: { bonus: 5, swings: 2, bonusEvery: `Bonus : 1 tour sur 105 · toujours au moins ×${BONUS_MIN_X} ta mise` },
+  },
+  olympe: {
+    render: renderOlympus, icon: '🐍', iconSvg: MEDUSA_ICON, title: 'Le Regard de Medusa',
+    hint: 'Des rouleaux avares : tout se joue dans les tours gratuits. Avec 5 temples, souvent plus de 1 000 fois la mise. La plus explosive.',
+    profile: { bonus: 4, swings: 5, bonusEvery: `Bonus : 1 tour sur 150 · toujours au moins ×${MEDUSA_MIN_X} ta mise` },
+  },
+  eloise: {
+    render: renderLuna, icon: '🌙', iconSvg: ELOISE_ICON, title: 'Eloise’s Book',
+    hint: 'Les rouleaux paient souvent. Le bonus est plus rare, avec un symbole qui remplit l’écran.',
+    profile: { bonus: 3, swings: 3, bonusEvery: `Bonus : 1 tour sur 195 · toujours au moins ×${BOOK_MIN_X} ta mise` },
+  },
   blackjack: { render: renderBlackjack, icon: '🃏', title: 'Blackjack', hint: 'Bats le croupier sans dépasser 21' },
   roulette: { render: renderRoulette, icon: '🎡', title: 'Roulette', hint: 'Européenne, un seul zéro' },
 };
@@ -33,6 +73,16 @@ export function renderCasino(root: HTMLElement, params: string[]): () => void {
   if (game) return game.render(root);
   renderLobby(root);
   return () => {};
+}
+
+/** Two gauges and how often the bonus comes: the machine's style, never its payback. */
+function profileLines(profile: MachineProfile): HTMLElement[] {
+  const gauge = (label: string, level: number) =>
+    el('span', { class: 'casino-gauge' }, `${label} `, el('b', { text: '●'.repeat(level) }), el('i', { text: '●'.repeat(5 - level) }));
+  return [
+    el('span', { class: 'casino-gauges' }, gauge('Bonus', profile.bonus), gauge('Gros coups', profile.swings)),
+    el('span', { class: 'casino-profile', text: profile.bonusEvery }),
+  ];
 }
 
 /** "Ton record : ×312 ta mise" under a machine that has already paid; nothing otherwise. */
@@ -98,6 +148,7 @@ function renderLobby(root: HTMLElement): void {
           { class: 'menu-card-text' },
           el('strong', { text: game.title }),
           el('span', { class: 'menu-card-hint', text: game.hint }),
+          ...(game.profile ? profileLines(game.profile) : []),
           ...bestWinLine(id),
         ),
       ),
@@ -113,6 +164,12 @@ function renderLobby(root: HTMLElement): void {
         'main',
         { class: 'casino-lobby' },
         bank,
+        el(
+          'p',
+          { class: 'casino-kindness' },
+          `🎰 Ici, toutes les machines rendent environ ${OUR_PAYBACK} jetons pour 100 misés. `,
+          el('em', { text: `Dans un vrai casino : ≈ ${REAL_CASINO_PAYBACK}.` }),
+        ),
         tables,
         el(
           'section',

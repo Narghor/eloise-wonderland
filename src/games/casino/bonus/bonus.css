@@ -194,6 +194,16 @@
 }
 @keyframes bonus-gain { to { transform: translateY(-28px); opacity: 0; } }
 .bonus-coin-jp { background: radial-gradient(circle at 35% 30%, #ffd1e3, #e0457b 60%, #8a1c45); color: white; }
+/* The x2: a violet coin that doubles the board. */
+.bonus-coin-x2 { background: radial-gradient(circle at 35% 30%, #e9d8ff, #8a4fe0 60%, #3f1a7a); color: white; box-shadow: 0 0 0 2px #2a0f55, 0 0 16px 4px #c9a7ff; }
+.bonus-coin-x2 b { font-size: clamp(15px, 5vw, 22px); }
+/* A coin just doubled by a x2: one short swell. */
+.bonus-coin.bonus-coin-doubled { animation: bonus-doubled 0.45s ease-out; }
+@keyframes bonus-doubled {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
 .bonus-pop { animation: bonus-pop 0.45s ease-out; }
 
 /* Hold & Spin running total, inside the cabinet. */

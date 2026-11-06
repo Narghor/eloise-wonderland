@@ -55,6 +55,9 @@ const REEL_STAGGER = 220;
 const TENSION_MS = 2200;
 const STEP_MS = 900;
 const COIN_GAP_MS = 220;
+/** Coin values (times the bet) that shake the machine, and that it calls huge. */
+const BIG_COIN = 20;
+const HUGE_COIN = 60;
 const LAST_DOOR_REEL = DOOR_REELS[DOOR_REELS.length - 1];
 const MIN_COIN = OPENING_COIN_VALUES[0][0];
 const MAX_COIN = RESPIN_COIN_VALUES[RESPIN_COIN_VALUES.length - 1][0];
@@ -106,6 +109,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     totalView,
     respinsView,
     reelWindow,
+    el('div', { class: 'casino-guarantee', text: `Bonus : au moins ×${BONUS_MIN_X} ta mise` }),
   );
   const lights = marquee(machine, 10);
   const message = el('div', { class: 'bonus-message', role: 'status' }, inlineDoor(), ' sur les rouleaux 1, 3 et 5 = bonus !');
@@ -132,6 +136,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
   );
   if (CASINO_TEST_BUTTONS) rulesButton.after(testBar([ // TEST-BUTTONS
     { label: 'Porte (bonus)', outcome: 'door' }, // TEST-BUTTONS
+    { label: 'Bonus + ×2', outcome: 'x2' }, // TEST-BUTTONS
     ...JACKPOT_NAMES.map((name, tier) => ({ label: `Bonus + ${name}`, outcome: `${tier}` })), // TEST-BUTTONS
   ])); // TEST-BUTTONS
   tapToSpin(machine, spinButton);
@@ -194,7 +199,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     refresh();
 
     const force = CASINO_TEST_BUTTONS ? takeForced<string>() : null; // TEST-BUTTONS
-    const forceTier = force !== null && force !== 'door' ? Number(force) : undefined; // TEST-BUTTONS
+    const forceTier = force !== null && force !== 'door' && force !== 'x2' ? Number(force) : undefined; // TEST-BUTTONS
     const result = spinGrid(Math.random, force === null ? undefined : 'door'); // TEST-BUTTONS
     await animateReels(result);
     if (disposed) return;
@@ -216,7 +221,7 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     if (triggered) {
       await wait(won > 0 ? 1200 : 300);
       const values = jackpotsNow(lv);
-      await runBonus(playBonus(Math.random, lv, forceTier, values), lv, values); // TEST-BUTTONS
+      await runBonus(playBonus(Math.random, lv, forceTier, values, force === 'x2'), lv, values); // TEST-BUTTONS
     }
     busy = false;
     const id = window.setTimeout(() => {
@@ -346,6 +351,8 @@ export function renderBonusSlot(root: HTMLElement): () => void {
       v.textContent = '';
     });
     let running = 0;
+    /** The board as the player sees it so far: coins carry the x2 already revealed, not the later ones. */
+    let shown: (Coin | null)[] = new Array(CELLS).fill(null);
     let respinsBefore = RESPINS;
     for (const step of bonus.steps) {
       if (step !== bonus.steps[0]) {
@@ -392,15 +399,23 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         message.textContent = `+${step.fresh.length} pièce${step.fresh.length > 1 ? 's' : ''} ! Relances remises à ${RESPINS}`;
         message.className = 'bonus-message bonus-big';
       }
-      for (const i of step.fresh) {
-        const coin = step.cells[i] as Coin;
+      for (const [position, i] of step.fresh.entries()) {
+        const final = step.cells[i] as Coin;
         const v = cellViews[i];
+        if (final.kind === 'doubler') {
+          shown = shown.map((c) => (c && c.kind !== 'doubler' ? { ...c, doubled: c.doubled + 1 } : c));
+          shown[i] = final;
+          running = shown.reduce((sum, c) => sum + (c ? coinChips(c, lv.bet, values) : 0), 0);
+          await landDoubler(v, shown, lv, values, running);
+          if (disposed) return;
+          continue;
+        }
+        // The step records the board at its end: undo the x2 landing later in this same step.
+        const doublersAfter = step.fresh.slice(position + 1).filter((j) => step.cells[j]?.kind === 'doubler').length;
+        const coin = { ...final, doubled: final.doubled - doublersAfter };
+        shown[i] = coin;
         const value = coinChips(coin, lv.bet, values);
-        v.className = `bonus-cell bonus-coin${coin.kind === 'jackpot' ? ' bonus-coin-jp' : ''}`;
-        v.replaceChildren(
-          el('b', { text: coin.kind === 'value' ? compact(value) : JACKPOT_NAMES[coin.tier] }),
-          el('small', { text: coin.kind === 'value' ? 'jetons' : 'jackpot' }),
-        );
+        paintCoin(v, coin, lv, values);
         running += value;
         paintTotal(running);
         totalView.classList.remove('is-bump');
@@ -409,8 +424,9 @@ export function renderBonusSlot(root: HTMLElement): () => void {
         const gain = el('span', { class: 'bonus-gain', text: `+${compact(value)}` });
         v.append(gain);
         window.setTimeout(() => gain.remove(), 900);
-        burst(v, coin.kind === 'jackpot' || (coin.kind === 'value' && coin.mult >= 15) ? 18 : 8, 'coins');
-        playCoinLand(coin.kind === 'jackpot' ? 'jackpot' : coin.mult >= 15 ? 'big' : 'small');
+        const big = coin.kind === 'value' && coin.mult >= BIG_COIN;
+        burst(v, coin.kind === 'jackpot' || big ? 18 : 8, 'coins');
+        playCoinLand(coin.kind === 'jackpot' ? 'jackpot' : big ? 'big' : 'small');
         if (coin.kind === 'jackpot') {
           buzz(BUZZ.jackpot);
           lights.setMode('big');
@@ -419,10 +435,10 @@ export function renderBonusSlot(root: HTMLElement): () => void {
           await wait(400);
           await showBigWin(document.body, value, lv.bet, `JACKPOT ${JACKPOT_NAMES[coin.tier].toUpperCase()} !`);
         } else {
-          if (coin.mult >= 15) {
+          if (big) {
             shake(machine, 2);
             v.classList.add('bonus-coin-big');
-            message.textContent = coin.mult >= 25 ? 'ÉNORME PIÈCE !' : 'Grosse pièce !';
+            message.textContent = coin.mult >= HUGE_COIN ? 'ÉNORME PIÈCE !' : 'Grosse pièce !';
             message.className = 'bonus-message bonus-big';
           }
           await wait(COIN_GAP_MS);
@@ -474,6 +490,46 @@ export function renderBonusSlot(root: HTMLElement): () => void {
     screen.classList.remove('bonus-in-feature');
     releaseScreen?.();
     releaseScreen = null;
+  }
+
+  function paintCoin(v: HTMLElement, coin: Coin, lv: BetLevel, values: number[]): void {
+    if (coin.kind === 'doubler') {
+      v.className = 'bonus-cell bonus-coin bonus-coin-x2';
+      v.replaceChildren(el('b', { text: '×2' }), el('small', { text: 'tout double' }));
+      return;
+    }
+    v.className = `bonus-cell bonus-coin${coin.kind === 'jackpot' ? ' bonus-coin-jp' : ''}`;
+    const jackpotLabel = coin.doubled > 0 ? `jackpot ×${2 ** coin.doubled}` : 'jackpot';
+    v.replaceChildren(
+      el('b', { text: coin.kind === 'value' ? compact(coinChips(coin, lv.bet, values)) : JACKPOT_NAMES[coin.tier] }),
+      el('small', { text: coin.kind === 'value' ? 'jetons' : jackpotLabel }),
+    );
+  }
+
+  /** The x2 lands, then every coin already on the board flips to its doubled value, one after the other. */
+  async function landDoubler(v: HTMLElement, board: (Coin | null)[], lv: BetLevel, values: number[], total: number): Promise<void> {
+    paintCoin(v, { kind: 'doubler' }, lv, values);
+    message.textContent = '×2 ! Toutes les pièces doublent !';
+    message.className = 'bonus-message bonus-big';
+    lights.setMode('big');
+    shake(machine, 3);
+    burst(v, 24, 'coins');
+    buzz(BUZZ.jackpot);
+    playCoinLand('jackpot');
+    await wait(500);
+    for (const [i, coin] of board.entries()) {
+      if (!coin || coin.kind === 'doubler' || disposed) continue;
+      const cell = cellViews[i];
+      paintCoin(cell, coin, lv, values);
+      cell.classList.add('bonus-coin-doubled');
+      playTallyNote(0);
+      await wait(90);
+    }
+    paintTotal(total);
+    totalView.classList.remove('is-bump');
+    void totalView.offsetWidth;
+    totalView.classList.add('is-bump');
+    await wait(700);
   }
 
   /** The coins light up one by one and pour into the total, each note a little higher. */
@@ -573,9 +629,10 @@ function rules(lv: BetLevel): HTMLElement[] {
     payoutTable(entries, lv.bet),
     rulesBlock(
       ['La porte ', inlineDoor()],
-      'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 106, quelle que soit la mise).',
+      'Une porte sur les rouleaux 1, 3 ET 5 en même temps ouvre le bonus Hold & Spin (environ 1 lancer sur 105, quelle que soit la mise).',
       `Tu commences avec ${START_COINS} pièces et ${RESPINS} relances. Chaque nouvelle pièce reste bloquée et remet les relances à ${RESPINS}.`,
-      `Les ${START_COINS} pièces de départ valent de ${MIN_COIN} à ${MAX_OPENING_COIN} × ta mise. Celles qui tombent pendant les relances valent bien plus, jusqu’à ${MAX_COIN} × ta mise, et ce sont elles qui portent les jackpots.`,
+      `Les ${START_COINS} pièces de départ valent de ${MIN_COIN} à ${MAX_OPENING_COIN} × ta mise. Celles qui tombent pendant les relances peuvent valoir jusqu’à ${MAX_COIN} × ta mise, et ce sont elles qui portent les jackpots.`,
+      'La pièce violette ×2 peut tomber pendant les relances : elle double toutes les pièces déjà sur le plateau, jackpots compris. Plus le plateau est rempli, plus elle rapporte !',
       `Un bonus rapporte toujours au moins ${BONUS_MIN_X} × ta mise, souvent bien plus : plus tu mises, plus il paie.`,
     ),
     rulesBlock(

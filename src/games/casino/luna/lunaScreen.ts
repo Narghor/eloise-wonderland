@@ -79,6 +79,7 @@ export function renderLuna(root: HTMLElement): () => void {
     el('div', { class: 'luna-marquee-title' }, headerPortrait(), el('span', { text: 'Eloise’s Book' }), el('span', { class: 'luna-moon', 'aria-hidden': 'true' })),
     featureBar,
     reels,
+    el('div', { class: 'casino-guarantee', text: `Tours gratuits : au moins ×${FREE_SPINS_MIN_X} ta mise` }),
   );
   const lights = marquee(machine, 10);
   const message = el('div', { class: 'luna-message', role: 'status', text: '3 livres ou plus ouvrent les tours gratuits !' });
