@@ -1,4 +1,5 @@
 import { el } from './dom';
+import { changelogButton } from './changelog';
 import { exportSave, importSave, readGame } from './save';
 import { isColored } from './pictures/pixelPicture';
 import { pictureCanvas } from './pictures/pictureCanvas';
@@ -99,6 +100,7 @@ export function renderHome(root: HTMLElement): () => void {
       'header',
       { class: 'home-header' },
       el('h1', {}, el('span', { class: 'home-title-owner', text: "Eloise's" }), 'Wonderland Games'),
+      changelogButton(),
     ),
     el(
       'main',

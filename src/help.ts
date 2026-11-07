@@ -30,14 +30,13 @@ export function openHelpOnFirstVisit(help: Help): void {
 }
 
 function openHelp(help: Help): void {
-  const close = el('button', { class: 'button', type: 'button' }, "C'est parti !");
-  const dialog = el(
-    'dialog',
-    { class: 'detail-dialog help-dialog' },
-    el('h2', { text: help.title }),
-    el('ol', { class: 'help-steps' }, ...help.steps.map((parts) => el('li', {}, ...parts))),
-    close,
-  );
+  openReading(help.title, [el('ol', { class: 'help-steps' }, ...help.steps.map((parts) => el('li', {}, ...parts)))], "C'est parti !");
+}
+
+/** A dialog to read: a title, its content, one button that closes it; it also closes when the screen changes. */
+export function openReading(title: string, content: Node[], closeLabel: string): void {
+  const close = el('button', { class: 'button', type: 'button' }, closeLabel);
+  const dialog = el('dialog', { class: 'detail-dialog help-dialog' }, el('h2', { text: title }), ...content, close);
   close.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();
