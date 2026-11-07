@@ -29,17 +29,21 @@ export const ZONES: Zone[] = [
   { id: 'bridge', name: 'Le petit pont', scene: 'bridge', leaves: 1400, palette: ['#c9402e', '#e06a3a', '#f09a3c', '#a83a2a', '#8e5ad8'], snails: true, levelReward: 340, spotlessDeco: 'deco-autumn-garland' },
 ];
 
-/** Levels of a place; the last one makes it spotless. */
-export const MAX_LEVEL = 10;
+/** Clearing this level makes a place spotless (its house decoration); the levels go on after it, with no end. */
+export const SPOTLESS_LEVEL = 10;
 /** The next place opens when the previous one reaches this level. */
 export const OPEN_AT_LEVEL = 3;
 
-/** Each level adds this share of leaves on the ground and of leaf value. */
+/** Each level adds this share of leaves on the ground (plus a part growing with the square of the level) and of leaf value. */
 export const LEVEL_LEAVES = 0.25;
+export const LEVEL_LEAVES_SQUARED = 0.02;
 export const LEVEL_VALUE = 0.1;
+/** Leaves on screen at most: a phone stutters past it. Bigger levels then get more carpets, not bigger ones. */
+export const MAX_CARPET = 6000;
 
 /** A level is a run of carpets: clean the whole ground, the wind lays the next carpet. */
-export const CARPET = (leaves: number, level: number) => Math.round(leaves * (1 + LEVEL_LEAVES * (level - 1)));
+export const CARPET = (leaves: number, level: number) =>
+  Math.min(MAX_CARPET, Math.round(leaves * (1 + LEVEL_LEAVES * (level - 1) + LEVEL_LEAVES_SQUARED * (level - 1) ** 2)));
 export const CARPETS = (level: number) => 1 + Math.ceil(level / 2);
 export const LEVEL_GOAL = (leaves: number, level: number) => CARPET(leaves, level) * CARPETS(level);
 
@@ -117,7 +121,7 @@ export const RARE_LEAVES: RareLeaf[] = [
   { id: 'dawn', page: 2, name: 'Feuille d’aube', color: '#ffb38a', note: 'Encore rose de la lumière du matin.', hint: 'Seulement au lever du soleil', when: (c) => c.time === 'dawn' },
   { id: 'lily', page: 2, name: 'Feuille de nénuphar', color: '#5fc7a8', note: 'Elle a flotté jusqu’ici, toute ronde.', hint: 'Près de l’eau : la fontaine ou le petit pont', when: (c) => c.zone === 'fountain' || c.zone === 'bridge' },
   { id: 'blossom', page: 2, name: 'Feuille de pommier en fleur', color: '#ffd1e6', note: 'Une feuille avec une fleur encore accrochée.', hint: 'Au verger', when: (c) => c.zone === 'orchard' },
-  { id: 'ancient', page: 2, name: 'Feuille ancienne', color: '#a08060', note: 'Elle a vu passer cent automnes.', hint: 'Aux niveaux 8 à 10', when: (c) => c.level >= 8 },
+  { id: 'ancient', page: 2, name: 'Feuille ancienne', color: '#a08060', note: 'Elle a vu passer cent automnes.', hint: 'À partir du niveau 8', when: (c) => c.level >= 8 },
   { id: 'goldbar', page: 2, name: 'Feuille d’or massif', color: '#ffb000', note: 'Lourde comme un lingot, elle ne s’envole jamais.', hint: 'Cachée dans un tapis doré', when: () => false },
   { id: 'rainbow', page: 2, name: 'Feuille arc-en-ciel', color: '#ff7fae', note: 'Le papillon doré l’a laissée tomber.', hint: 'Parfois, en attrapant le papillon doré', when: () => false },
   { id: 'crystal', page: 2, name: 'Feuille de cristal', color: '#bff3ff', note: 'Transparente, elle fait des arcs-en-ciel au soleil.', hint: 'Sous une méga feuille étoile', when: () => false },
@@ -189,8 +193,9 @@ export const ORNAMENT_PLACE_FACTOR = 1.5;
 export const ORNAMENT_VALUE = 0.05;
 export const ornamentPrice = (o: Ornament, placeIndex: number) => Math.round(o.price * ORNAMENT_PLACE_FACTOR ** placeIndex);
 
-/** Hidden treasures per place: this many, plus one per level. */
+/** Hidden treasures per place: this many, plus one per level, up to MAX_TREASURES. */
 export const TREASURES_PER_ZONE = 4;
+export const MAX_TREASURES = 20;
 /** Chance a hidden treasure is a decoration for the house instead. */
 export const DECO_CHANCE = 0.06;
 

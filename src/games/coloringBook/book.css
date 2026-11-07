@@ -151,8 +151,28 @@
   height: 100%;
 }
 
+.book-sheet {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
 .book-lines {
   pointer-events: none;
+}
+
+.book-zoom-reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: var(--shadow);
+  font-size: 1.3rem;
+  cursor: pointer;
 }
 
 .book-board.is-finished {

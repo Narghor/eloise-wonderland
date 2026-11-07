@@ -35,3 +35,11 @@ export function topBar(title: string, right?: HTMLElement, back: BackLink = BACK
     right ?? el('span'),
   );
 }
+
+/**
+ * Gives a canvas's pixels back right away. Safari (and every browser on iPhone) frees them late and
+ * stops drawing anything past its canvas memory cap: call it on the big canvases a screen drops.
+ */
+export function freeCanvas(...canvases: HTMLCanvasElement[]): void {
+  for (const canvas of canvases) canvas.width = canvas.height = 0;
+}

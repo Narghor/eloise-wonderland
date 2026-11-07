@@ -1,5 +1,5 @@
 import './origami.css';
-import { el, topBar } from '../../dom';
+import { el, freeCanvas, topBar } from '../../dom';
 import { addCoins, loadCompanion } from '../../companion/companionSave';
 import { armSoundUnlock, muteButton, playFold, playSmallWin } from '../casino/fx/sound';
 import { SCALE, sharpCanvas } from '../leaves/leavesArt';
@@ -569,5 +569,8 @@ export function renderOrigami(root: HTMLElement): () => void {
 
   start();
   frame = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(frame);
+  return () => {
+    cancelAnimationFrame(frame);
+    freeCanvas(table);
+  };
 }

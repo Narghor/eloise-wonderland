@@ -1,5 +1,5 @@
 import './aquarium.css';
-import { el, topBar } from '../../dom';
+import { el, freeCanvas, topBar } from '../../dom';
 import { loadCompanion, saveCompanion } from '../../companion/companionSave';
 import { armSoundUnlock, muteButton, playChime, playCoinLand, playGulp, playShine, playSmallWin, playSprinkle, playWipe } from '../casino/fx/sound';
 import { fishCanvas } from '../fishing/fishingArt';
@@ -940,5 +940,6 @@ export function renderAquarium(root: HTMLElement): () => void {
   return () => {
     cancelAnimationFrame(frame);
     timers.forEach((id) => window.clearTimeout(id));
+    freeCanvas(algae);
   };
 }

@@ -129,6 +129,8 @@ const page = {
     writeFileSync(path, Buffer.from(data, 'base64'));
     console.log(`shot ${path}`);
   },
+  /** Any Chrome DevTools Protocol command, for what the helpers above do not cover. */
+  cdp: send,
   log(text) {
     console.log(text);
   },

@@ -1,5 +1,5 @@
 import { readGame, writeGame } from '../../save';
-import { CRITTERS, MAX_LEVEL, ORNAMENTS, RARE_LEAVES, TREASURES, UPGRADES, ZONES, type UpgradeId } from './leavesData';
+import { CRITTERS, ORNAMENTS, RARE_LEAVES, TREASURES, UPGRADES, ZONES, type UpgradeId } from './leavesData';
 
 const GAME_ID = 'leaves';
 /** Bumped when the game changes so much that old progress makes no sense: an older save starts over. */
@@ -67,7 +67,7 @@ export function loadLeaves(): LeavesSave {
   const zones: Record<string, ZoneState> = {};
   for (const z of ZONES) {
     const s = rec(rec(data.zones)[z.id]);
-    const cleared = isCount(s.cleared) ? Math.min(MAX_LEVEL, s.cleared) : s.done === true ? 1 : 0;
+    const cleared = isCount(s.cleared) ? s.cleared : s.done === true ? 1 : 0;
     zones[z.id] = {
       left: isCount(s.left) ? s.left : -1,
       at: typeof s.at === 'number' ? s.at : Date.now(),

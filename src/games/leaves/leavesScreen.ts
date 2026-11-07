@@ -1,5 +1,5 @@
 import './leaves.css';
-import { el, topBar } from '../../dom';
+import { el, freeCanvas, topBar } from '../../dom';
 import { addCoins, loadCompanion } from '../../companion/companionSave';
 import { loadHouse, saveHouse } from '../../house/houseSave';
 import { WALL_DECOS } from '../../house/houseStyle';
@@ -39,8 +39,9 @@ import {
   LEVEL_GOAL,
   LEVEL_VALUE,
   LUCK,
-  MAX_LEVEL,
+  MAX_TREASURES,
   OPEN_AT_LEVEL,
+  SPOTLESS_LEVEL,
   ORNAMENTS,
   ORNAMENT_VALUE,
   GRAB,
@@ -75,12 +76,15 @@ interface Leaf {
   golden: boolean;
   rare: RareLeaf | null;
   /** While a new carpet falls: when this leaf starts falling (ms), and how far left or right it drifts. */
-  fall?: { at: number; drift: number };
+  /** `seen`: drawn while it falls; the others land unseen, under the falling ones. */
+  fall?: { at: number; drift: number; seen: boolean };
 }
 
 /** A new carpet comes down from the trees, left to right with the wind, in this long. */
 const CARPET_FALL_MS = 1600;
 const LEAF_FALL_MS = 650;
+/** Only the top leaves of a carpet are drawn falling (about two layers): the ones under them would not show. */
+const SEEN_FALLING = 1200;
 
 interface Falling {
   leaf: Leaf;
@@ -206,9 +210,8 @@ export function renderLeaves(root: HTMLElement): () => void {
   // -----------------------------------------------
 
   const state = () => save.zones[zone.id];
-  /** A spotless place can only be replayed. */
-  const replaying = () => state().replay > 0 || state().cleared >= MAX_LEVEL;
-  const level = () => state().replay || Math.min(MAX_LEVEL, state().cleared + 1);
+  const replaying = () => state().replay > 0;
+  const level = () => state().replay || state().cleared + 1;
   const luck = () => LUCK(save.levels.luck);
   const goal = () => LEVEL_GOAL(zone.leaves, level());
   const carpet = () => CARPET(zone.leaves, level());
@@ -237,6 +240,7 @@ export function renderLeaves(root: HTMLElement): () => void {
     zone = next;
     save.zone = zone.id;
     const state = save.zones[zone.id];
+    freeCanvas(back, front);
     back = drawBack(zone);
     front = drawFront(zone);
     falling = [];
@@ -334,7 +338,10 @@ export function renderLeaves(root: HTMLElement): () => void {
   function letCarpetFall(): void {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const start = now();
-    for (const leaf of leaves) leaf.fall = { at: start + (leaf.x / W) * (CARPET_FALL_MS - LEAF_FALL_MS) * (0.75 + Math.random() * 0.25), drift: (Math.random() - 0.3) * 40 };
+    const firstSeen = leaves.length - SEEN_FALLING;
+    leaves.forEach((leaf, i) => {
+      leaf.fall = { at: start + (leaf.x / W) * (CARPET_FALL_MS - LEAF_FALL_MS) * (0.75 + Math.random() * 0.25), drift: (Math.random() - 0.3) * 40, seen: i >= firstSeen };
+    });
     fallingUntil = start + CARPET_FALL_MS;
     layerCtx.clearRect(0, 0, W, H);
     dirtyArea = null;
@@ -344,7 +351,7 @@ export function renderLeaves(root: HTMLElement): () => void {
   /** Buries the treasures of this level under the leaves. */
   function hideTreasures(): void {
     hidden = hidden.filter((h) => h.kind === 'hedgehog');
-    const count = TREASURES_PER_ZONE + level() - 1;
+    const count = Math.min(MAX_TREASURES, TREASURES_PER_ZONE + level() - 1);
     const owned = new Set(loadHouse().ownedStyles);
     const buried = TREASURES.filter((t) => (t.minLevel ?? 1) <= level());
     for (let i = 0; i < count; i++) {
@@ -549,13 +556,13 @@ export function renderLeaves(root: HTMLElement): () => void {
       s.cleared++;
       const next = ZONES[ZONES.indexOf(zone) + 1];
       const opened = s.cleared === OPEN_AT_LEVEL && next;
-      if (s.cleared >= MAX_LEVEL) {
+      if (s.cleared === SPOTLESS_LEVEL) {
         const house = loadHouse();
         const deco = WALL_DECOS.find((d) => d.id === zone.spotlessDeco)!;
         if (!house.ownedStyles.includes(deco.id)) house.ownedStyles.push(deco.id);
         saveHouse(house);
         banner.textContent = '🏆 Lieu impeccable ! 🏆';
-        status.textContent = `${zone.name} est impeccable ! Cadeau pour la maison : ${deco.name} (dans « Décos murales »). Tu peux rejouer tous ses niveaux.`;
+        status.textContent = `${zone.name} est impeccable ! Cadeau pour la maison : ${deco.name} (dans « Décos murales »). Et ça continue : niveau ${level()}, encore plus de feuilles !`;
       } else {
         banner.textContent = `✨ Niveau ${level()} ! ✨`;
         status.textContent = `${zone.name} passe au niveau ${level()} : plus de feuilles, plus de trésors, et chaque feuille vaut plus !${opened ? ` Nouveau lieu : ${next.name} !` : ''}`;
@@ -931,6 +938,7 @@ export function renderLeaves(root: HTMLElement): () => void {
         stamp(leaf);
         continue;
       }
+      if (!leaf.fall.seen) continue;
       const ease = 1 - (1 - p) * (1 - p);
       const from = -20 - leaf.y * 0.15;
       const x = leaf.x + (leaf.fall?.drift ?? 0) * (1 - ease);
@@ -1067,10 +1075,10 @@ export function renderLeaves(root: HTMLElement): () => void {
   function paintLevels(): void {
     const s = state();
     const options: HTMLOptionElement[] = [];
-    if (s.cleared < MAX_LEVEL) options.push(el('option', { value: '0', text: `Niveau ${s.cleared + 1} · à découvrir` }));
+    options.push(el('option', { value: '0', text: `Niveau ${s.cleared + 1} · à découvrir` }));
     for (let l = s.cleared; l >= 1; l--) options.push(el('option', { value: `${l}`, text: `Rejouer le niveau ${l} · ${LEVEL_GOAL(zone.leaves, l).toLocaleString('fr-FR')} feuilles` }));
     zoneLevel.replaceChildren(...options);
-    zoneLevel.value = `${s.cleared >= MAX_LEVEL ? s.replay || MAX_LEVEL : s.replay}`;
+    zoneLevel.value = `${s.replay}`;
   }
 
   zoneLevel.addEventListener('change', () => {
@@ -1116,9 +1124,9 @@ export function renderLeaves(root: HTMLElement): () => void {
       ...ZONES.map((z, i) => {
         const open = isOpen(i);
         const done = save.zones[z.id].cleared;
-        const button = el('button', { class: `leaves-zone${z === zone ? ' is-on' : ''}`, type: 'button' }, open ? `${z.name} · ${done >= MAX_LEVEL ? '🏆' : done + 1}` : `🔒 ${z.name}`);
+        const button = el('button', { class: `leaves-zone${z === zone ? ' is-on' : ''}`, type: 'button' }, open ? `${z.name} · ${done >= SPOTLESS_LEVEL ? '🏆 ' : ''}${done + 1}` : `🔒 ${z.name}`);
         button.disabled = !open;
-        button.title = open ? (done >= MAX_LEVEL ? 'Lieu impeccable' : `Niveau ${done + 1}`) : `${ZONES[i - 1].name} au niveau ${OPEN_AT_LEVEL} pour l’ouvrir`;
+        button.title = open ? `${done >= SPOTLESS_LEVEL ? 'Lieu impeccable, ' : ''}Niveau ${done + 1}` : `${ZONES[i - 1].name} au niveau ${OPEN_AT_LEVEL} pour l’ouvrir`;
         button.addEventListener('click', () => {
           save.zones[zone.id].left = leaves.length;
           save.zones[zone.id].at = Date.now();
@@ -1254,5 +1262,6 @@ export function renderLeaves(root: HTMLElement): () => void {
     save.zones[zone.id].left = leaves.length;
     save.zones[zone.id].at = Date.now();
     saveLeaves(save);
+    freeCanvas(canvas, layer, back, front);
   };
 }

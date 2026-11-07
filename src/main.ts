@@ -1,4 +1,5 @@
 import './style.css';
+import { freeCanvas } from './dom';
 import { renderHome } from './home';
 import { renderPicross } from './games/picross/picrossScreen';
 import { renderColoring } from './games/coloring/coloringScreen';
@@ -73,6 +74,7 @@ let leaveScreen: (() => void) | null = null;
 
 function route(): void {
   leaveScreen?.();
+  freeCanvas(...root.querySelectorAll('canvas'));
   const [name, ...params] = location.hash.replace(/^#\/?/, '').split('/');
   const screen = routes[name] ?? renderHome;
   root.replaceChildren();
