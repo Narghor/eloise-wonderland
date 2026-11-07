@@ -98,8 +98,14 @@ export interface SpinOutcome {
 /** The free spins draw fewer books than the base game: there they stick as wilds and retrigger. */
 export const FREE_BOOK_WEIGHT = 1.9;
 
-function drawSymbol(rng: Rng, noBook: boolean, free: boolean): number {
-  const weights = SYMBOLS.map((s, i) => (i === BOOK && free ? FREE_BOOK_WEIGHT : s.weight));
+/**
+ * Weight of the special symbol on the reels during its free spins, replacing its usual weight (index = symbol).
+ * The rarer the special, the more it shows: every special pays about as well as the others, the rare ones go higher.
+ */
+export const FREE_SPECIAL_WEIGHTS = [11, 11, 10.5, 11, 11, 6.8, 6.8, 6.8, 5.6];
+
+function drawSymbol(rng: Rng, noBook: boolean, free: boolean, special: number | null): number {
+  const weights = SYMBOLS.map((s, i) => (i === BOOK && free ? FREE_BOOK_WEIGHT : i === special ? FREE_SPECIAL_WEIGHTS[i] : s.weight));
   const total = weights.reduce((s, w) => s + w, 0);
   for (;;) {
     let r = rng() * total;
@@ -112,14 +118,14 @@ function drawSymbol(rng: Rng, noBook: boolean, free: boolean): number {
   }
 }
 
-/** One book per reel at most, like on a real strip. */
-export function randomGrid(rng: Rng, free = false): Grid {
+/** One book per reel at most, like on a real strip. `special`: the free spins' special symbol, null in the base game. */
+export function randomGrid(rng: Rng, free = false, special: number | null = null): Grid {
   const grid: Grid = [];
   for (let reel = 0; reel < REELS; reel++) {
     const column: number[] = [];
     let hasBook = false;
     for (let row = 0; row < ROWS; row++) {
-      const s = drawSymbol(rng, hasBook, free);
+      const s = drawSymbol(rng, hasBook, free, special);
       if (s === BOOK) hasBook = true;
       column.push(s);
     }
@@ -231,7 +237,7 @@ export function playFreeSpins(rng: Rng, forcedSpecial?: number): FreeSpinsResult
   while (left > 0 && played < MAX_FREE_SPINS) {
     left--;
     played++;
-    const drawn = randomGrid(rng, true);
+    const drawn = randomGrid(rng, true, special);
     // Fresh books (not on a sticky cell) count for the retrigger.
     let fresh = 0;
     drawn.forEach((col, reel) => col.forEach((s, row) => { if (s === BOOK && !sticky.has(`${reel},${row}`)) fresh++; }));
