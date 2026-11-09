@@ -321,7 +321,7 @@
   text-shadow: 0 0 12px #ffb300, 0 3px 0 #5a3c00;
   white-space: nowrap;
 }
-.fx-winpop-label { font-weight: 900; font-size: clamp(0.8rem, 3.6vw, 1.05rem); letter-spacing: 0.06em; color: var(--fx-pop-label, #fff3c4); text-transform: uppercase; }
+.fx-winpop-label { font-weight: 900; font-size: clamp(0.8rem, 3.6vw, 1.05rem); letter-spacing: 0.06em; color: var(--fx-pop-label, #fff3c4); text-transform: uppercase; white-space: nowrap; }
 @keyframes fx-winpop {
   0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
   15% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }

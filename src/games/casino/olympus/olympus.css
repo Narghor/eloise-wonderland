@@ -149,6 +149,7 @@
   padding: 6px 0;
   border-radius: 8px;
   overflow: hidden;
+  container-type: inline-size;
   animation: oly-land 0.25s ease-out;
 }
 .oly-reel-medusa .oly-tall {
@@ -158,6 +159,8 @@
   box-shadow: inset 0 0 0 2px #f2c230, inset 0 0 0 4px #1f7a4a;
 }
 .oly-reel-medusa .oly-tall > span:first-child { font-size: clamp(12px, 4vw, 22px); }
+/* The caption follows the column's width (cqi), so it never spills over the next reel. */
+.oly-reel-medusa .oly-tall > span:last-child { font-size: min(13px, 17cqi); letter-spacing: 0.04em; }
 .oly-reel-medusa .oly-tall .oly-medusa-art {
   position: absolute;
   top: 50%;

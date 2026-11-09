@@ -18,6 +18,13 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-09',
+    date: '9 novembre',
+    news: [
+      '🐍 Le Regard de Medusa : moins frustrante, et l’écran plein paie plus gros.',
+    ],
+  },
+  {
     id: '2026-11-07',
     date: '7 novembre',
     news: [
