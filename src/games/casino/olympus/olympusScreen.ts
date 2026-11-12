@@ -18,7 +18,7 @@ import {
   FREE_SPINS_MIN_X,
   FREE_RETRIGGER_SPINS,
   LINES,
-  MEDUSA_REEL_MIN_X,
+  MEDUSA_REEL_X,
   MIN_SCATTERS,
   PAY_SCALE,
   ROWS,
@@ -376,8 +376,7 @@ export function renderOlympus(root: HTMLElement): () => void {
         setMessage('');
         await stampBanner(sky, `+${step.added}`, 'TOURS GRATUITS');
       } else if (won > 0) {
-        const label = step.medusaMinimum ? 'Garanti par Medusa' : medusaCount === COLS ? 'Medusa partout !' : medusaCount >= 2 ? `${medusaCount} colonnes de Medusa` : '';
-        winPop(sky, won, { label, stake });
+        winPop(sky, won, { label: freeWinLabel(medusaCount, won, chipsFor(step.medusaMult ?? 0, stake)), stake });
       }
       if (won > 0) {
         lights.setMode('win');
@@ -432,7 +431,7 @@ export function renderOlympus(root: HTMLElement): () => void {
       el('p', { class: 'oly-intro-count', text: `${spins}` }),
       el('p', { class: 'oly-intro-title', text: 'TOURS GRATUITS' }),
       el('p', { class: 'oly-intro-text', text: 'Ne croise pas son regard : Medusa 🐍 envahit l’écran, colonne après colonne !' }),
-      el('p', { class: 'oly-intro-text', text: `Chaque colonne de Medusa 🐍 rapporte au moins ×${MEDUSA_REEL_MIN_X} ta mise.` }),
+      el('p', { class: 'oly-intro-text', text: `Chaque colonne de Medusa 🐍 ajoute ×${MEDUSA_REEL_X} ta mise au gain des lignes.` }),
       el('p', { class: 'oly-intro-text', text: 'Les temples 🏛️ redonnent des tours, sans limite.' }),
       el('span', { class: 'oly-intro-hint', text: 'Touche pour commencer' }),
     );
@@ -518,6 +517,14 @@ function loadPending(): PendingFeature | null {
   }
 }
 
+/** A free spin's pop: what the lines and the Medusa reels each paid, when both did. */
+function freeWinLabel(medusaCount: number, won: number, medusaChips: number): string {
+  if (medusaCount === COLS) return 'Medusa partout !';
+  if (medusaChips <= 0) return '';
+  if (won > medusaChips) return `Lignes ${formatChips(won - medusaChips)} + Medusa ${formatChips(medusaChips)}`;
+  return medusaCount >= 2 ? `${medusaCount} colonnes de Medusa` : 'Colonne de Medusa';
+}
+
 function randomSymbol(): number {
   return Math.floor(Math.random() * SYMBOLS.length);
 }
@@ -575,7 +582,7 @@ function paytable(stake: number): HTMLElement[] {
       `${MIN_SCATTERS} temples ou plus, n’importe où : ${FREE_SPINS_BY_SCATTERS[3]} tours pour 3, ${FREE_SPINS_BY_SCATTERS[4]} pour 4, ${FREE_SPINS_BY_SCATTERS[5]} pour 5.`,
       'Pendant les tours gratuits, Medusa 🐍 tombe en colonnes entières, souvent plusieurs à la fois, et peut remplir tout l’écran.',
       'Pendant les tours gratuits, chaque ligne paie le DOUBLE du tableau ci-dessous.',
-      `Chaque colonne de Medusa 🐍 garantit au moins ${MEDUSA_REEL_MIN_X} fois ta mise sur le tour : 3 colonnes = au moins ${3 * MEDUSA_REEL_MIN_X} fois ta mise, même si aucune ligne ne gagne.`,
+      `Chaque colonne de Medusa 🐍 ajoute ${MEDUSA_REEL_X} fois ta mise au gain des lignes : 3 colonnes = les lignes + ${3 * MEDUSA_REEL_X} fois ta mise, même si aucune ligne ne gagne.`,
       'Plus il y a de colonnes de Medusa collées depuis la gauche, plus les lignes paient : 6 colonnes = les 20 lignes à 6 Medusa.',
       `Pendant les tours gratuits, les temples tombent bien plus souvent : 3 temples = +${FREE_RETRIGGER_SPINS} tours, sans limite. Un bonus sur quatre repart, parfois plusieurs fois !`,
       `Les tours gratuits paient toujours au moins ${FREE_SPINS_MIN_X} fois ta mise.`,

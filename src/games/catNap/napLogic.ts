@@ -10,15 +10,17 @@ export interface NapTier {
   size: number;
   /** Most one-cell cushions allowed: each one gives a cat away. */
   singleCushions: number;
+  /** Least hardness (see Deduction) the room must need; 0 keeps the first room found. */
+  minHardness: number;
 }
 
 /** One tier per difficulty, easiest first. */
 export const NAP_TIERS: readonly NapTier[] = [
-  { size: 5, singleCushions: 2 },
-  { size: 6, singleCushions: 1 },
-  { size: 7, singleCushions: 1 },
-  { size: 8, singleCushions: 0 },
-  { size: 9, singleCushions: 1 },
+  { size: 5, singleCushions: 2, minHardness: 0 },
+  { size: 6, singleCushions: 1, minHardness: 0 },
+  { size: 7, singleCushions: 1, minHardness: 0 },
+  { size: 8, singleCushions: 0, minHardness: 0 },
+  { size: 9, singleCushions: 1, minHardness: 10 },
 ];
 
 export interface NapPuzzle {
@@ -30,6 +32,7 @@ export interface NapPuzzle {
 }
 
 const MAX_ATTEMPTS = 4000;
+const MAX_HARDEN_STEPS = 3000;
 
 /** A room whose cats can all be found by deduction alone, without ever guessing. */
 export function generateNap(tier: NapTier, random: () => number = Math.random): NapPuzzle {
@@ -40,10 +43,62 @@ export function generateNap(tier: NapTier, random: () => number = Math.random): 
     if (!cats) continue;
     const regions = growCushions(size, cats, random);
     last = { size, regions, cats };
-    if (singleCushions(size, regions) <= tier.singleCushions && solveByDeduction(size, regions)) return last;
+    if (singleCushions(size, regions) <= tier.singleCushions && solveByDeduction(size, regions)) return harden(tier, last, random);
   }
   // Never seen in tests; a room that needs a guess is still a valid room.
   return last!;
+}
+
+/**
+ * Moves one border cell at a time from a cushion to its neighbour, keeping each move that leaves
+ * the room solvable by deduction and at least as hard, until the tier's hardness is reached.
+ * Cat cells never move, so the solution stays the same.
+ */
+function harden(tier: NapTier, puzzle: NapPuzzle, random: () => number): NapPuzzle {
+  const { size, cats } = puzzle;
+  let regions = puzzle.regions;
+  let hardness = solveByDeduction(size, regions)?.hardness ?? 0;
+  const catCells = new Set(cats.map((col, row) => row * size + col));
+  for (let step = 0; step < MAX_HARDEN_STEPS && hardness < tier.minHardness; step++) {
+    const cell = Math.floor(random() * size * size);
+    if (catCells.has(cell)) continue;
+    const others = sidesOf(size, cell).filter((side) => regions[side] !== regions[cell]);
+    if (others.length === 0) continue;
+    const moved = [...regions];
+    moved[cell] = regions[others[Math.floor(random() * others.length)]];
+    if (!isConnected(size, moved, regions[cell]) || singleCushions(size, moved) > tier.singleCushions) continue;
+    const deduction = solveByDeduction(size, moved);
+    if (!deduction || deduction.hardness < hardness) continue;
+    regions = moved;
+    hardness = deduction.hardness;
+  }
+  return { size, regions, cats };
+}
+
+function isConnected(size: number, regions: readonly number[], region: number): boolean {
+  const start = regions.indexOf(region);
+  const reached = new Set([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    for (const side of sidesOf(size, queue.pop()!)) {
+      if (regions[side] !== region || reached.has(side)) continue;
+      reached.add(side);
+      queue.push(side);
+    }
+  }
+  return reached.size === regions.filter((owner) => owner === region).length;
+}
+
+/** The cells sharing a side with this one. */
+function sidesOf(size: number, cell: number): number[] {
+  const row = Math.floor(cell / size);
+  const col = cell % size;
+  const sides: number[] = [];
+  if (row > 0) sides.push(cell - size);
+  if (row < size - 1) sides.push(cell + size);
+  if (col > 0) sides.push(cell - 1);
+  if (col < size - 1) sides.push(cell + 1);
+  return sides;
 }
 
 function singleCushions(size: number, regions: readonly number[]): number {
@@ -91,11 +146,7 @@ function growCushions(size: number, cats: number[], random: () => number): numbe
     while (pick > pace[region] && region < size - 1) pick -= pace[region++];
     const border: number[] = [];
     regions.forEach((owner, cell) => {
-      if (owner !== -1) return;
-      const row = Math.floor(cell / size);
-      const col = cell % size;
-      const sides = [row > 0 ? cell - size : -1, row < size - 1 ? cell + size : -1, col > 0 ? cell - 1 : -1, col < size - 1 ? cell + 1 : -1];
-      if (sides.some((side) => side >= 0 && regions[side] === region)) border.push(cell);
+      if (owner === -1 && sidesOf(size, cell).some((side) => regions[side] === region)) border.push(cell);
     });
     if (border.length === 0) continue;
     regions[border[Math.floor(random() * border.length)]] = region;
@@ -108,12 +159,19 @@ function growCushions(size: number, cats: number[], random: () => number): numbe
 // SOLVING BY DEDUCTION
 // -----------------------------------------------
 
+export interface Deduction {
+  /** Column of the cat of each row. */
+  cats: number[];
+  /** Times the simple rule found nothing: 1 per cushion held in one line, 2 per blocking cell. */
+  hardness: number;
+}
+
 /**
  * Solves the room with the deductions a player makes: a line or cushion with one free cell,
  * a cushion held in one line (or a line in one cushion), and a cell that would leave a line or
- * a cushion without any free cell. Returns the cats' columns, or null when it would need a guess.
+ * a cushion without any free cell. Returns null when it would need a guess.
  */
-export function solveByDeduction(size: number, regions: readonly number[]): number[] | null {
+export function solveByDeduction(size: number, regions: readonly number[]): Deduction | null {
   const free = new Array<boolean>(size * size).fill(true);
   const cats = new Array<number>(size).fill(-1);
   const units = unitsOf(size, regions);
@@ -129,6 +187,7 @@ export function solveByDeduction(size: number, regions: readonly number[]): numb
     }
   };
 
+  let hardness = 0;
   let progress = true;
   while (progress) {
     progress = false;
@@ -142,9 +201,15 @@ export function solveByDeduction(size: number, regions: readonly number[]): numb
       }
     }
     if (progress) continue;
-    progress = confine(size, free, units, cats) || blockers(size, regions, free, units, cats);
+    if (confine(size, free, units, cats)) {
+      hardness += 1;
+      progress = true;
+    } else if (blockers(size, regions, free, units, cats)) {
+      hardness += 2;
+      progress = true;
+    }
   }
-  return cats.every((col) => col >= 0) ? cats : null;
+  return cats.every((col) => col >= 0) ? { cats, hardness } : null;
 }
 
 function isCat(cats: number[], size: number, cell: number): boolean {

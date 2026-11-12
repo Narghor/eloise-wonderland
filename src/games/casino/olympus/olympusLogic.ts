@@ -41,12 +41,12 @@ const PAYING = 9;
 /** Base game: extra chance per cell, off the first reel, to show Medusa. */
 export const BASE_EXTRA_MEDUSA_CHANCE = 0.008;
 /** Chance per cell to show a temple. */
-export const BASE_SCATTER_CHANCE = 0.0128;
+export const BASE_SCATTER_CHANCE = 0.012;
 export const FREE_SCATTER_CHANCE = 0.03;
 /** Free spins: chance per reel to be a full stack of Medusa. */
 export const FREE_MEDUSA_STACK = 0.24;
-/** Free spins: each full Medusa reel guarantees the spin at least this many times the bet. */
-export const MEDUSA_REEL_MIN_X = 2;
+/** Free spins: each full Medusa reel adds this many times the bet to the lines' win. */
+export const MEDUSA_REEL_X = 2;
 
 export const FREE_SPINS_BY_SCATTERS: Record<number, number> = { 3: 10, 4: 25, 5: 100 };
 export const MIN_SCATTERS = 3;
@@ -58,7 +58,7 @@ export const FREE_PAY_SCALE = PAY_SCALE * 2;
 /** A feature always pays at least this many times the bet (topped up at the end). */
 export const FREE_SPINS_MIN_X = 30;
 /** Spins per free spins round on average, measured by tools/casino-stats.mjs: measure again after changing the odds. */
-export const FREE_SPINS_EVERY = 150;
+export const FREE_SPINS_EVERY = 180;
 /** Safety cap on the spins of one feature, retriggers included. */
 export const MAX_FREE_SPINS = 500;
 
@@ -183,10 +183,10 @@ export function freeSpinsFor(scatters: number): number {
 export interface FreeSpin {
   grid: Grid;
   wins: LineWin[];
-  /** In multiples of the bet, the Medusa minimum included. */
+  /** In multiples of the bet: the lines plus the Medusa reels. */
   mult: number;
-  /** True when the Medusa reels' minimum paid more than the lines (absent in sessions saved before it existed). */
-  medusaMinimum?: boolean;
+  /** In multiples of the bet, the part paid by the Medusa reels (absent in sessions saved before it existed). */
+  medusaMult?: number;
   /** Spins added by this spin (retrigger). */
   added: number;
   spinsLeft: number;
@@ -212,10 +212,8 @@ export function playFreeSpins(rng: Rng, startSpins: number, boostSpins = 0): Fre
     left--;
     const grid = spinGrid(rng, true, spins.length < boostSpins ? 'flood' : undefined); // TEST-BUTTONS
     const wins = lineWins(grid, FREE_PAY_SCALE);
-    const linesMult = winMult(wins);
-    const minimum = medusaReels(grid).length * MEDUSA_REEL_MIN_X;
-    const medusaMinimum = minimum > linesMult;
-    const mult = Math.max(linesMult, minimum);
+    const medusaMult = medusaReels(grid).length * MEDUSA_REEL_X;
+    const mult = winMult(wins) + medusaMult;
     let added = scatterCount(grid) >= MIN_SCATTERS ? FREE_RETRIGGER_SPINS : 0;
     if (awarded + added > MAX_FREE_SPINS) {
       capped = capped || added > 0;
@@ -224,7 +222,7 @@ export function playFreeSpins(rng: Rng, startSpins: number, boostSpins = 0): Fre
     awarded += added;
     left += added;
     total += mult;
-    spins.push({ grid, wins, mult, medusaMinimum, added, spinsLeft: left });
+    spins.push({ grid, wins, mult, medusaMult, added, spinsLeft: left });
   }
   const topUp = Math.max(0, FREE_SPINS_MIN_X - total);
   return { spins, mult: total + topUp, topUp, capped };

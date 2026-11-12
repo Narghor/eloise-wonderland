@@ -18,6 +18,14 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-12',
+    date: '12 novembre',
+    news: [
+      '🐱 Elomew : les salons Expert demandent beaucoup plus de réflexion.',
+      '🐍 Le Regard de Medusa : chaque colonne de Medusa s’ajoute maintenant au gain des lignes. Les tours gratuits arrivent un peu moins souvent, mais rapportent bien plus.',
+    ],
+  },
+  {
     id: '2026-11-09',
     date: '9 novembre',
     news: [
