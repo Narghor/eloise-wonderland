@@ -33,10 +33,11 @@ function openHelp(help: Help): void {
   openReading(help.title, [el('ol', { class: 'help-steps' }, ...help.steps.map((parts) => el('li', {}, ...parts)))], "C'est parti !");
 }
 
-/** A dialog to read: a title, its content, one button that closes it; it also closes when the screen changes. */
+/** A dialog to read: a title, its content, one button always in view that closes it; it also closes when the screen changes. */
 export function openReading(title: string, content: Node[], closeLabel: string): void {
   const close = el('button', { class: 'button', type: 'button' }, closeLabel);
-  const dialog = el('dialog', { class: 'detail-dialog help-dialog' }, el('h2', { text: title }), ...content, close);
+  const footer = el('div', { class: 'help-dialog-footer' }, close);
+  const dialog = el('dialog', { class: 'detail-dialog help-dialog' }, el('h2', { text: title }), ...content, footer);
   close.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();

@@ -584,7 +584,7 @@ function paytable(stake: number): HTMLElement[] {
       'Pendant les tours gratuits, chaque ligne paie le DOUBLE du tableau ci-dessous.',
       `Chaque colonne de Medusa 🐍 ajoute ${MEDUSA_REEL_X} fois ta mise au gain des lignes : 3 colonnes = les lignes + ${3 * MEDUSA_REEL_X} fois ta mise, même si aucune ligne ne gagne.`,
       'Plus il y a de colonnes de Medusa collées depuis la gauche, plus les lignes paient : 6 colonnes = les 20 lignes à 6 Medusa.',
-      `Pendant les tours gratuits, les temples tombent bien plus souvent : 3 temples = +${FREE_RETRIGGER_SPINS} tours, sans limite. Un bonus sur quatre repart, parfois plusieurs fois !`,
+      `Pendant les tours gratuits, les temples tombent bien plus souvent : 3 temples ou plus = +${FREE_RETRIGGER_SPINS} tours, quel que soit leur nombre, sans limite. Un bonus sur quatre repart, parfois plusieurs fois !`,
       `Les tours gratuits paient toujours au moins ${FREE_SPINS_MIN_X} fois ta mise.`,
     ),
     el('h3', { class: 'oly-paytable-title', text: `Les ${LINES.length} lignes` }),

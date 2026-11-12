@@ -241,6 +241,16 @@ a {
   margin: 0 auto;
 }
 
+/* Stays at the bottom while the text scrolls: closing never needs a scroll. */
+.help-dialog-footer {
+  position: sticky;
+  bottom: -24px;
+  margin: 16px -28px -24px;
+  padding: 12px 28px 20px;
+  background: inherit;
+  box-shadow: 0 -10px 12px -10px rgb(80 30 60 / 0.25);
+}
+
 .help-steps {
   display: grid;
   gap: 12px;
