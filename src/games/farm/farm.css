@@ -1391,3 +1391,75 @@
   accent-color: var(--ui-accent);
   touch-action: pan-x;
 }
+
+/* ----------------------------------------------- */
+/* PC: a wide window keeps the phone's proportions */
+/* ----------------------------------------------- */
+
+@media (min-width: 720px) {
+  .farm-level {
+    flex: 0 1 380px;
+  }
+
+  .farm-top .farm-money {
+    margin-left: auto;
+  }
+
+  .farm-bar {
+    grid-template-columns: repeat(6, minmax(0, 104px));
+    justify-content: center;
+    gap: 6px;
+  }
+
+}
+
+/* A hand over what can be touched, with a mouse */
+.farm-canvas.is-pointing {
+  cursor: pointer;
+}
+
+.farm-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+/* A "coup de cœur" order: pays double, holds a parcel */
+.farm-card.is-special {
+  position: relative;
+  border-color: #e8789e;
+  background: #fff1f6;
+}
+
+.farm-special {
+  justify-self: start;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: #e8789e;
+  color: #fff;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+
+/* "While you were away" */
+.farm-away {
+  justify-items: start !important;
+  text-align: left;
+  width: 100%;
+}
+
+.farm-away li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+/* The farm's charm, above the decorations */
+.farm-charm {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff1f6;
+  border: 2px solid #e8789e;
+  font-size: 12.5px;
+  font-weight: 600;
+}

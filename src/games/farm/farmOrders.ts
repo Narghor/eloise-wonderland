@@ -7,7 +7,8 @@ import { PERSON_IDS } from './data/people';
 import type { ItemId } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import type { FarmSave, Order } from './farmSave';
-import { earn, emit, gainXp, hasItems, isUnlocked, ownCount, takeItems } from './farmProgress';
+import { charm, earn, emit, gainXp, hasItems, isUnlocked, ownCount, pay, takeItems } from './farmProgress';
+import { charmStep } from './data/charm';
 
 // -----------------------------------------------
 // THE ORDER BOARD (docs/ferme.md 4.5): orders never expire
@@ -19,6 +20,10 @@ export const ORDER_XP = 0.35;
 const SERVED_WAIT_MINUTES = 1;
 const REFUSED_WAIT_MINUTES = 15;
 const MAX_QUANTITY = 12;
+const MIN_CAP = 4;
+/** A "coup de cœur" order, from level 2: double Eloisettes and a parcel. */
+const SPECIAL_CHANCE = 0.12;
+const SPECIAL_LEVEL = 2;
 
 /** Items the farm can make right now and that people ask for (feeds stay for the animals). */
 export function orderable(save: FarmSave): ItemId[] {
@@ -32,23 +37,28 @@ export function orderable(save: FarmSave): ItemId[] {
 export function rollOrder(save: FarmSave, random: () => number): Order {
   const pool = orderable(save);
   const n = Math.min(pool.length, 1 + (random() < 0.5 ? 1 : 0) + (save.level >= 5 && random() < 0.25 ? 1 : 0));
-  const target = (12 + 10 * save.level) * (0.7 + 0.6 * random());
+  // From a small basket to a big one: the same mean as before, a wider spread so no two orders look alike.
+  const target = (12 + 10 * save.level) * (0.45 + 1.1 * random());
   const picked = new Set<ItemId>();
   while (picked.size < n) picked.add(pool[Math.floor(random() * pool.length)]);
   const items: Partial<Record<ItemId, number>> = {};
   let value = 0;
   for (const id of picked) {
     const v = item(id).value;
-    const qty = Math.max(1, Math.min(MAX_QUANTITY, Math.round(target / n / v)));
+    // A cap drawn per item, so cheap goods do not always come by the dozen.
+    const cap = MIN_CAP + Math.round(random() * (MAX_QUANTITY - MIN_CAP));
+    const qty = Math.max(1, Math.min(cap, Math.round(target / n / v)));
     items[id] = qty;
     value += qty * v;
   }
+  const special = save.level >= SPECIAL_LEVEL && random() < SPECIAL_CHANCE;
   return {
     id: save.nextOrderId++,
     who: PERSON_IDS[Math.floor(random() * PERSON_IDS.length)],
     items,
-    nuts: Math.round(value * ORDER_NUTS),
+    nuts: Math.round(value * ORDER_NUTS * (1 + charmStep(charm(save)).step.orderBonusPercent / 100) * (special ? 2 : 1)),
     xp: Math.max(1, Math.round(value * ORDER_XP)),
+    ...(special ? { special } : {}),
   };
 }
 
@@ -74,6 +84,7 @@ export function deliver(save: FarmSave, id: number, now: number): Order | null {
   for (const [itemId, n] of Object.entries(order.items)) emit(save, { type: 'deliver', target: itemId, count: n ?? 0 });
   emit(save, { type: 'order', count: 1 });
   earn(save, order.nuts);
+  if (order.special) pay(save, { parcels: 1 });
   gainXp(save, order.xp);
   return order;
 }

@@ -92,6 +92,22 @@ interface Particle {
   sprite?: Sprite;
 }
 
+/**
+ * The light of the hour, laid over the map by multiplying: [hour, red, green, blue, strength]. Golden at the end of
+ * the afternoon, blue at night, pink at dawn; nothing in the day. The interface stays as it is.
+ */
+const DAYLIGHT: readonly [number, number, number, number, number][] = [
+  [0, 70, 90, 165, 0.42],
+  [5, 70, 90, 165, 0.42],
+  [6.5, 255, 175, 170, 0.18],
+  [8, 255, 240, 220, 0],
+  [17, 255, 240, 220, 0],
+  [18.5, 255, 180, 105, 0.32],
+  [20, 125, 110, 185, 0.32],
+  [21.5, 70, 90, 165, 0.42],
+  [24, 70, 90, 165, 0.42],
+];
+
 /** The grains that fly off each crop when it is picked. */
 const CROP_COLOURS: Record<CropId, string[]> = {
   wheat: ['#f2c94c', '#fbe38a', '#d9a339'],
@@ -118,6 +134,17 @@ const DRAG_START_PX = 7;
 /** Tiles shown along the short side of the screen: the close and far views of the button, and the pinch limits. */
 const ZOOM_TILES = { near: 12, far: 22, closest: 7, farthest: 26 };
 const WALK_SPEED = 0.012;
+/**
+ * Frame pacing, for the battery: full speed while the player touches the farm or something flies, 20 images a second
+ * while the farm just lives (animals, butterflies), 8 after a minute without a touch, 1 when the page is hidden.
+ */
+const BUSY_AFTER_INPUT_MS = 3000;
+const CALM_FRAME_MS = 50;
+const ASLEEP_AFTER_MS = 60_000;
+const ASLEEP_FRAME_MS = 125;
+const HIDDEN_FRAME_MS = 1000;
+/** After a pinch or the wheel, the zoom settles on the nearest scale where art pixels fall on whole screen pixels. */
+const SETTLE_AFTER_WHEEL_MS = 250;
 /** The ground past the map's edge, under the forest. */
 const FOREST_FLOOR = '#3f6b35';
 /** The front lip of a tilled patch. */
@@ -147,6 +174,8 @@ export class FarmScene {
   private readonly actors = new Map<number, Actor[]>();
   private readonly butterflies: Butterfly[] = [];
   private particles: Particle[] = [];
+  /** TEST-BUTTONS: hours added to the clock, to see the evening without waiting for it. */
+  hourOffset = 0;
   private cam = { x: 0, y: 0 };
   /** The zoom, as tiles across the short side of the screen: continuous, so pinching follows the fingers. */
   private viewTiles = ZOOM_TILES.near;
@@ -158,6 +187,10 @@ export class FarmScene {
   private width = 0;
   private height = 0;
   private frameId = 0;
+  private sleepTimer = 0;
+  private sleeping = false;
+  private lastInput = performance.now();
+  private wheelTimer = 0;
   private last = performance.now();
   private readonly resizer: ResizeObserver;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -183,6 +216,8 @@ export class FarmScene {
 
   dispose(): void {
     cancelAnimationFrame(this.frameId);
+    window.clearTimeout(this.sleepTimer);
+    window.clearTimeout(this.wheelTimer);
     this.resizer.disconnect();
     this.canvas.width = this.canvas.height = 0;
   }
@@ -251,6 +286,8 @@ export class FarmScene {
     this.canvas.height = Math.round(box.height * this.dpr);
     this.applyZoom();
     if (!this.centred) {
+      this.viewTiles = this.crispTiles(this.viewTiles);
+      this.applyZoom();
       this.centreOn(MAP_SIZE / 2, MAP_SIZE / 2);
       this.centred = true;
     }
@@ -286,9 +323,24 @@ export class FarmScene {
     this.clampCamera();
   }
 
+  /** Keyboard: moves the view by some tiles. */
+  panBy(tilesX: number, tilesY: number): void {
+    this.cam.x += tilesX * TILE;
+    this.cam.y += tilesY * TILE;
+    this.clampCamera();
+    this.wake();
+  }
+
+  /** Keyboard: one step closer (1) or farther (-1), settling on a crisp scale. */
+  zoomStep(direction: 1 | -1): void {
+    this.zoomGoal = this.crispTiles((this.zoomGoal ?? this.viewTiles) * (direction > 0 ? 0.8 : 1.25));
+    this.wake();
+  }
+
   /** Glides between the close and the far view, around the middle of the screen. */
   toggleZoom(): void {
-    this.zoomGoal = this.isFar ? ZOOM_TILES.near : Math.min(ZOOM_TILES.far, this.farthestTiles());
+    this.zoomGoal = this.crispTiles(this.isFar ? ZOOM_TILES.near : Math.min(ZOOM_TILES.far, this.farthestTiles()));
+    this.wake();
   }
 
   get isFar(): boolean {
@@ -354,7 +406,7 @@ export class FarmScene {
   // -----------------------------------------------
 
   private frame(now: number): void {
-    const dt = Math.min(100, now - this.last);
+    const dt = Math.min(200, now - this.last);
     this.last = now;
     if (this.width > 0) {
       this.walk(dt);
@@ -364,7 +416,44 @@ export class FarmScene {
       this.draw(now);
       this.onFrame?.();
     }
+    this.schedule(now);
+  }
+
+  /** The next image: at once while busy, later when calm, the slower the longer nobody touches the farm. */
+  private schedule(now: number): void {
+    const busy = this.gesture !== null || this.zoomGoal !== null || this.particles.length > 0 || now - this.lastInput < BUSY_AFTER_INPUT_MS;
+    if (busy && !document.hidden) {
+      this.frameId = requestAnimationFrame((t) => this.frame(t));
+      return;
+    }
+    const delay = document.hidden ? HIDDEN_FRAME_MS : now - this.lastInput > ASLEEP_AFTER_MS ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
+    this.sleeping = true;
+    this.sleepTimer = window.setTimeout(() => {
+      this.sleeping = false;
+      this.frameId = requestAnimationFrame((t) => this.frame(t));
+    }, delay);
+  }
+
+  /** Something happened (a touch, an action, a new state): back to full speed at once. */
+  wake(): void {
+    this.lastInput = performance.now();
+    if (!this.sleeping) return;
+    window.clearTimeout(this.sleepTimer);
+    this.sleeping = false;
     this.frameId = requestAnimationFrame((t) => this.frame(t));
+  }
+
+  /** The nearest zoom where one art pixel covers a whole number of screen pixels: crisp at rest. */
+  private crispTiles(tiles: number): number {
+    const short = Math.min(this.width, this.height);
+    const pixel = Math.max(1, Math.round((short / (tiles * TILE)) * this.dpr));
+    const crisp = (short * this.dpr) / (pixel * TILE);
+    return crisp >= ZOOM_TILES.closest && crisp <= this.farthestTiles() ? crisp : tiles;
+  }
+
+  private settleZoom(): void {
+    this.zoomGoal = this.crispTiles(this.viewTiles);
+    this.wake();
   }
 
   private spriteOf(o: PlacedObject, now: number): Sprite {
@@ -473,7 +562,9 @@ export class FarmScene {
     for (const paint of flat) paint();
     list.sort((a, b) => a.base - b.base);
     for (const d of list) d.draw();
-    this.drawButterflies(now);
+    const light = this.daylight();
+    this.drawLight(light, view);
+    this.drawButterflies(now, light.night);
     this.drawParticles();
 
     // On top of everything: what is ready, and the ripe fields' sparkles.
@@ -517,8 +608,63 @@ export class FarmScene {
   // LIFE: butterflies, a bird passing, chimney smoke, the stream glinting
   // -----------------------------------------------
 
-  private drawButterflies(now: number): void {
+  /** The hour's tint and how much of the night there is (0 by day, 1 deep at night). */
+  private daylight(): { r: number; g: number; b: number; alpha: number; night: number } {
+    const d = new Date();
+    const hour = (d.getHours() + d.getMinutes() / 60 + this.hourOffset + 24) % 24;
+    let i = 0;
+    while (i < DAYLIGHT.length - 2 && hour >= DAYLIGHT[i + 1][0]) i++;
+    const [h0, r0, g0, b0, a0] = DAYLIGHT[i];
+    const [h1, r1, g1, b1, a1] = DAYLIGHT[i + 1];
+    const k = Math.min(1, Math.max(0, (hour - h0) / (h1 - h0)));
+    const mix = (x: number, y: number) => x + (y - x) * k;
+    const night = hour >= 19.5 || hour < 6 ? Math.min(1, hour >= 19.5 ? (hour - 19.5) / 1.5 : (6 - hour) / 1) : 0;
+    return { r: mix(r0, r1), g: mix(g0, g1), b: mix(b0, b1), alpha: mix(a0, a1), night };
+  }
+
+  private drawLight(light: ReturnType<FarmScene['daylight']>, view: { x0: number; y0: number; x1: number; y1: number }): void {
+    if (light.alpha <= 0.01) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgba(${Math.round(light.r)}, ${Math.round(light.g)}, ${Math.round(light.b)}, ${light.alpha})`;
+    ctx.fillRect(view.x0, view.y0, view.x1 - view.x0, view.y1 - view.y0);
+    if (light.night > 0) {
+      // Lanterns glow once the evening comes.
+      ctx.globalCompositeOperation = 'lighter';
+      for (const o of this.save.objects) {
+        if (o.type !== 'lantern') continue;
+        const sprite = this.spriteOf(o, 0);
+        const at = this.origin(o, sprite);
+        const x = at.x + sprite.width / 2;
+        const y = at.y + 5;
+        const glow = ctx.createRadialGradient(x, y, 1, x, y, 26);
+        glow.addColorStop(0, `rgba(255, 205, 120, ${0.55 * light.night})`);
+        glow.addColorStop(1, 'rgba(255, 205, 120, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - 26, y - 26, 52, 52);
+      }
+    }
+    ctx.restore();
+  }
+
+  /** Butterflies by day; at night the same little flights become fireflies. */
+  private drawButterflies(now: number, night: number): void {
     if (this.reduced) return;
+    if (night > 0.4) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const b of this.butterflies) {
+        const blink = 0.5 + 0.5 * Math.sin(now / 420 + b.phase * 9);
+        ctx.fillStyle = `rgba(255, 240, 140, ${0.35 + 0.65 * blink})`;
+        ctx.fillRect(Math.round(b.x) + 2, Math.round(b.y) + 2, 2, 2);
+        ctx.fillStyle = `rgba(255, 230, 120, ${0.15 * blink})`;
+        ctx.fillRect(Math.round(b.x), Math.round(b.y), 6, 6);
+      }
+      ctx.restore();
+      return;
+    }
     for (const b of this.butterflies) {
       const frame = (Math.floor(now / 140 + b.phase * 7) % 2) as 0 | 1;
       const bob = Math.round(Math.sin(now / 300 + b.phase * 6) * 2);
@@ -910,6 +1056,7 @@ export class FarmScene {
   private listen(): void {
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
+      this.wake();
       c.setPointerCapture(e.pointerId);
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 2) {
@@ -927,7 +1074,9 @@ export class FarmScene {
       this.gesture = { mode: onGhost ? 'ghost' : 'pending', x: e.clientX, y: e.clientY, last: { x: e.clientX, y: e.clientY }, camX: this.cam.x, camY: this.cam.y, target, grab };
     });
     c.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' && e.buttons === 0) c.classList.toggle('is-pointing', this.targetAtClient(e.clientX, e.clientY) !== null);
       if (!this.pointers.has(e.pointerId)) return;
+      this.wake();
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const g = this.gesture;
       if (!g) return;
@@ -951,6 +1100,7 @@ export class FarmScene {
         if (g.mode === 'harvest') this.events.harvest(g.target as PlacedObject);
       }
       if (g.mode === 'pan') {
+        c.classList.add('is-dragging');
         this.cam.x = g.camX - dx / this.scale;
         this.cam.y = g.camY - dy / this.scale;
         this.clampCamera();
@@ -976,6 +1126,9 @@ export class FarmScene {
       const g = this.gesture;
       if (this.pointers.size > 0) return;
       this.gesture = null;
+      c.classList.remove('is-dragging');
+      this.wake();
+      if (g?.mode === 'pinch') this.settleZoom();
       if (g && g.mode === 'pending' && e.type === 'pointerup') {
         const w = this.toWorld(g.x, g.y);
         this.events.tap(g.target, [Math.floor(w.x / TILE), Math.floor(w.y / TILE)]);
@@ -989,6 +1142,9 @@ export class FarmScene {
         e.preventDefault();
         this.zoomGoal = null;
         this.zoomAround(this.viewTiles * Math.exp(e.deltaY * 0.0015), e.clientX, e.clientY);
+        this.wake();
+        window.clearTimeout(this.wheelTimer);
+        this.wheelTimer = window.setTimeout(() => this.settleZoom(), SETTLE_AFTER_WHEEL_MS);
       },
       { passive: false },
     );

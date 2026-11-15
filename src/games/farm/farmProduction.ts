@@ -228,6 +228,26 @@ export function readyOn(object: PlacedObject, now: number): ItemId | 'nuts' | nu
 }
 
 /** Things ready to pick up on the whole farm. */
+/** What became ready between two visits: the news told on coming back. */
+export interface AwayNews {
+  fields: number;
+  animals: number;
+  machines: number;
+  trees: number;
+}
+
+export function awayNews(save: FarmSave, since: number, now: number): AwayNews {
+  const within = (t: number | undefined) => t !== undefined && t > since && t <= now;
+  const news: AwayNews = { fields: 0, animals: 0, machines: 0, trees: 0 };
+  for (const o of save.objects) {
+    if (o.type === 'field' && o.crop && within(o.readyAt)) news.fields++;
+    if (o.animals) news.animals += o.animals.filter((t) => t !== HUNGRY && within(t)).length;
+    if (o.queue) news.machines += o.queue.filter((j) => within(j.readyAt)).length;
+    if (o.type === 'hazel' && within(o.readyAt)) news.trees++;
+  }
+  return news;
+}
+
 export function readyCount(save: FarmSave, now: number): number {
   return save.objects.filter((o) => readyOn(o, now) !== null).length;
 }

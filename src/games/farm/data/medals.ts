@@ -24,6 +24,7 @@ export const MEDALS: readonly Medal[] = [
   { id: 'clear', name: 'Défricheuse', key: 'clear', tiers: [10, 50, 150], text: (n) => `${fr(n)} obstacles dégagés` },
   { id: 'decor', name: 'Décoratrice', key: 'place:deco', tiers: [10, 50, 200], text: (n) => `${fr(n)} décos placées` },
   { id: 'hazel', name: 'Cueilleuse', key: 'collect:hazel', tiers: [10, 100, 1000], text: (n) => `${fr(n)} noisetiers cueillis` },
+  { id: 'album', name: 'Collectionneuse', key: 'collect:treasure', tiers: [3, 6, 9], text: (n) => `${fr(n)} trésors dans l’album` },
   { id: 'earn', name: 'Petit pécule', key: 'earn', tiers: [1000, 10000, 100000], text: (n) => `${fr(n)} Éloisettes gagnées` },
 ];
 

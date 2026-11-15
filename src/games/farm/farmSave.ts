@@ -55,6 +55,8 @@ export interface Order {
   items: Partial<Record<ItemId, number>>;
   nuts: number;
   xp: number;
+  /** A "coup de cœur": pays double and holds one of Gaston's parcels. */
+  special?: boolean;
 }
 
 export interface DailyTask {
@@ -218,7 +220,7 @@ function readOrder(value: unknown): Order[] {
   const o = asRecord(value);
   if (!isCount(o.id) || !isOneOf(o.who, PERSON_IDS) || !isCount(o.nuts) || !isCount(o.xp)) return [];
   const items = counts(o.items, ITEM_IDS);
-  return Object.keys(items).length > 0 ? [{ id: o.id, who: o.who, items, nuts: o.nuts, xp: o.xp }] : [];
+  return Object.keys(items).length > 0 ? [{ id: o.id, who: o.who, items, nuts: o.nuts, xp: o.xp, ...(o.special === true ? { special: true } : {}) }] : [];
 }
 
 function readTask(value: unknown): DailyTask[] {

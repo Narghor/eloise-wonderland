@@ -543,3 +543,33 @@ déplace d'un même geste), la molette zoome autour du curseur, et le bouton du 
 proche (12 cases) et vue d'ensemble (22). Les pixels ne sont plus à l'échelle entière : sur téléphone (2 à 3 pixels
 d'écran par point) ça ne se voit pas. La forêt autour de la carte passe à 12 cases (`GROUND_MARGIN`) et le dézoom
 s'arrête avant d'en sortir.
+
+---
+
+## 14. Deuxième autocritique, tout validé par Flo (15/11 au soir)
+
+- **Batterie** : la carte ne se redessine plus 60 fois par seconde quand rien ne bouge. Pleine vitesse pendant un
+  geste et 3 s après, ou tant qu'une particule vole ou que le zoom glisse ; 20 images/s quand la ferme vit seule
+  (animaux, papillons) ; 8 après une minute sans toucher ; 1 page cachée (`farmScene.schedule`). Toute action
+  (`commit`) réveille la carte.
+- **Netteté** : après un pincement, la molette ou le bouton, le zoom se pose sur l'échelle la plus proche où un
+  pixel du dessin couvre un nombre entier de pixels d'écran : fluide pendant le geste, net au repos.
+- **PC** : barre de niveau limitée en largeur, onglets resserrés au centre, main au survol de ce qui se touche,
+  clavier : flèches, ZQSD ou WASD pour se déplacer (Maj = plus loin), + et - pour zoomer, Échap ferme ce qui est
+  ouvert (bulle, graines, fiche, Aménager).
+- **Commandes** : plus variées (panier de 0,45 à 1,55 fois la taille habituelle, même moyenne ; un plafond tiré de
+  4 à 12 par produit), chaque villageois dit un petit mot (`people.ts`), et dès le niveau 2, **une commande sur 8
+  environ est un « coup de cœur »** : Éloisettes doublées et un colis de Gaston.
+- **Gaston se présente** au premier colis, avant qu'on l'ouvre.
+- **« Pendant ton absence… »** : après 20 min d'absence, une carte dit ce qui a mûri, produit, été fabriqué,
+  donné, les colis déposés, les nouvelles commandes et les nouvelles tâches du jour.
+- **Le Charme** (`data/charm.ts`) : chaque déco posée ajoute du charme (environ 1 point par 10 Éloisettes de prix ;
+  trésors : rare 15, épique 30, légendaire 60 ; les décos rangées ne comptent pas). Six paliers, de « Ferme toute
+  simple » à « Ferme de rêve » (0, 20, 50, 100, 180, 300) : Gaston passe toutes les 4 h puis jusqu'à 2 h 45, et les
+  commandes paient jusqu'à +15 %. Affiché dans la Boutique (onglet Déco, « +N de charme » sur chaque carte) et dans
+  le bandeau d'Aménager.
+- **Le soir à l'écran** : lumière dorée vers 18 h 30, bleutée la nuit (21 h 30 à 5 h), rose à l'aube ; les
+  lanternes brillent la nuit et les papillons deviennent des lucioles. L'interface n'est pas teintée. TEST : bouton
+  « Heure +3 h ».
+- **Album** : médaille « Collectionneuse » à 3, 6 et 9 trésors (l'or à l'album complet).
+- Non modélisé dans le simulateur : coups de cœur et Charme (ils accélèrent un peu une joueuse qui décore).

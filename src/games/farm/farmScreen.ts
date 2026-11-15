@@ -22,6 +22,8 @@ import { FarmHud, type SheetId } from './farmHud';
 import { buyAndPlace, buyParcel, buyRefusal, canMove, canStand, canStore, clearObstacle, ensureMailbox, footprint, freeSpotNear, moveObject, newFarm, parcelOffers, storeObject } from './farmMap';
 import { deliver, refillOrders, refuse } from './farmOrders';
 import {
+  awayNews,
+  type AwayNews,
   buyAnimal,
   buySlot,
   collectMachine,
@@ -34,7 +36,6 @@ import {
   penAnimal,
   queueRecipe,
   readyAnimals,
-  readyCount,
   sell,
   sow,
   trayJobs,
@@ -51,6 +52,7 @@ import {
   parcelBubble,
   penBubble,
   rewardLine,
+  charmLine,
   seedRow,
   sheetContent,
   treeBubble,
@@ -59,6 +61,9 @@ import {
 import { FarmScene, type Ghost } from './farmScene';
 import { swipeToClose } from './farmSwipe';
 import { FarmMusic, musicVolume } from './farmMusic';
+import { todayKey } from '../../daily/daily';
+
+const GASTON_HELLO = 'Bonjour ! Gaston, le facteur du village. Je passerai te déposer un colis toutes les quatre heures, et il y en a parfois de très jolis dedans… Celui-ci, c’est pour te souhaiter la bienvenue !';
 import { loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
 import { MINUTE_MS } from './farmTime';
 
@@ -66,8 +71,8 @@ import { MINUTE_MS } from './farmTime';
 // #/ferme: the farm in full screen
 // -----------------------------------------------
 
-/** Away longer than this, the farm says what waits. */
-const WELCOME_AFTER_MS = 15 * 60 * 1000;
+/** Away longer than this, the farm tells what happened while the player was gone. */
+const WELCOME_AFTER_MS = 20 * 60 * 1000;
 
 export function renderFarm(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -75,14 +80,15 @@ export function renderFarm(root: HTMLElement): () => void {
   const saved = loadFarm();
   const save = saved ?? newFarm(now);
   ensureMailbox(save);
-  deliverMail(save, now);
+  const away = saved && now - saved.lastVisit > WELCOME_AFTER_MS;
+  const news = away ? awayNews(save, saved.lastVisit, now) : null;
+  const parcels = deliverMail(save, now);
+  const orders = refillOrders(save, now);
+  const newDay = !!saved?.daily && saved.daily.day !== todayKey(new Date(now));
   const screen = new FarmScreen(root, save);
+  if (news) screen.welcomeBack(news, parcels, orders, newDay);
   screen.commit();
   openHelpOnFirstVisit(FARM_HELP);
-  if (saved && now - saved.lastVisit > WELCOME_AFTER_MS) {
-    const ready = readyCount(save, now);
-    if (ready > 0) screen.toast(`Bon retour ! ${ready} chose${ready > 1 ? 's' : ''} t’attend${ready > 1 ? 'ent' : ''}.`);
-  }
   return () => screen.dispose();
 }
 
@@ -112,6 +118,23 @@ class FarmScreen implements FarmUi {
   private pluckStep = 0;
   private pluckAt = 0;
   private comboEl: HTMLElement | null = null;
+
+  /** On a PC: Escape closes what is open, the arrows (or WASD) move the view, + and - zoom. */
+  private readonly onKey = (e: KeyboardEvent): void => {
+    if (e.target instanceof HTMLInputElement || e.altKey || e.ctrlKey || e.metaKey) return;
+    const step = e.shiftKey ? 4 : 2;
+    const pans: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+      a: [-step, 0], d: [step, 0], w: [0, -step], s: [0, step], q: [-step, 0], z: [0, -step],
+    };
+    const pan = pans[e.key];
+    if (pan) {
+      e.preventDefault();
+      this.scene.panBy(...pan);
+    } else if (e.key === '+' || e.key === '=') this.scene.zoomStep(1);
+    else if (e.key === '-' || e.key === '_') this.scene.zoomStep(-1);
+    else if (e.key === 'Escape') this.closeTopmost();
+  };
   private shownFar = false;
   private readonly music = new FarmMusic();
 
@@ -142,6 +165,7 @@ class FarmScreen implements FarmUi {
     this.root.append(this.overlay);
     this.scene.onFrame = () => this.follow();
     this.timer = window.setInterval(() => this.tick(), 1000);
+    window.addEventListener('keydown', this.onKey);
     // The music waits for a first touch (browsers forbid sound before one).
     this.root.addEventListener('pointerdown', () => this.music.start(), { once: true });
   }
@@ -153,6 +177,7 @@ class FarmScreen implements FarmUi {
     saveFarm(this.save);
     this.scene.dispose();
     this.music.dispose();
+    window.removeEventListener('keydown', this.onKey);
   }
 
   now(): number {
@@ -170,6 +195,7 @@ class FarmScreen implements FarmUi {
 
   commit(): void {
     window.clearTimeout(this.commitTimer);
+    this.scene.wake();
     const now = Date.now();
     refillOrders(this.save, now);
     const notices = settle(this.save, now);
@@ -214,6 +240,14 @@ class FarmScreen implements FarmUi {
       if (state === 'ripe') this.closeBubble();
       else if (state !== 'empty') this.bubble!.el.replaceChildren(...(this.bubbleContent(target) ?? []));
     }
+  }
+
+  /** Escape: the last thing opened closes first. */
+  private closeTopmost(): void {
+    if (this.bubble) return this.closeBubble();
+    if (this.seeds) return this.closeSeeds();
+    if (this.sheet) return this.closeSheet();
+    if (this.editing || this.placing) return this.exitEdit();
   }
 
   // -----------------------------------------------
@@ -840,8 +874,33 @@ class FarmScreen implements FarmUi {
 
   /** Opens the mailbox: a parcel to unwrap, or when Gaston comes back. */
   private openMailbox(mailbox: PlacedObject): void {
-    if (this.save.mail.waiting > 0) return this.queueDialog(() => this.parcelDialog());
-    this.openBubble(mailbox);
+    if (this.save.mail.waiting === 0) return this.openBubble(mailbox);
+    // The very first parcel: Gaston introduces himself before it is opened.
+    if (this.save.mail.opened === 0) this.queueDialog(() => this.speech('gaston', 'Le facteur', GASTON_HELLO, 'Ouvrir le colis !'));
+    this.queueDialog(() => this.parcelDialog());
+  }
+
+  /** "While you were away": what grew, what came, told as one happy card. */
+  welcomeBack(news: AwayNews, parcels: number, orders: number, newDay: boolean): void {
+    const plural = (n: number, one: string, many: string) => (n > 1 ? many.replace('#', String(n)) : one);
+    const lines: [Sprite, string][] = [];
+    if (news.fields > 0) lines.push([itemIcon('wheat'), plural(news.fields, 'Un champ a mûri', '# champs ont mûri')]);
+    if (news.animals > 0) lines.push([itemIcon('egg'), plural(news.animals, 'Un animal a produit', '# animaux ont produit')]);
+    if (news.machines > 0) lines.push([itemIcon('flour'), plural(news.machines, 'Une fabrication est prête', '# fabrications sont prêtes')]);
+    if (news.trees > 0) lines.push([uiIcon('nut'), plural(news.trees, 'Un noisetier a donné', '# noisetiers ont donné')]);
+    if (parcels > 0) lines.push([parcelSprite(null), plural(parcels, 'Gaston a déposé un colis', 'Gaston a déposé # colis')]);
+    if (orders > 0) lines.push([uiIcon('orders'), plural(orders, 'Une nouvelle commande', '# nouvelles commandes')]);
+    if (newDay) lines.push([uiIcon('chest'), 'De nouvelles tâches du jour']);
+    if (lines.length === 0) return;
+    this.queueDialog(() =>
+      el(
+        'div',
+        { class: 'farm-dialog-box farm-box' },
+        el('h2', { text: 'Pendant ton absence…' }),
+        el('ul', { class: 'farm-away' }, ...lines.map(([icon, text]) => el('li', {}, spriteImage(icon, 3), text))),
+        el('button', { class: 'farm-btn is-wide', type: 'button', text: 'Allons voir !' }),
+      ),
+    );
   }
 
   /** The parcel shakes when touched, then bursts open in the colour of its rarity. */
@@ -896,7 +955,7 @@ class FarmScreen implements FarmUi {
     this.scene.editMode = true;
     this.hud.setEditing(true);
     this.hud.setPressed('build');
-    this.showBanner('Aménager : touche un objet pour le déplacer, le tourner ou le ranger.', 'Fini', () => this.exitEdit());
+    this.showBanner(`Aménager : touche un objet pour le déplacer, le tourner ou le ranger. ${charmLine(this.save)}`, 'Fini', () => this.exitEdit());
   }
 
   private exitEdit(): void {
@@ -1060,6 +1119,10 @@ class FarmScreen implements FarmUi {
         this.save.orderWaits = this.save.orderWaits.map(() => now);
       }),
       button('+5 colis', () => (this.save.mail.waiting += 5)),
+      button('Heure +3 h', () => {
+        this.scene.hourOffset = (this.scene.hourOffset + 3) % 24;
+        this.toast(`Heure affichée : ${(new Date().getHours() + this.scene.hourOffset) % 24} h`);
+      }),
       button('+10 de chaque produit', () => {
         for (const id of ['wheat', 'corn', 'carrot', 'egg', 'milk', 'flour', 'chickenFeed', 'cowFeed'] as ItemId[]) this.save.stock[id] = have(this.save, id) + 10;
       }),

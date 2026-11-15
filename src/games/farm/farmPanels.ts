@@ -11,7 +11,8 @@ import { PLACEABLES, placeable, type Placeable } from './data/placeables';
 import { PROJECTS } from './data/projects';
 import { QUESTS } from './data/quests';
 import { obstacle } from './data/land';
-import { person } from './data/people';
+import { orderLine, person } from './data/people';
+import { charmOf, charmStep } from './data/charm';
 import type { BoosterId, BreedId, CropId, DecorId, ItemId, ObstacleId, PlaceableId, Reward } from './data/types';
 import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, hazelSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
 import type { SheetId } from './farmHud';
@@ -32,6 +33,7 @@ import {
   trayJobs,
 } from './farmProduction';
 import {
+  charm,
   counter,
   have,
   isChestReady,
@@ -399,10 +401,12 @@ function ordersSheet(ui: FarmUi): Node[] {
     refuse.addEventListener('click', () => ui.refuse(o.id));
     return el(
       'div',
-      { class: `farm-card${ok ? ' is-ready' : ''}` },
+      { class: `farm-card${ok ? ' is-ready' : ''}${o.special ? ' is-special' : ''}` },
+      ...(o.special ? [el('span', { class: 'farm-special', text: '♥ Coup de cœur' })] : []),
       el('div', { class: 'farm-who' }, face(o.who), el('span', {}, person(o.who).name, el('small', { text: person(o.who).role }))),
+      el('p', { class: 'farm-quote', text: `« ${orderLine(o.who, o.id)} »` }),
       el('div', { class: 'farm-lines' }, ...needs),
-      el('div', { class: 'farm-pay' }, ...rewardLine({ nuts: o.nuts, xp: o.xp })),
+      el('div', { class: 'farm-pay' }, ...rewardLine({ nuts: o.nuts, xp: o.xp, ...(o.special ? { parcels: 1 } : {}) })),
       button([ok ? 'Livrer' : 'Il en manque'], () => ui.deliver(o.id), { disabled: !ok, wide: true }),
       refuse,
     );
@@ -615,12 +619,21 @@ function animalsShop(ui: FarmUi): Node[] {
   ];
 }
 
+/** The farm's charm, what it brings now and at the next step. */
+export function charmLine(save: FarmSave): string {
+  const value = charm(save);
+  const { step, next } = charmStep(value);
+  const now = `Charme ${value} · ${step.name}`;
+  return next ? `${now}. À ${next.min} : Gaston toutes les ${duration(next.parcelMinutes)}, commandes +${next.orderBonusPercent} %.` : `${now}. Le plus haut palier !`;
+}
+
 function decorShop(ui: FarmUi): Node[] {
   // Treasures show only while one is stored, ready to be placed again.
   const list = PLACEABLES.filter((p) => p.kind === 'deco' && (!p.treasure || (ui.save.decorStore[p.id as DecorId] ?? 0) > 0));
   return [
-    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id)))),
-    el('p', { class: 'farm-note', text: 'Les décos se posent où tu veux, se tournent et se rangent dans « Aménager ».' }),
+    el('p', { class: 'farm-charm', text: charmLine(ui.save) }),
+    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), `+${charmOf(p.id)} de charme`))),
+    el('p', { class: 'farm-note', text: 'Chaque déco posée ajoute du charme : Gaston passe plus souvent et les commandes paient un peu mieux. Les décos se tournent et se rangent dans « Aménager ».' }),
   ];
 }
 

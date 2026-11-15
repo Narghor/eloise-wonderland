@@ -1,9 +1,10 @@
 import { PEN_CAPACITY, animal } from './data/animals';
-import { MAILBOX_SIZE, PARCEL_EVERY_MINUTES, PITY, PRIZES, RARITIES, breed, type Prize } from './data/parcels';
+import { MAILBOX_SIZE, PITY, PRIZES, RARITIES, breed, type Prize } from './data/parcels';
+import { charmStep } from './data/charm';
 import type { BreedId, Rarity } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import { HUNGRY, type FarmSave } from './farmSave';
-import { emit, isUnlocked, pay } from './farmProgress';
+import { charm, emit, isUnlocked, pay } from './farmProgress';
 
 // -----------------------------------------------
 // GASTON'S PARCELS: they arrive, they are opened, what they hold
@@ -12,7 +13,8 @@ import { emit, isUnlocked, pay } from './farmProgress';
 /** Gaston's rounds since the last look: the mailbox fills up to MAILBOX_SIZE, then he waits for room. */
 export function deliverMail(save: FarmSave, now: number): number {
   const mail = save.mail;
-  const every = PARCEL_EVERY_MINUTES * MINUTE_MS;
+  // A charming farm sees Gaston more often.
+  const every = charmStep(charm(save)).step.parcelMinutes * MINUTE_MS;
   let came = 0;
   while (now >= mail.nextAt) {
     if (mail.waiting >= MAILBOX_SIZE) {
@@ -73,6 +75,7 @@ function rollRarity(atLeastRare: boolean, random: () => number): Rarity {
 function addToAlbum(save: FarmSave, id: FarmSave['album'][number]): boolean {
   if (save.album.includes(id)) return false;
   save.album.push(id);
+  emit(save, { type: 'collect', target: 'treasure', count: 1 });
   return true;
 }
 
