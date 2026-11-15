@@ -94,6 +94,7 @@ export function takeItems(save: FarmSave, items: Partial<Record<ItemId, number>>
 /** Pays any reward: the one way quests, levels, tasks, medals and projects give things. */
 export function pay(save: FarmSave, reward: Reward): void {
   if (reward.nuts) earn(save, reward.nuts);
+  if (reward.parcels) save.mail.waiting += reward.parcels;
   for (const [id, n] of Object.entries(reward.boosters ?? {})) save.boosters[id as keyof typeof save.boosters] += n ?? 0;
   for (const [id, n] of Object.entries(reward.decor ?? {})) save.decorStore[id as keyof typeof save.decorStore] = (save.decorStore[id as keyof typeof save.decorStore] ?? 0) + (n ?? 0);
   if (reward.xp) gainXp(save, reward.xp);
@@ -290,7 +291,7 @@ export function unlocksAt(level: number): string[] {
     ...PLACEABLES.filter((p) => p.kind !== 'deco' && p.kind !== 'obstacle' && p.kind !== 'field' && at(p.unlock)).map((p) => `Bâtiment : ${p.name}`),
     ...ANIMALS.filter((a) => at(a.unlock)).map((a) => `Animal : ${a.name}`),
     ...RECIPES.filter((r) => at(r.unlock) && !PLACEABLES.some((p) => p.id === r.machine && at(p.unlock))).map((r) => `Recette : ${item(r.item).name}`),
-    ...PLACEABLES.filter((p) => p.kind === 'deco' && at(p.unlock)).map((p) => `Déco : ${p.name}`),
+    ...PLACEABLES.filter((p) => p.kind === 'deco' && !p.treasure && at(p.unlock)).map((p) => `Déco : ${p.name}`),
     ...PROJECTS.filter((p) => at(p.unlock)).map((p) => `Grand projet : ${p.name}`),
   ];
 }

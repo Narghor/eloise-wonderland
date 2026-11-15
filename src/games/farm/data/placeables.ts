@@ -6,7 +6,7 @@ import { atLevel, type DecorId, type MachineId, type ObstacleId, type PenId, typ
 // Fields, pens, machines, trees, decorations and the wild share one shape and one code to be bought, placed,
 // moved, turned and stored. `size` is the size seen from the front; a quarter turn swaps it.
 
-export type PlaceableKind = 'field' | 'pen' | 'machine' | 'tree' | 'deco' | 'obstacle';
+export type PlaceableKind = 'field' | 'pen' | 'machine' | 'tree' | 'deco' | 'obstacle' | 'mailbox';
 
 export interface Placeable {
   id: PlaceableId;
@@ -20,12 +20,15 @@ export interface Placeable {
   maxCount?: number;
   /** Flat on the ground (paths): drawn under everything, walked over. */
   flat?: boolean;
+  /** Found only in Gaston's parcels: never in the shop. */
+  treasure?: boolean;
 }
 
 const machine = (id: MachineId, name: string, level: number, price: number): Placeable => ({ id, name, kind: 'machine', size: [2, 2], price, unlock: atLevel(level), maxCount: 1 });
 const pen = (id: PenId, name: string, level: number, price: number): Placeable => ({ id, name, kind: 'pen', size: [3, 3], price, unlock: atLevel(level), maxCount: 1 });
 const tree = (id: TreeId, name: string, level: number, price: number, maxCount: number): Placeable => ({ id, name, kind: 'tree', size: [2, 2], price, unlock: atLevel(level), maxCount });
 const deco = (id: DecorId, name: string, size: [number, number], price: number, level: number, flat = false): Placeable => ({ id, name, kind: 'deco', size, price, unlock: atLevel(level), ...(flat ? { flat } : {}) });
+const treasure = (id: DecorId, name: string, size: [number, number]): Placeable => ({ id, name, kind: 'deco', size, price: 0, unlock: atLevel(1), treasure: true });
 const wild = (id: ObstacleId, name: string, size: [number, number]): Placeable => ({ id, name, kind: 'obstacle', size, price: 0, unlock: atLevel(1) });
 
 export const PLACEABLES: readonly Placeable[] = [
@@ -59,6 +62,15 @@ export const PLACEABLES: readonly Placeable[] = [
   wild('stump', 'Souche', [1, 1]),
   wild('rock', 'Rocher', [1, 1]),
   wild('bigRock', 'Gros rocher', [2, 2]),
+  // Gaston's mailbox: every farm has one; it moves like the rest but is never sold nor stored.
+  { id: 'mailbox', name: 'Boîte aux lettres', kind: 'mailbox', size: [1, 1], price: 0, unlock: atLevel(1), maxCount: 1 },
+  // Treasures from the parcels (data/parcels.ts).
+  treasure('gnome', 'Nain de jardin', [1, 1]),
+  treasure('hayBales', 'Bottes de foin', [2, 1]),
+  treasure('teaTable', 'Table à thé', [1, 1]),
+  treasure('flowerArch', 'Arche fleurie', [2, 1]),
+  treasure('swing', 'Balançoire', [2, 2]),
+  treasure('fountain', 'Fontaine dorée', [2, 2]),
 ];
 
 export const PLACEABLE_IDS = PLACEABLES.map((p) => p.id);
@@ -67,7 +79,7 @@ export function placeable(id: PlaceableId): Placeable {
   return PLACEABLES.find((p) => p.id === id)!;
 }
 
-export const DECOR = PLACEABLES.filter((p) => p.kind === 'deco');
+export const DECOR = PLACEABLES.filter((p) => p.kind === 'deco' && !p.treasure);
 
 /** Hazel tree: Eloisettes every few hours, never replanted. */
 export const HAZEL = { minutes: 240, nuts: [5, 10] as const, xp: 1 };

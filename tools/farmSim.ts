@@ -18,6 +18,7 @@ import { HAZEL as DATA_HAZEL, PLACEABLES, placeable } from '../src/games/farm/da
 import { project } from '../src/games/farm/data/projects';
 import type { ItemId, Unlock } from '../src/games/farm/data/types';
 import { ORDER_NUTS, ORDER_XP } from '../src/games/farm/farmOrders';
+import { MAILBOX_SIZE, PARCEL_EVERY_MINUTES, PITY, PRIZES, RARITIES } from '../src/games/farm/data/parcels';
 import { MERCHANT_SHARE as DATA_MERCHANT_SHARE } from '../src/games/farm/farmProduction';
 
 const DAYS = Number(process.argv[2] ?? 90);
@@ -149,6 +150,36 @@ class Farm {
   used = { fertilizer: 0, wateringCan: 0, hourglass: 0 };
   levelAt: number[] = [0, 0];
   bridgeDoneAt = -1;
+  /** Gaston's parcels: waiting in the mailbox, next round, plain ones in a row. */
+  mail = { waiting: 1, nextAt: PARCEL_EVERY_MINUTES, sinceRare: 0, opened: 0 };
+
+  /** Collects Gaston's rounds and opens every parcel, as a player would on each visit. */
+  openMail(now: number): void {
+    while (now >= this.mail.nextAt) {
+      if (this.mail.waiting >= MAILBOX_SIZE) {
+        this.mail.nextAt = now + PARCEL_EVERY_MINUTES;
+        break;
+      }
+      this.mail.waiting++;
+      this.mail.nextAt += PARCEL_EVERY_MINUTES;
+    }
+    for (; this.mail.waiting > 0; this.mail.waiting--) {
+      this.mail.opened++;
+      const pool = this.mail.sinceRare >= PITY - 1 ? RARITIES.filter((x) => x.id !== 'common') : RARITIES;
+      let roll = this.random() * pool.reduce((sum, x) => sum + x.weight, 0);
+      const rarity = (pool.find((x) => (roll -= x.weight) < 0) ?? pool[0]).id;
+      this.mail.sinceRare = rarity === 'common' ? this.mail.sinceRare + 1 : 0;
+      const prizes = PRIZES[rarity];
+      const prize = prizes[Math.floor(this.random() * prizes.length)];
+      if (prize.kind === 'nuts') this.earn(prize.base + prize.perLevel * this.level, 'colis');
+      if (prize.kind === 'boosters') {
+        this.boosters.fertilizer += prize.boosters.fertilizer ?? 0;
+        this.boosters.wateringCan += prize.boosters.wateringCan ?? 0;
+        this.boosters.hourglass += prize.boosters.hourglass ?? 0;
+      }
+      // Treasures (decorations, rare animals) do not pace the game: a rare animal's extra product is left out.
+    }
+  }
   playMinutes = 0;
   readonly random: () => number;
 
@@ -198,6 +229,7 @@ class Farm {
       this.earn(reward.coins, 'niveaux');
       this.boosters.fertilizer += reward.fertilizer;
       this.boosters.hourglass += reward.hourglass;
+      this.mail.waiting += dataLevelReward(this.level).parcels ?? 0;
     }
   }
 
@@ -542,6 +574,7 @@ function play(profile: Profile, seed: number): Farm {
     }
     visits.forEach(([start, length], i) => {
       const begin = day * MIN_PER_DAY + start;
+      farm.openMail(begin);
       const end = begin + length;
       const next = i + 1 < visits.length ? day * MIN_PER_DAY + visits[i + 1][0] : (day + 1) * MIN_PER_DAY + visits[0][0];
       for (let t = begin; t < end; t++) farm.act(t, end, next, rule);
@@ -551,6 +584,7 @@ function play(profile: Profile, seed: number): Farm {
     farm.earn(DAILY.tasks * DAILY.coins(farm.level) + DAILY.chestCoins(farm.level), 'taches');
     farm.gainXp(DAILY.tasks * DAILY.xp(farm.level), (day + 1) * MIN_PER_DAY - 1, 'taches');
     farm.boosters.hourglass += DAILY.chestHourglass;
+    farm.mail.waiting += dailyChestReward(farm.level).parcels ?? 0;
     farm.boosters.fertilizer += DAILY.tasks;
     if (farm.level >= MAX_LEVEL && farm.bridgeDoneAt >= 0) break;
   }

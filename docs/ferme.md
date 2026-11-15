@@ -498,3 +498,31 @@ la terre), le pincement à deux doigts, la place des bulles sur un petit écran,
   à dégager, ombre sous tout objet posé, champs voisins raccordés en une parcelle labourée, papillons, ombre
   d'oiseau, blé mûr qui ondule, fumée des cheminées qui travaillent, reflets du ruisseau (tout se coupe avec
   « réduire les animations »), boutons latéraux plus petits, noisette peinte sur les panneaux.
+
+---
+
+## 13. Le côté « ça pète » et les colis de Gaston (15/11 au soir, demande de Flo : gacha, envie d'y retourner)
+
+**Les effets** (plan A) : grains qui jaillissent à la récolte, compteur « ×N ! » qui grandit pendant un glissé de
+récolte (avec la note qui monte), pluie d'Éloisettes vers la bourse quand on livre une commande, confettis au passage
+de niveau et sur les colis épiques/légendaires, un cœur quand on touche un enclos, « bientôt : … » sous la barre d'XP
+(ce que le niveau suivant ouvre). Rien ne clignote ; seulement des déplacements et de la transparence.
+
+**Les colis** (plan B, `data/parcels.ts`, `farmParcels.ts`) :
+- Gaston passe toutes les **4 h** ; la boîte aux lettres garde **3 colis** au plus de ses tournées (il revient une
+  tournée après qu'elle a de la place). Chaque **niveau** et le **coffre du jour** donnent aussi un colis (ceux-là
+  rentrent toujours). Une ferme neuve, ou d'avant les colis, reçoit **un colis de bienvenue**.
+- Ouvrir : le colis tremble au toucher, puis s'ouvre dans la couleur de sa rareté. Raretés : commun 62 %, rare 28 %,
+  épique 8,5 %, légendaire 1,5 % ; **jamais 10 colis de suite sans un rare au moins** (`PITY`).
+- Contenu : commun = Éloisettes (20 + 10 × niveau) ou petits boosters ; rare = arrosoir, lot de boosters, ou une déco
+  rare (nain de jardin, bottes de foin, table à thé) ; épique = arche fleurie, balançoire, poule rousse, vache à
+  taches roses ; légendaire = fontaine dorée, poule dorée.
+- **Les trésors** (décos et animaux rares) ne s'achètent nulle part : ils remplissent l'**album** (onglet des Quêtes),
+  qui montre en silhouette ce qui manque. Un animal rare va dans l'enclos de son espèce s'il y a de la place, sinon
+  il attend dans la Boutique (onglet Animaux) ; il donne parfois un produit de plus (30 %, 50 % pour la poule dorée).
+- **Les colis ne s'achètent pas** avec les pièces du site : la ferme ne doit pas s'acheter.
+- MESURE (simulateur, graines 1 à 4, colis ouverts à chaque visite) : la durée ne bouge presque pas (niveau 15 à
+  j43-44, j28-30, j14-16) : les colis font plaisir sans raccourcir le jeu.
+
+Prochaines idées notées, non faites : récoltes dorées rares (album), cadeau de première visite du jour (calendrier
+de 7 cases qui ne se perd pas), visiteurs spéciaux, musique (Flo peut en générer avec Suno).

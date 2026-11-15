@@ -4,7 +4,7 @@ import { xpToNext } from './data/levels';
 import { person } from './data/people';
 import { faceSprite, spriteImage, uiIcon, type UiIcon } from './farmArt';
 import { deliverableCount } from './farmOrders';
-import { isChestReady, isQuestReady, objectiveProgress, openQuests } from './farmProgress';
+import { isChestReady, isQuestReady, objectiveProgress, openQuests, unlocksAt } from './farmProgress';
 import type { FarmSave } from './farmSave';
 
 // -----------------------------------------------
@@ -39,6 +39,7 @@ export class FarmHud {
   private readonly levelText = el('span');
   private readonly xpFill = el('i');
   private readonly nuts = el('b');
+  private readonly money = el('div', { class: 'farm-money farm-box', title: 'Éloisettes' }, spriteImage(uiIcon('nut'), 2, 'Éloisettes'), this.nuts);
   private readonly boosterCount = el('span', { class: 'farm-count is-neutral' });
   private readonly questFace = el('span', { class: 'farm-face' });
   private readonly questText = el('p');
@@ -57,7 +58,7 @@ export class FarmHud {
       { class: 'farm-top' },
       back,
       el('div', { class: 'farm-level farm-box' }, this.levelBadge, el('div', { class: 'farm-level-meta' }, this.levelText, el('div', { class: 'farm-xp' }, this.xpFill))),
-      el('div', { class: 'farm-money farm-box', title: 'Éloisettes' }, spriteImage(uiIcon('nut'), 2, 'Éloisettes'), this.nuts),
+      this.money,
       boosters,
     );
     this.quest = el('button', { class: 'farm-quest-pill farm-box', type: 'button' }, this.questFace, this.questText, this.questBadge);
@@ -101,6 +102,11 @@ export class FarmHud {
     this.setZoom(false);
   }
 
+  /** Where Eloisettes fall to: the purse at the top. */
+  nutsTarget(): DOMRect {
+    return this.money.getBoundingClientRect();
+  }
+
   /** Where products fly to: the barn tab. */
   barnTarget(): DOMRect {
     return this.tabs.get('barn')!.querySelector('.farm-tab-ico')!.getBoundingClientRect();
@@ -124,7 +130,9 @@ export class FarmHud {
   refresh(save: FarmSave): void {
     const next = xpToNext(save.level);
     this.levelBadge.textContent = String(save.level);
-    this.levelText.textContent = next === null ? 'Niveau maximum' : `${save.xp} / ${next} XP`;
+    // What the next level opens, so there is always something just ahead.
+    const soon = unlocksAt(save.level + 1)[0]?.split(' : ')[1];
+    this.levelText.textContent = next === null ? 'Niveau maximum' : `${save.xp} / ${next} XP${soon ? ` · bientôt : ${soon}` : ''}`;
     this.xpFill.style.transform = `scaleX(${next === null ? 1 : Math.min(1, save.xp / next)})`;
     this.nuts.textContent = save.nuts.toLocaleString('fr-FR');
     const boosters = Object.values(save.boosters).reduce((a, b) => a + b, 0);

@@ -7,13 +7,16 @@ import {
   OUTLINE,
   TILE,
   animalSprite,
+  breedSprite,
   butterflySprite,
   chimneyOf,
   cropSprite,
   fernSprite,
   fieldSprite,
   hazelSprite,
+  heartSprite,
   itemIcon,
+  mailboxSprite,
   millHub,
   millSails,
   objectSprite,
@@ -26,7 +29,8 @@ import {
   type Sprite,
 } from './farmArt';
 import { footprint, isOwned, type ParcelOffer } from './farmMap';
-import { fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
+import { breedsOf, fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
+import type { CropId } from './data/types';
 import { have } from './farmProgress';
 import type { FarmSave, PlacedObject, Rotation } from './farmSave';
 import { mulberry32 } from '../../random';
@@ -75,6 +79,31 @@ interface WildThing {
   shadow: boolean;
 }
 
+/** A short-lived speck: grains bursting from a harvest, or a heart above a petted animal. */
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** Milliseconds left, and at the start. */
+  life: number;
+  max: number;
+  color: string;
+  sprite?: Sprite;
+}
+
+/** The grains that fly off each crop when it is picked. */
+const CROP_COLOURS: Record<CropId, string[]> = {
+  wheat: ['#f2c94c', '#fbe38a', '#d9a339'],
+  corn: ['#f5d342', '#fff1a0', '#7cc456'],
+  carrot: ['#f08a4b', '#ffb27c', '#7cc456'],
+  tomato: ['#e0475b', '#ff8a96', '#7cc456'],
+  strawberry: ['#e0475b', '#ffd0d8', '#7cc456'],
+  sunflower: ['#f5c518', '#8a5a2b', '#7cc456'],
+  pumpkin: ['#f08a3c', '#ffb066', '#7cc456'],
+  cotton: ['#ffffff', '#f3eee4', '#9ccc65'],
+};
+
 interface Butterfly {
   x: number;
   y: number;
@@ -116,6 +145,7 @@ export class FarmScene {
   private signs: { parcel: number; x: number; y: number }[] = [];
   private readonly actors = new Map<number, Actor[]>();
   private readonly butterflies: Butterfly[] = [];
+  private particles: Particle[] = [];
   private cam = { x: 0, y: 0 };
   private zoom = 0;
   private dpr = 1;
@@ -296,6 +326,7 @@ export class FarmScene {
     if (this.width > 0) {
       this.walk(dt);
       this.flutter(dt);
+      this.updateParticles(dt);
       this.draw(now);
       this.onFrame?.();
     }
@@ -308,6 +339,7 @@ export class FarmScene {
       return state === 'empty' ? soilTile() : cropSprite(o.crop!, state, 0);
     }
     if (o.type === 'hazel') return hazelSprite(readyOn(o, Date.now()) !== null);
+    if (o.type === 'mailbox') return mailboxSprite(this.save.mail.waiting > 0, o.rot % 2 === 1 ? 'profile' : 'face');
     void now;
     return objectSprite(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
   }
@@ -408,6 +440,7 @@ export class FarmScene {
     list.sort((a, b) => a.base - b.base);
     for (const d of list) d.draw();
     this.drawButterflies(now);
+    this.drawParticles();
 
     // On top of everything: what is ready, and the ripe fields' sparkles.
     if (!this.editMode) {
@@ -618,6 +651,21 @@ export class FarmScene {
       ctx.fillRect(x - 1, y, 3, 1);
       return;
     }
+    if (o.type === 'mailbox') {
+      if (this.reduced || this.save.mail.waiting === 0) return;
+      const sprite = this.spriteOf(o, now);
+      const at = this.origin(o, sprite);
+      for (let i = 0; i < 3; i++) {
+        const phase = (now / 700 + i / 3) % 1;
+        if (phase > 0.45) continue;
+        const x = at.x + ((i * 7 + 3) % sprite.width);
+        const y = at.y + 2 + ((i * 5) % 8) - Math.round(phase * 6);
+        ctx.fillStyle = i === 1 ? '#ffe07a' : '#fffbe0';
+        ctx.fillRect(x, y - 1, 1, 3);
+        ctx.fillRect(x - 1, y, 3, 1);
+      }
+      return;
+    }
     const ready = readyOn(o, clock);
     let icon: Sprite | null = null;
     let alpha = 1;
@@ -677,10 +725,71 @@ export class FarmScene {
   /** Animals stand in the yard, so they are drawn right after their pen, front ones last. */
   private queueAnimals(pen: PlacedObject, list: { base: number; draw: () => void }[], penBase: number): void {
     const id = penAnimal(pen).id;
-    for (const a of this.actorsOf(pen)) {
-      const sprite = animalSprite(id, a.peck > 0 ? 1 : 0);
+    const breeds = breedsOf(pen);
+    this.actorsOf(pen).forEach((a, i) => {
+      const frame = a.peck > 0 ? 1 : 0;
+      const rare = breeds[i];
+      const sprite = rare ? breedSprite(rare, frame) : animalSprite(id, frame);
       list.push({ base: penBase + 0.01 + a.y / 10000, draw: () => this.stamp(sprite, Math.round(a.x), Math.round(a.y), a.face < 0) });
+    });
+  }
+
+  // -----------------------------------------------
+  // PARTICLES
+  // -----------------------------------------------
+
+  /** Grains bursting out of a field that was just picked. */
+  burstCrop(field: { x: number; y: number }, crop: CropId): void {
+    if (this.reduced) return;
+    const colours = CROP_COLOURS[crop];
+    for (let i = 0; i < 10; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+      const speed = 0.04 + Math.random() * 0.05;
+      const life = 450 + Math.random() * 300;
+      this.particles.push({
+        x: field.x * TILE + 4 + Math.random() * 8,
+        y: field.y * TILE + 6 + Math.random() * 4,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life,
+        max: life,
+        color: colours[i % colours.length],
+      });
     }
+  }
+
+  /** A heart above one animal of the pen. */
+  cheer(pen: PlacedObject): void {
+    const actors = this.actorsOf(pen);
+    const a = actors[Math.floor(Math.random() * actors.length)];
+    if (!a) return;
+    this.particles.push({ x: a.x + 1, y: a.y - 6, vx: 0, vy: -0.012, life: 1000, max: 1000, color: '', sprite: heartSprite() });
+    a.peck = 0;
+    a.wait = 900;
+  }
+
+  private updateParticles(dt: number): void {
+    if (this.particles.length === 0) return;
+    for (const p of this.particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (!p.sprite) p.vy += 0.00018 * dt;
+    }
+    this.particles = this.particles.filter((p) => p.life > 0);
+  }
+
+  private drawParticles(): void {
+    const ctx = this.ctx;
+    for (const p of this.particles) {
+      ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
+      if (p.sprite) ctx.drawImage(p.sprite, Math.round(p.x), Math.round(p.y));
+      else {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   private walk(dt: number): void {

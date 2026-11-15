@@ -255,6 +255,10 @@
   opacity: 1;
 }
 
+.farm-side-menu[hidden] {
+  display: none;
+}
+
 .farm-side-menu {
   display: grid;
   gap: 2px;
@@ -1213,5 +1217,162 @@
   }
   .farm-fly {
     transition: none;
+  }
+}
+
+/* ----------------------------------------------- */
+/* JUICE: the swipe combo and the confetti          */
+/* ----------------------------------------------- */
+
+.farm-combo {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font: 700 20px/1 var(--ui-font);
+  color: #ffe07a;
+  text-shadow: 0 2px 0 #4a3135, 0 -1px 0 #4a3135, 1px 0 0 #4a3135, -1px 0 0 #4a3135;
+  pointer-events: none !important;
+  z-index: 6;
+  animation: farm-combo 0.9s ease-out forwards;
+}
+
+.farm-combo.is-big {
+  font-size: 26px;
+  color: #ffb3d1;
+}
+
+@keyframes farm-combo {
+  from { opacity: 0; scale: 0.4; }
+  15% { opacity: 1; scale: 1.25; }
+  30% { scale: 1; }
+  to { opacity: 0; translate: 0 -22px; }
+}
+
+.farm-confetti {
+  position: absolute;
+  top: -8px;
+  width: 7px;
+  height: 10px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: farm-confetti 1.6s ease-in forwards;
+}
+
+@keyframes farm-confetti {
+  from { transform: translate(0, 0) rotate(0); opacity: 1; }
+  to { transform: translate(var(--drift), 420px) rotate(var(--spin)); opacity: 0; }
+}
+
+.farm-dialog-box {
+  position: relative;
+  overflow: hidden;
+}
+
+/* ----------------------------------------------- */
+/* GASTON'S PARCELS                                */
+/* ----------------------------------------------- */
+
+.farm-parcel {
+  --rarity: #7cb342;
+}
+
+.farm-parcel.is-rare { --rarity: #4a90d9; }
+.farm-parcel.is-epic { --rarity: #9b59d0; }
+.farm-parcel.is-legendary { --rarity: #f2b632; }
+
+.farm-parcel-stage {
+  border: 0;
+  background: none;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.farm-parcel-stage.is-shaking {
+  animation: farm-shake 0.75s ease-in-out;
+}
+
+@keyframes farm-shake {
+  0%, 100% { transform: rotate(0) scale(1); }
+  15% { transform: rotate(-8deg) scale(1.05); }
+  30% { transform: rotate(8deg) scale(1.08); }
+  45% { transform: rotate(-10deg) scale(1.1); }
+  60% { transform: rotate(10deg) scale(1.14); }
+  80% { transform: rotate(-4deg) scale(1.2); }
+}
+
+.farm-parcel-prize {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 130px;
+  min-width: 180px;
+}
+
+.farm-parcel-prize img {
+  position: relative;
+  animation: farm-prize 0.45s cubic-bezier(0.3, 1.6, 0.6, 1);
+}
+
+@keyframes farm-prize {
+  from { transform: scale(0.2); opacity: 0; }
+}
+
+/* A burst of light in the rarity's colour behind the prize (still: nothing blinks). */
+.farm-rays {
+  position: absolute;
+  inset: -20px -40px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--rarity) 55%, white) 0 18%, transparent 62%),
+    repeating-conic-gradient(color-mix(in srgb, var(--rarity) 35%, transparent) 0 10deg, transparent 10deg 24deg);
+  mask-image: radial-gradient(circle, black 30%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle, black 30%, transparent 70%);
+  animation: farm-prize 0.5s ease-out;
+}
+
+.farm-rarity {
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: var(--rarity);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  border: 2px solid var(--ui-border);
+}
+
+.farm-new {
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: #fff3c4;
+  color: #8a6400;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* The album: treasures found in colour, the others as silhouettes */
+.farm-treasure {
+  cursor: default;
+}
+
+.farm-treasure.is-rare { border-color: #4a90d9; }
+.farm-treasure.is-epic { border-color: #9b59d0; }
+.farm-treasure.is-legendary { border-color: #f2b632; background: #fff8dc; }
+
+.farm-treasure.is-missing img {
+  filter: brightness(0) opacity(0.22);
+}
+
+.farm-rarity-tag {
+  font-size: 10.5px;
+  color: var(--ui-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .farm-combo,
+  .farm-parcel-stage.is-shaking,
+  .farm-parcel-prize img,
+  .farm-rays {
+    animation: none;
   }
 }

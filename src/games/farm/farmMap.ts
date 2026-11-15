@@ -21,7 +21,7 @@ import {
 import { STARTING_NUTS } from './data/levels';
 import type { BoosterId, DecorId, ObstacleId, PlaceableId } from './data/types';
 import { MINUTE_MS } from './farmTime';
-import { FARM_VERSION, type FarmSave, type PlacedObject, type Rotation } from './farmSave';
+import { FARM_VERSION, newMail, type FarmSave, type PlacedObject, type Rotation } from './farmSave';
 import { earn, emit, gainXp, isUnlocked, noBoosters, ownCount, spend } from './farmProgress';
 
 // -----------------------------------------------
@@ -125,7 +125,10 @@ export function buyAndPlace(save: FarmSave, id: PlaceableId, x: number, y: numbe
 function newObject(save: FarmSave, id: PlaceableId, x: number, y: number, rot: Rotation, now: number): PlacedObject {
   const p = placeable(id);
   const object: PlacedObject = { uid: save.nextUid++, type: id, x, y, rot };
-  if (p.kind === 'pen') object.animals = [];
+  if (p.kind === 'pen') {
+    object.animals = [];
+    object.breeds = [];
+  }
   if (p.kind === 'machine') {
     object.queue = [];
     object.slots = STARTING_QUEUE;
@@ -145,6 +148,7 @@ export function moveObject(save: FarmSave, object: PlacedObject, x: number, y: n
   return true;
 }
 
+/** Obstacles are cleared, not moved; everything else moves, the mailbox included. */
 export function canMove(object: PlacedObject): boolean {
   return placeable(object.type).kind !== 'obstacle';
 }
@@ -295,6 +299,9 @@ export function newFarm(now: number): FarmSave {
     medals: {},
     lastSeed: 'wheat',
     lastVisit: now,
+    mail: newMail(now),
+    album: [],
+    waitingBreeds: [],
   };
   const fieldsAt: [number, number][] = [[10, 10], [11, 10], [12, 10], [10, 11], [11, 11], [12, 11]];
   for (const [x, y] of fieldsAt) {
@@ -302,10 +309,21 @@ export function newFarm(now: number): FarmSave {
     field.crop = 'wheat';
     field.readyAt = now;
   }
+  newObject(save, 'mailbox', MAILBOX_AT[0], MAILBOX_AT[1], 0, now);
   // The middle stays clear for the first buildings; the wild fills the rest.
   const middle = (x: number, y: number) => x >= 8 && x <= 15 && y >= 8 && y <= 14;
   scatterObstacles(save, STARTING_PARCELS, STARTING_OBSTACLES, 77, middle);
   return save;
+}
+
+/** Where a new farm's mailbox stands, by the fields. */
+const MAILBOX_AT: [number, number] = [9, 9];
+
+/** Farms from before the parcels get their mailbox near the middle, on the first free tile. */
+export function ensureMailbox(save: FarmSave): void {
+  if (save.objects.some((o) => o.type === 'mailbox')) return;
+  const spot = freeSpotNear(save, MAILBOX_AT[0] + 0.5, MAILBOX_AT[1] + 0.5, 1, 1);
+  if (spot) newObject(save, 'mailbox', spot[0], spot[1], 0, 0);
 }
 
 /** Room left in a pen. */

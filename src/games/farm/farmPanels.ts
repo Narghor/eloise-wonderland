@@ -1,5 +1,7 @@
 import { el } from '../../dom';
-import { ANIMALS, PEN_CAPACITY } from './data/animals';
+import { ANIMALS, PEN_CAPACITY, animal } from './data/animals';
+import { BREED_IDS, PITY, TREASURES, breed, rarityName } from './data/parcels';
+import { placeableBreeds } from './farmParcels';
 import { BOOSTERS, booster } from './data/boosters';
 import { CROPS, crop } from './data/crops';
 import { DAILY_TASKS, dailyChestReward, dailyTaskReward } from './data/daily';
@@ -10,8 +12,8 @@ import { PROJECTS } from './data/projects';
 import { QUESTS } from './data/quests';
 import { obstacle } from './data/land';
 import { person } from './data/people';
-import type { BoosterId, CropId, DecorId, ItemId, ObstacleId, PlaceableId, Reward } from './data/types';
-import { animalSprite, boosterIcon, faceSprite, fieldSprite, hazelSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
+import type { BoosterId, BreedId, CropId, DecorId, ItemId, ObstacleId, PlaceableId, Reward } from './data/types';
+import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, hazelSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
 import type { SheetId } from './farmHud';
 import { buyRefusal, capOf, parcelOffers, priceOf, type ParcelOffer } from './farmMap';
 import { canDeliver } from './farmOrders';
@@ -79,6 +81,7 @@ export interface FarmUi {
   finishStage(): void;
   sell(itemId: ItemId, count: number): void;
   buyBooster(id: BoosterId): void;
+  placeBreed(id: BreedId): void;
   /** Sheets remember a chosen item (the barn) between refreshes. */
   sheetState: { barnItem: ItemId | null };
 }
@@ -114,6 +117,7 @@ export function rewardLine(reward: Reward): HTMLElement[] {
   if (reward.xp) parts.push(el('span', {}, img(uiIcon('star')), `${reward.xp} XP`));
   for (const [id, n] of Object.entries(reward.boosters ?? {})) parts.push(el('span', {}, img(boosterIcon(id as BoosterId)), `${n} ${(n ?? 0) > 1 ? booster(id as BoosterId).plural : booster(id as BoosterId).name}`));
   for (const [id, n] of Object.entries(reward.decor ?? {})) parts.push(el('span', {}, `${n} × ${placeable(id as DecorId).name}`));
+  if (reward.parcels) parts.push(el('span', {}, img(parcelSprite(null), 1), reward.parcels > 1 ? `${reward.parcels} colis` : '1 colis'));
   return parts;
 }
 
@@ -268,6 +272,16 @@ export function obstacleBubble(ui: FarmUi, object: PlacedObject): Node[] {
   ];
 }
 
+export function mailboxBubble(ui: FarmUi): Node[] {
+  const mail = ui.save.mail;
+  return [
+    el('h3', {}, img(parcelSprite(null), 2), 'La boîte aux lettres'),
+    el('p', { text: `Gaston repasse à ${clockAt(mail.nextAt, ui.now())} avec un colis. Les niveaux et le coffre du jour en donnent aussi.` }),
+    el('p', { text: `${mail.opened} colis ouvert${mail.opened > 1 ? 's' : ''} · ${ui.save.album.length} / ${TREASURES.length} trésors dans l’album.` }),
+    button(['Voir l’album'], () => ui.openSheet('quests', 'album'), { ghost: true, wide: true }),
+  ];
+}
+
 export function decoBubble(object: PlacedObject): Node[] {
   return [el('h3', { text: placeable(object.type).name }), el('p', { text: 'Pour la déplacer, la tourner ou la ranger : « Aménager », en bas.' })];
 }
@@ -306,9 +320,9 @@ export function sheetContent(ui: FarmUi, id: SheetId, tab?: string): SheetConten
     const storyNews = openQuests(ui.save).some((q) => isQuestReady(ui.save, q));
     return {
       title: 'Quêtes',
-      tabs: [['story', 'Histoire', storyNews], ['daily', 'Tâches du jour', isChestReady(ui.save)], ['project', 'Grand projet'], ['medals', 'Médailles']],
+      tabs: [['story', 'Histoire', storyNews], ['daily', 'Tâches du jour', isChestReady(ui.save)], ['album', 'Album'], ['project', 'Grand projet'], ['medals', 'Médailles']],
       tab: t,
-      body: t === 'daily' ? dailySheet(ui) : t === 'project' ? projectSheet(ui) : t === 'medals' ? medalsSheet(ui) : storySheet(ui),
+      body: t === 'album' ? albumSheet(ui) : t === 'daily' ? dailySheet(ui) : t === 'project' ? projectSheet(ui) : t === 'medals' ? medalsSheet(ui) : storySheet(ui),
     };
   }
   const t = tab ?? 'buildings';
@@ -487,6 +501,28 @@ function projectSheet(ui: FarmUi): Node[] {
   });
 }
 
+/** Every treasure of the parcels: found ones in colour, the others as a dark silhouette to chase. */
+function albumSheet(ui: FarmUi): Node[] {
+  const cards = TREASURES.map((t) => {
+    const found = ui.save.album.includes(t.id);
+    const isBreed = (BREED_IDS as readonly string[]).includes(t.id);
+    const sprite = isBreed ? breedSprite(t.id as BreedId, 0) : objectSprite(t.id as DecorId, 'face');
+    const scale = Math.max(1, Math.min(isBreed ? 4 : 3, Math.floor(56 / sprite.height)));
+    const name = isBreed ? breed(t.id as BreedId).name : placeable(t.id as DecorId).name;
+    return el(
+      'div',
+      { class: `farm-item farm-treasure is-${t.rarity}${found ? '' : ' is-missing'}` },
+      el('div', { class: 'farm-art' }, img(sprite, scale)),
+      el('span', { text: found ? name : '???' }),
+      el('small', { class: 'farm-rarity-tag', text: rarityName(t.rarity) }),
+    );
+  });
+  return [
+    el('p', { class: 'farm-note', text: `${ui.save.album.length} / ${TREASURES.length} trésors trouvés. Ils sortent des colis de Gaston : un rare au moins tous les ${PITY} colis.` }),
+    el('div', { class: 'farm-items' }, ...cards),
+  ];
+}
+
 function medalsSheet(ui: FarmUi): Node[] {
   const save = ui.save;
   return MEDALS.map((m) => {
@@ -562,11 +598,26 @@ function animalsShop(ui: FarmUi): Node[] {
     });
     return card;
   });
-  return [el('div', { class: 'farm-shop' }, ...cards), el('p', { class: 'farm-note', text: 'Un nouvel animal arrive affamé : nourris-le d’un tap sur son enclos.' })];
+  const waiting = [...new Set(ui.save.waitingBreeds)].map((id) => {
+    const count = ui.save.waitingBreeds.filter((b) => b === id).length;
+    const ready = placeableBreeds(ui.save).includes(id);
+    return el(
+      'div',
+      { class: 'farm-card is-ready' },
+      el('div', { class: 'farm-who' }, img(breedSprite(id, 0), 3), el('span', {}, `${breed(id).name}${count > 1 ? ` × ${count}` : ''}`, el('small', { text: ready ? 'Elle t’attend : il y a de la place.' : `Il faut de la place : ${placeable(animal(breed(id).animal).pen).name}.` }))),
+      button(['L’installer'], () => ui.placeBreed(id), { disabled: !ready, wide: true }),
+    );
+  });
+  return [
+    ...(waiting.length > 0 ? [el('p', { class: 'farm-subtitle', text: 'Trouvées dans les colis' }), ...waiting] : []),
+    el('div', { class: 'farm-shop' }, ...cards),
+    el('p', { class: 'farm-note', text: 'Un nouvel animal arrive affamé : nourris-le d’un tap sur son enclos.' }),
+  ];
 }
 
 function decorShop(ui: FarmUi): Node[] {
-  const list = PLACEABLES.filter((p) => p.kind === 'deco');
+  // Treasures show only while one is stored, ready to be placed again.
+  const list = PLACEABLES.filter((p) => p.kind === 'deco' && (!p.treasure || (ui.save.decorStore[p.id as DecorId] ?? 0) > 0));
   return [
     el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id)))),
     el('p', { class: 'farm-note', text: 'Les décos se posent où tu veux, se tournent et se rangent dans « Aménager ».' }),

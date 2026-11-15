@@ -16,7 +16,7 @@ export function xpToNext(level: number): number | null {
 
 /** What reaching a level gives, on top of what it opens. */
 export function levelReward(level: number): Reward {
-  return { nuts: 15 * level, boosters: { fertilizer: 1, ...(level % 2 === 0 ? { hourglass: 1 } : {}) } };
+  return { nuts: 15 * level, parcels: 1, boosters: { fertilizer: 1, ...(level % 2 === 0 ? { hourglass: 1 } : {}) } };
 }
 
 /** Order board places at a level. */

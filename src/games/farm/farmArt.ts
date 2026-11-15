@@ -1,4 +1,4 @@
-import type { AnimalId, BoosterId, CropId, ItemId, PersonId, PlaceableId } from './data/types';
+import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity } from './data/types';
 import { BRIDGE_TILES, MAP_SIZE, isWater } from './data/land';
 import { mulberry32 } from '../../random';
 
@@ -1217,6 +1217,408 @@ function bigRock(): Sprite {
 }
 
 // -----------------------------------------------
+// TREASURES: the decorations only Gaston's parcels bring
+// -----------------------------------------------
+// The rewards people chase: richer colours, and a touch of gold and sparkle on the epic and legendary ones.
+
+const ROSE = '#f06a96';
+const ROSE_DARK = '#c94a76';
+const ROSE_LIGHT = '#ffb3cc';
+const SPARKLE = '#fff6c8';
+
+/** A small four-point twinkle. */
+function twinkle(P: Painter, x: number, y: number): void {
+  P.px(x, y, SPARKLE);
+  P.px(x - 1, y, '#ffe9a0');
+  P.px(x + 1, y, '#ffe9a0');
+  P.px(x, y - 1, '#ffe9a0');
+  P.px(x, y + 1, '#ffe9a0');
+}
+
+function gnome(view: View): Sprite {
+  return sprite(13, 20, (P) => {
+    const red = C.red;
+    const redDark = '#b4353f';
+    const redLight = '#ff7a8a';
+    const lean = view === 'profile' ? 1 : 0;
+    // The pointed hat, its tip leaning forward in profile.
+    P.px(6 + 2 * lean, 0, redLight);
+    P.rect(5 + lean, 1, 2, 1, red);
+    P.rect(5 + lean, 2, 3, 1, red);
+    P.rect(4, 3, 4 + lean, 1, red);
+    P.rect(4, 4, 5, 1, red);
+    P.rect(3, 5, 6, 1, red);
+    P.rect(2, 6, 8, 1, red);
+    P.rect(2, 7, 8, 1, redDark);
+    P.px(5 + lean, 2, redLight);
+    P.px(4, 4, redLight);
+    P.px(3, 5, redLight);
+    // Blue coat, belt, boots.
+    P.rect(2, 12, 8, 5, C.blue);
+    P.rect(2, 12, 1, 5, C.blueDark);
+    P.rect(2, 16, 8, 1, C.woodDark);
+    P.px(6, 16, C.gold);
+    P.rect(3, 17, 2, 2, C.bark);
+    P.rect(7, 17, 2, 2, C.bark);
+    P.rect(3, 19, 2, 1, C.barkDark);
+    P.rect(7, 19, 2, 1, C.barkDark);
+    // Face and the big white beard.
+    P.rect(3, 8, 6, 2, SKIN);
+    if (view === 'face') {
+      P.px(4, 8, OUTLINE);
+      P.px(7, 8, OUTLINE);
+      P.px(5, 9, '#f29aa6');
+      P.px(6, 9, '#f29aa6');
+    } else {
+      P.px(7, 8, OUTLINE);
+      P.rect(9, 8, 1, 2, '#f29aa6');
+    }
+    P.rect(2, 10, 8, 3, C.white);
+    P.rect(3, 13, 6, 1, C.white);
+    P.rect(4, 14, 4, 1, '#e8e0d2');
+    P.px(3, 11, '#e8e0d2');
+    // A little flower held in the hand.
+    P.line(10, 13, 11, 11, C.leafDark);
+    P.px(12, 10, ROSE);
+    P.px(11, 10, ROSE_LIGHT);
+    P.px(12, 11, ROSE);
+    P.px(10, 12, SKIN);
+  });
+}
+
+function hayBales(view: View): Sprite {
+  const bale = (P: Painter, cx: number, cy: number, r: number) => {
+    P.disc(cx, cy, r, C.strawDark);
+    P.disc(cx, cy, r - 1, C.straw);
+    P.disc(cx - 1, cy - 1, r - 3, C.strawLight);
+    P.disc(cx, cy, Math.max(1, r - 4), C.strawDark);
+    P.px(cx, cy, C.straw);
+    P.rect(cx - r + 1, cy + r - 1, 2 * r - 1, 1, '#bfa060');
+  };
+  if (view === 'face') {
+    return sprite(29, 17, (P) => {
+      bale(P, 7, 10, 6);
+      bale(P, 21, 10, 6);
+      bale(P, 14, 6, 6);
+      P.px(3, 3, C.strawLight);
+      P.px(26, 4, C.strawLight);
+    });
+  }
+  // Seen from the side, round bales are rolls lying on top of each other.
+  return sprite(13, 28, (P) => {
+    const roll = (y: number, h: number) => {
+      P.rect(1, y, 11, h, C.straw);
+      P.rect(1, y, 11, 2, C.strawLight);
+      P.rect(1, y + h - 2, 11, 2, C.strawDark);
+      for (let x = 3; x < 12; x += 3) P.rect(x, y + 2, 1, h - 4, C.strawDark);
+      P.rect(0, y + 1, 1, h - 2, C.strawDark);
+      P.rect(12, y + 1, 1, h - 2, C.strawDark);
+    };
+    roll(16, 12);
+    roll(3, 12);
+  });
+}
+
+function teaTable(): Sprite {
+  return sprite(14, 19, (P) => {
+    // Long wooden legs, then a flat round top under a short pink cloth: a table, not a cake.
+    P.rect(2, 11, 2, 8, C.woodDark);
+    P.rect(10, 11, 2, 8, C.woodDark);
+    P.rect(2, 11, 1, 8, C.wood);
+    P.rect(10, 11, 1, 8, C.wood);
+    P.rect(3, 15, 8, 1, C.woodDark);
+    P.ellipse(7, 9, 6, 2, '#f7a8c4');
+    P.rect(1, 9, 13, 2, '#f48fb1');
+    P.ellipse(7, 8, 4, 1, '#ffd0e0');
+    for (let x = 1; x < 14; x += 3) P.px(x, 11, '#e0709a');
+    // A white teapot with its spout, handle and blue lid, and a cup on its saucer.
+    P.disc(5, 5, 3, C.white);
+    P.rect(3, 7, 5, 1, '#e8e0d2');
+    P.rect(4, 2, 3, 1, C.blue);
+    P.px(5, 1, C.blueDark);
+    P.rect(3, 5, 5, 1, C.blueLight);
+    P.line(8, 5, 10, 3, C.white);
+    P.px(10, 2, C.white);
+    P.rect(1, 4, 1, 3, C.white);
+    P.px(4, 4, '#ffffff');
+    P.rect(10, 6, 3, 2, C.white);
+    P.px(13, 6, C.white);
+    P.rect(9, 8, 5, 1, '#bfe0f5');
+    P.rect(10, 6, 3, 1, '#b07a52');
+  });
+}
+
+function flowerArch(view: View): Sprite {
+  const rose = (P: Painter, x: number, y: number) => {
+    P.rect(x, y, 2, 2, ROSE);
+    P.px(x, y, ROSE_LIGHT);
+    P.px(x + 1, y + 1, ROSE_DARK);
+  };
+  if (view === 'face') {
+    return sprite(30, 30, (P) => {
+      P.rect(1, 12, 3, 18, C.wood);
+      P.rect(26, 12, 3, 18, C.wood);
+      P.rect(1, 12, 1, 18, C.woodLight);
+      P.rect(28, 12, 1, 18, C.woodDark);
+      // The arch: two pixels thick, a half ellipse over the path.
+      for (let x = 1; x <= 28; x++) {
+        const t = (x - 14.5) / 13.5;
+        const y = Math.round(12 - Math.sqrt(Math.max(0, 1 - t * t)) * 10);
+        P.rect(x, y, 1, 3, C.wood);
+        P.px(x, y, C.woodLight);
+      }
+      // Leaves and roses climbing all over it.
+      for (let x = 2; x <= 27; x += 3) {
+        const t = (x - 14.5) / 13.5;
+        const y = Math.round(12 - Math.sqrt(Math.max(0, 1 - t * t)) * 10);
+        P.disc(x, y + 1, 2, C.leafDark);
+        P.px(x - 1, y, C.leaf);
+        P.px(x + 1, y + 1, C.leafLight);
+      }
+      for (const y of [16, 21, 26]) {
+        P.disc(2, y, 2, C.leafDark);
+        P.disc(27, y + 2, 2, C.leafDark);
+        P.px(1, y - 1, C.leaf);
+        P.px(28, y + 1, C.leaf);
+      }
+      for (const [x, y] of [[3, 7], [8, 3], [14, 1], [20, 3], [25, 7], [1, 14], [27, 18], [2, 22], [26, 24], [11, 2], [17, 1]] as const) rose(P, x, y);
+      twinkle(P, 14, 6);
+    });
+  }
+  return sprite(14, 30, (P) => {
+    P.rect(5, 6, 3, 24, C.wood);
+    P.rect(5, 6, 1, 24, C.woodLight);
+    P.rect(3, 4, 7, 3, C.wood);
+    P.disc(6, 4, 4, C.leafDark);
+    P.disc(5, 3, 2, C.leaf);
+    for (const y of [11, 16, 21, 26]) {
+      P.disc(y % 2 ? 4 : 9, y, 2, C.leafDark);
+      P.px(y % 2 ? 3 : 10, y - 1, C.leaf);
+    }
+    for (const [x, y] of [[3, 1], [8, 2], [9, 6], [2, 10], [9, 15], [2, 20], [9, 24]] as const) rose(P, x, y);
+  });
+}
+
+function swing(view: View): Sprite {
+  const garland = (P: Painter, x0: number, x1: number, y: number) => {
+    const colours = [ROSE, C.gold, C.white, '#b9a2ff'];
+    for (let x = x0, i = 0; x <= x1; x += 3, i++) {
+      P.px(x, y + 1, C.leaf);
+      P.px(x + 1, y, colours[i % colours.length]);
+    }
+  };
+  const meadow = (P: Painter, w: number) => {
+    for (let x = 1; x < w - 1; x += 2) P.px(x, 39, x % 4 ? C.leaf : C.leafLight);
+    for (const [x, c] of [[4, ROSE], [9, C.gold], [w - 6, C.white], [w - 3, ROSE]] as const) {
+      P.px(x, 38, c);
+      P.px(x, 39, C.leafDark);
+    }
+  };
+  if (view === 'face') {
+    return sprite(30, 40, (P) => {
+      // A slim post on each side with a little brace, and a beam on top: light, not a wall.
+      for (const x of [2, 26]) {
+        P.rect(x, 3, 2, 37, C.wood);
+        P.rect(x, 3, 1, 37, C.woodLight);
+        P.rect(x + 1, 3, 1, 37, C.woodDark);
+      }
+      P.line(4, 7, 7, 4, C.woodDark);
+      P.line(25, 7, 22, 4, C.woodDark);
+      // A rose vine climbing the left post.
+      for (let y = 12; y < 38; y += 5) {
+        P.px(1, y, C.leaf);
+        P.px(4, y + 2, C.leafDark);
+        P.px(1, y + 1, ROSE);
+      }
+      P.rect(0, 1, 30, 3, C.wood);
+      P.rect(0, 1, 30, 1, C.woodLight);
+      P.rect(0, 3, 30, 1, C.woodDark);
+      garland(P, 2, 27, 4);
+      // Ropes, the seat and its pink cushion.
+      P.line(10, 5, 10, 27, '#d8c9a8');
+      P.line(19, 5, 19, 27, '#d8c9a8');
+      P.rect(8, 27, 14, 3, C.woodLight);
+      P.rect(8, 29, 14, 1, C.woodDark);
+      P.rect(9, 25, 12, 2, '#f48fb1');
+      P.rect(10, 25, 4, 1, '#ffc0d6');
+      meadow(P, 30);
+    });
+  }
+  return sprite(30, 40, (P) => {
+    P.line(15, 2, 4, 39, C.woodDark);
+    P.line(16, 2, 5, 39, C.wood);
+    P.line(15, 2, 25, 39, C.woodDark);
+    P.line(16, 2, 26, 39, C.wood);
+    P.rect(12, 1, 7, 3, C.wood);
+    P.rect(12, 1, 7, 1, C.woodLight);
+    garland(P, 12, 18, 4);
+    P.line(15, 4, 15, 27, '#d8c9a8');
+    P.rect(13, 27, 5, 3, C.woodLight);
+    P.rect(13, 25, 5, 2, '#f48fb1');
+    meadow(P, 30);
+  });
+}
+
+/** The legendary one: stone and gold, water falling from a golden bowl, a golden bird on top. */
+function fountain(): Sprite {
+  return sprite(30, 40, (P) => {
+    // The basin: its wall, a gold band, the rim and the water.
+    P.rect(1, 30, 28, 8, C.stone);
+    P.rect(1, 37, 28, 1, C.stoneDark);
+    for (let y = 32; y < 37; y += 2) for (let x = 2 + (y % 4 === 0 ? 3 : 0); x < 28; x += 6) P.rect(x, y, 3, 1, C.stoneDark);
+    P.rect(1, 31, 28, 1, C.gold);
+    P.ellipse(15, 30, 14, 4, C.stoneDark);
+    P.ellipse(15, 29, 14, 4, C.stone);
+    P.ellipse(15, 29, 12, 3, C.waterDark);
+    P.ellipse(15, 29, 11, 2, C.water);
+    P.rect(6, 28, 4, 1, C.waterLight);
+    P.rect(19, 30, 3, 1, C.waterLight);
+    for (let x = 3; x < 28; x += 4) P.px(x, 26 + (x % 8 === 3 ? 1 : 0), C.goldLight);
+    // The pillar.
+    P.rect(13, 15, 5, 14, C.stone);
+    P.rect(13, 15, 1, 14, '#fffaf2');
+    P.rect(17, 15, 1, 14, C.stoneDark);
+    P.rect(12, 26, 7, 2, C.stoneDark);
+    P.rect(12, 18, 7, 1, C.gold);
+    // The golden bowl and its water falling into the basin.
+    P.ellipse(15, 14, 7, 2, C.goldDark);
+    P.ellipse(15, 13, 7, 2, C.gold);
+    P.ellipse(15, 13, 5, 1, C.water);
+    P.px(12, 13, C.waterLight);
+    for (let i = 0; i < 12; i++) {
+      const col = i % 3 === 0 ? '#ffffff' : C.waterLight;
+      P.px(7 - Math.floor(i / 3), 15 + i, col);
+      P.px(23 + Math.floor(i / 3), 15 + i, col);
+    }
+    // A golden bird on top.
+    P.ellipse(15, 9, 3, 2, C.gold);
+    P.ellipse(14, 8, 1, 1, C.goldLight);
+    P.disc(18, 6, 1, C.gold);
+    P.px(18, 5, C.goldLight);
+    P.px(20, 6, C.orange);
+    P.px(18, 6, OUTLINE);
+    P.rect(11, 8, 2, 1, C.goldDark);
+    P.px(10, 7, C.goldDark);
+    P.rect(14, 11, 2, 1, C.goldDark);
+    // Sparkles all around: this is the jackpot.
+    twinkle(P, 3, 6);
+    twinkle(P, 26, 3);
+    twinkle(P, 25, 19);
+    twinkle(P, 5, 21);
+    P.px(9, 2, SPARKLE);
+    P.px(22, 11, SPARKLE);
+  });
+}
+
+// -----------------------------------------------
+// GASTON'S MAILBOX
+// -----------------------------------------------
+
+function mailbox(view: View, hasMail: boolean): Sprite {
+  return sprite(14, 22, (P) => {
+    // The post.
+    P.rect(5, 10, 3, 12, C.wood);
+    P.rect(5, 10, 1, 12, C.woodLight);
+    P.rect(7, 10, 1, 12, C.woodDark);
+    P.rect(3, 20, 7, 2, C.leaf);
+    P.px(2, 21, C.leafDark);
+    P.px(10, 21, C.leafLight);
+    if (view === 'face') {
+      // The box seen from the front: a rounded door.
+      P.rect(1, 5, 11, 6, C.blue);
+      P.ellipse(6, 5, 5, 3, C.blue);
+      P.rect(1, 10, 11, 1, C.blueDark);
+      P.ellipse(6, 4, 3, 1, C.blueLight);
+      P.rect(2, 6, 9, 4, C.blueDark);
+      P.rect(3, 7, 7, 3, hasMail ? '#3f5a80' : C.blue);
+      if (hasMail) {
+        P.rect(3, 6, 6, 4, '#d9b27a');
+        P.rect(3, 6, 6, 1, '#e8c48e');
+        P.rect(5, 6, 1, 4, C.red);
+        P.rect(8, 6, 1, 4, '#b88a55');
+      }
+      P.px(6, 8, C.gold);
+    } else {
+      // From the side: the long box, the flag on its flank.
+      P.rect(0, 5, 12, 6, C.blue);
+      P.rect(0, 4, 11, 1, C.blueLight);
+      P.rect(0, 10, 12, 1, C.blueDark);
+      P.rect(11, 5, 1, 5, C.blueDark);
+      P.rect(1, 6, 1, 3, C.blueLight);
+      if (hasMail) {
+        P.rect(0, 4, 4, 3, '#d9b27a');
+        P.rect(1, 4, 1, 3, C.red);
+      }
+    }
+    // The flag: down along the box, or up when there is mail.
+    if (hasMail) {
+      P.rect(12, 0, 1, 7, C.greyDark);
+      P.rect(10, 0, 2, 3, C.red);
+      P.px(10, 0, '#ff7a8a');
+    } else {
+      P.rect(12, 6, 1, 3, C.greyDark);
+      P.rect(12, 8, 2, 2, C.red);
+    }
+  });
+}
+
+/** The mailbox with mail: flag up and a parcel peeking out (same size as objectSprite('mailbox', view)). */
+export function mailboxSprite(hasMail: boolean, view: View): Sprite {
+  return cached(`mailbox-${hasMail}-${view}`, () => mailbox(view, hasMail));
+}
+
+const RIBBONS: Record<Rarity, [string, string, string]> = {
+  common: ['#5aa54a', '#3f7f37', '#8fd06f'],
+  rare: ['#4f8fd8', '#3a6db0', '#8ec2f2'],
+  epic: ['#9b6ad8', '#7449b0', '#c7a6f2'],
+  legendary: [C.gold, C.goldDark, C.goldLight],
+};
+
+/** A wrapped parcel, about 16x14 inside: kraft paper with string; rarity colours the ribbon and adds sparkles for epic/legendary (common green, rare blue, epic violet, legendary gold); null = plain kraft parcel. */
+export function parcelSprite(rarity: Rarity | null): Sprite {
+  return cached(`parcel-${rarity ?? 'plain'}`, () =>
+    sprite(16, 14, (P) => {
+      const paper = rarity === 'legendary' ? '#f0d58a' : '#d9b27a';
+      const paperDark = rarity === 'legendary' ? '#d6a94a' : '#b88a55';
+      const paperLight = rarity === 'legendary' ? '#fbe9b0' : '#e8c48e';
+      P.rect(0, 4, 16, 10, paper);
+      P.rect(15, 4, 1, 10, paperDark);
+      P.rect(0, 13, 16, 1, paperDark);
+      P.rect(0, 3, 16, 2, paperLight);
+      P.rect(0, 5, 16, 1, paperDark);
+      const [ribbon, dark, light] = rarity ? RIBBONS[rarity] : ['#f6e5c8', '#c9b48a', '#fffaf2'];
+      const wide = rarity ? 2 : 1;
+      P.rect(8 - (wide === 2 ? 1 : 0), 3, wide, 11, ribbon);
+      P.rect(0, 8, 16, wide, ribbon);
+      // The bow on top.
+      P.ellipse(5, 1, 2, 1, ribbon);
+      P.ellipse(11, 1, 2, 1, ribbon);
+      P.px(4, 1, light);
+      P.px(10, 1, light);
+      P.rect(7, 1, 2, 2, dark);
+      if (rarity) {
+        P.px(6, 3, dark);
+        P.px(10, 3, dark);
+      }
+      if (rarity === 'epic' || rarity === 'legendary') {
+        twinkle(P, 2, 10);
+        twinkle(P, 13, 6);
+      }
+      if (rarity === 'legendary') {
+        P.px(1, 1, SPARKLE);
+        P.px(15, 0, SPARKLE);
+        P.px(12, 11, SPARKLE);
+      }
+    }),
+  );
+}
+
+/** A small pink heart (~7x6 inside) that pops above a petted animal. */
+export function heartSprite(): Sprite {
+  return cached('heart', () => mapSprite(['.aa.aa.', 'abaaaaa', 'aaaaaaa', '.aaaaa.', '..aaa..', '...a...'], { a: '#ff6f9e', b: '#ffd0e0' }));
+}
+
+// -----------------------------------------------
 // ANY OBJECT
 // -----------------------------------------------
 
@@ -1251,6 +1653,13 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'stump': return stump();
       case 'rock': return rock();
       case 'bigRock': return bigRock();
+      case 'gnome': return gnome(v);
+      case 'hayBales': return hayBales(v);
+      case 'teaTable': return teaTable();
+      case 'flowerArch': return flowerArch(v);
+      case 'swing': return swing(v);
+      case 'fountain': return fountain();
+      case 'mailbox': return mailbox(v, false);
       default: {
         const unknown: never = id;
         throw new Error(`no drawing for ${String(unknown)}`);
@@ -1262,7 +1671,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
 /** Seen the same from every side: one drawing for both views. */
 const SYMMETRIC = new Set<ObjectId>([
   'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
-  'bush', 'stump', 'rock', 'bigRock',
+  'bush', 'stump', 'rock', 'bigRock', 'teaTable', 'fountain',
 ]);
 
 // -----------------------------------------------
@@ -1270,42 +1679,59 @@ const SYMMETRIC = new Set<ObjectId>([
 // -----------------------------------------------
 
 export function animalSprite(id: AnimalId, frame: 0 | 1): Sprite {
-  return cached(`animal-${id}-${frame}`, () => {
-    if (id === 'chicken') {
-      return sprite(8, 7, (P) => {
-        P.ellipse(4, 4, 3, 2, C.white);
-        P.px(1, 2, C.white);
-        P.px(0, 1, C.white);
-        P.px(3, 4, '#efe3d2');
-        P.px(4, 5, '#efe3d2');
-        const hy = frame ? 3 : 0;
-        P.rect(5, hy, 2, 2, C.white);
-        P.px(6, Math.max(0, hy - 1), C.red);
-        P.px(7, hy + 1, '#f2a33a');
-        P.px(6, hy, OUTLINE);
-        P.px(3, 6, '#f2a33a');
-        P.px(5, 6, '#f2a33a');
-      });
+  return cached(`animal-${id}-${frame}`, () => (id === 'chicken' ? hen(frame, C.white, '#efe3d2', false) : cow(frame, '#4a3a3a')));
+}
+
+/** A rare animal, same canvas size and pose/frames as animalSprite of its kind (redHen and goldenHen like the hen, pinkCow like the cow). redHen: russet hen; goldenHen: golden hen with a tiny sparkle; pinkCow: cow with pink spots. */
+export function breedSprite(breed: BreedId, frame: 0 | 1): Sprite {
+  return cached(`breed-${breed}-${frame}`, () => {
+    if (breed === 'redHen') return hen(frame, '#c8693a', '#a4532c', false);
+    if (breed === 'goldenHen') return hen(frame, C.gold, C.goldDark, true);
+    return cow(frame, '#f48fb1');
+  });
+}
+
+function hen(frame: 0 | 1, body: string, shade: string, golden: boolean): Sprite {
+  return sprite(8, 7, (P) => {
+    P.ellipse(4, 4, 3, 2, body);
+    P.px(1, 2, body);
+    P.px(0, 1, body);
+    P.px(3, 4, shade);
+    P.px(4, 5, shade);
+    const hy = frame ? 3 : 0;
+    P.rect(5, hy, 2, 2, body);
+    P.px(6, Math.max(0, hy - 1), C.red);
+    P.px(7, hy + 1, '#f2a33a');
+    P.px(6, hy, OUTLINE);
+    P.px(3, 6, '#f2a33a');
+    P.px(5, 6, '#f2a33a');
+    if (golden) {
+      P.px(2, 3, '#fff1b0');
+      P.px(3, 3, C.goldLight);
+      P.px(0, 6, SPARKLE);
     }
-    return sprite(14, 10, (P) => {
-      P.ellipse(6, 5, 5, 3, C.white);
-      P.rect(1, 4, 10, 3, C.white);
-      P.rect(3, 3, 3, 2, '#4a3a3a');
-      P.rect(8, 5, 2, 2, '#4a3a3a');
-      P.px(2, 6, '#4a3a3a');
-      P.rect(2, 7, 9, 1, '#efe3d2');
-      for (const x of [2, 4, 8, 10]) P.rect(x, 8, 1, 2, '#5b4a48');
-      P.px(0, 4, C.white);
-      P.px(0, 5, '#4a3a3a');
-      P.px(6, 8, '#f5b3b8');
-      const hy = frame ? 3 : 1;
-      P.rect(11, hy, 3, 4, C.white);
-      P.rect(12, hy + 3, 2, 2, '#f5b3b8');
-      P.px(12, hy + 1, OUTLINE);
-      P.px(11, hy - 1, '#e8e0d2');
-      P.px(13, hy - 1, '#e8e0d2');
-      P.px(10, hy + 1, '#4a3a3a');
-    });
+  });
+}
+
+function cow(frame: 0 | 1, spot: string): Sprite {
+  return sprite(14, 10, (P) => {
+    P.ellipse(6, 5, 5, 3, C.white);
+    P.rect(1, 4, 10, 3, C.white);
+    P.rect(3, 3, 3, 2, spot);
+    P.rect(8, 5, 2, 2, spot);
+    P.px(2, 6, spot);
+    P.rect(2, 7, 9, 1, '#efe3d2');
+    for (const x of [2, 4, 8, 10]) P.rect(x, 8, 1, 2, '#5b4a48');
+    P.px(0, 4, C.white);
+    P.px(0, 5, spot);
+    P.px(6, 8, '#f5b3b8');
+    const hy = frame ? 3 : 1;
+    P.rect(11, hy, 3, 4, C.white);
+    P.rect(12, hy + 3, 2, 2, '#f5b3b8');
+    P.px(12, hy + 1, OUTLINE);
+    P.px(11, hy - 1, '#e8e0d2');
+    P.px(13, hy - 1, '#e8e0d2');
+    P.px(10, hy + 1, spot);
   });
 }
 
@@ -1855,6 +2281,7 @@ const BOARD_OBJECTS: ObjectId[] = [
   'fence', 'pathDirt', 'hedge', 'flowersPink', 'pathStone', 'flowersYellow', 'scarecrow', 'flowersWhite', 'bench', 'well',
   'logPile', 'wheelbarrow', 'appleTree', 'lantern', 'birdhouse', 'pond', 'bush', 'stump', 'rock', 'bigRock',
 ];
+const BOARD_TREASURES: ObjectId[] = ['gnome', 'hayBales', 'teaTable', 'flowerArch', 'swing', 'fountain'];
 const BOARD_ITEMS: ItemId[] = [
   'wheat', 'corn', 'carrot', 'tomato', 'strawberry', 'sunflower', 'pumpkin', 'cotton', 'egg', 'milk', 'chickenFeed', 'cowFeed',
   'flour', 'bread', 'carrotPie', 'strawberryCake', 'pumpkinPie', 'cream', 'butter', 'cheese', 'thread', 'fabric',
@@ -1909,6 +2336,14 @@ export function artBoard(): HTMLElement {
     [animalSprite('chicken', 0), 'poule'], [animalSprite('chicken', 1), 'poule picore'], [animalSprite('cow', 0), 'vache'], [animalSprite('cow', 1), 'vache broute'],
     [readyBubble(), 'bulle'], [signSprite(), 'panneau'],
   ]);
+  section('Trésors des colis (face / profil)', BOARD_TREASURES.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
+  section('Gaston et ses colis', [
+    [objectSprite('mailbox', 'face'), 'boîte'], [mailboxSprite(true, 'face'), 'boîte + courrier'],
+    [objectSprite('mailbox', 'profile'), 'boîte profil'], [mailboxSprite(true, 'profile'), 'profil + courrier'],
+    [parcelSprite(null), 'colis'], [parcelSprite('common'), 'commun'], [parcelSprite('rare'), 'rare'], [parcelSprite('epic'), 'épique'], [parcelSprite('legendary'), 'légendaire'],
+    [heartSprite(), 'cœur'],
+  ], 4);
+  section('Races rares', (['redHen', 'goldenHen', 'pinkCow'] as const).flatMap((b): [Sprite, string][] => [[breedSprite(b, 0), b], [breedSprite(b, 1), `${b} 1`]]), 4);
   section('Produits', BOARD_ITEMS.map((id): [Sprite, string] => [itemIcon(id), id]));
   section('Boosters', BOARD_BOOSTERS.map((id): [Sprite, string] => [boosterIcon(id), id]));
   section('Interface', BOARD_UI.map((id): [Sprite, string] => [uiIcon(id), id]));

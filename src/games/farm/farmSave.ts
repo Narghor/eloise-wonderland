@@ -7,7 +7,8 @@ import { PERSON_IDS } from './data/people';
 import { PROJECTS } from './data/projects';
 import { QUESTS } from './data/quests';
 import { MAP_SIZE } from './data/land';
-import type { BoosterId, CropId, DecorId, ItemId, PersonId, PlaceableId, ProjectId, QuestId } from './data/types';
+import { BREED_IDS, PARCEL_EVERY_MINUTES, TREASURES, type TreasureId } from './data/parcels';
+import type { BoosterId, BreedId, CropId, DecorId, ItemId, PersonId, PlaceableId, ProjectId, QuestId } from './data/types';
 
 // -----------------------------------------------
 // THE 'farm' BLOCK OF THE SITE SAVE
@@ -38,6 +39,8 @@ export interface PlacedObject {
   readyAt?: number;
   /** Pen: one entry per animal, when its product is ready; HUNGRY while it waits for food. */
   animals?: number[];
+  /** Pen: the rare breed of each animal, same order as `animals`; null for a plain one. */
+  breeds?: (BreedId | null)[];
   /** Machine: jobs in order; the finished ones wait on the tray until collected. */
   queue?: Job[];
   /** Machine: jobs that may wait unfinished at once. */
@@ -100,6 +103,25 @@ export interface FarmSave {
   lastSeed: CropId;
   /** Last time the farm was open: the "while you were away" news. */
   lastVisit: number;
+  /** Gaston's parcels waiting in the mailbox, when the next round comes, and the pity count. */
+  mail: Mail;
+  /** Treasures found at least once, for the album. */
+  album: TreasureId[];
+  /** Rare animals won while their pen was full or not built yet: placed from the shop later. */
+  waitingBreeds: BreedId[];
+}
+
+export interface Mail {
+  waiting: number;
+  nextAt: number;
+  opened: number;
+  /** Parcels opened since the last rare or better. */
+  sinceRare: number;
+}
+
+/** A new mailbox holds a welcome parcel, and Gaston comes back a round later. */
+export function newMail(now: number): Mail {
+  return { waiting: 1, nextAt: now + PARCEL_EVERY_MINUTES * 60_000, opened: 0, sinceRare: 0 };
 }
 
 export function farmExists(): boolean {
@@ -147,6 +169,9 @@ export function loadFarm(): FarmSave | null {
     medals: Object.fromEntries(Object.entries(asRecord(data.medals)).filter(([, n]) => isCount(n) && n <= 3)) as Record<string, number>,
     lastSeed: isOneOf(data.lastSeed, CROP_IDS) ? data.lastSeed : 'wheat',
     lastVisit: typeof data.lastVisit === 'number' ? data.lastVisit : 0,
+    mail: readMail(data.mail),
+    album: asArray(data.album).filter((id): id is TreasureId => TREASURES.some((t) => t.id === id)),
+    waitingBreeds: asArray(data.waitingBreeds).filter((id): id is BreedId => isOneOf(id, BREED_IDS)),
   };
   // Two objects must never share a uid: the newest uid is always above every one in use.
   save.nextUid = Math.max(save.nextUid, ...save.objects.map((o) => o.uid + 1));
@@ -167,7 +192,11 @@ function readObject(value: unknown): PlacedObject[] {
     object.crop = o.crop;
     object.readyAt = o.readyAt;
   } else if (typeof o.readyAt === 'number') object.readyAt = o.readyAt;
-  if (Array.isArray(o.animals)) object.animals = o.animals.filter((t): t is number => typeof t === 'number');
+  if (Array.isArray(o.animals)) {
+    object.animals = o.animals.filter((t): t is number => typeof t === 'number');
+    const breeds = asArray(o.breeds);
+    object.breeds = object.animals.map((_, i) => (isOneOf(breeds[i], BREED_IDS) ? breeds[i] : null));
+  }
   if (Array.isArray(o.queue)) {
     object.queue = o.queue.flatMap((j) => {
       const job = asRecord(j);
@@ -176,6 +205,13 @@ function readObject(value: unknown): PlacedObject[] {
   }
   if (isCount(o.slots)) object.slots = o.slots;
   return [object];
+}
+
+/** Saves from before the parcels get a mailbox with a welcome parcel. */
+function readMail(value: unknown): Mail {
+  const m = asRecord(value);
+  if (!isCount(m.waiting) || typeof m.nextAt !== 'number') return newMail(Date.now());
+  return { waiting: m.waiting, nextAt: m.nextAt, opened: count(m.opened), sinceRare: count(m.sinceRare) };
 }
 
 function readOrder(value: unknown): Order[] {

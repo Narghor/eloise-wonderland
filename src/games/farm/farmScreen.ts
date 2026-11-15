@@ -1,7 +1,8 @@
 import './farm.css';
 import { el } from '../../dom';
 import { openHelp, openHelpOnFirstVisit } from '../../help';
-import { armSoundUnlock, playClack, playCluck, playCoinLand, playFanfare, playMoo, playPluck, playPop, playRustle, playSeed, playThunk } from '../casino/fx/sound';
+import { armSoundUnlock, playBigWin, playBonusTrigger, playClack, playCluck, playCoinLand, playFanfare, playMoo, playPluck, playPop, playRustle, playSeed, playThunk } from '../casino/fx/sound';
+import { prefersReducedMotion } from '../casino/fx/effects';
 import { CASINO_TEST_BUTTONS } from '../casino/fx/testMode'; // TEST-BUTTONS
 import { booster } from './data/boosters';
 import { crop } from './data/crops';
@@ -12,11 +13,13 @@ import { placeable } from './data/placeables';
 import { project } from './data/projects';
 import { item, itemCount } from './data/items';
 import type { BoosterId, CropId, ItemId, PlaceableId } from './data/types';
-import { boosterIcon, faceSprite, itemIcon, spriteImage, uiIcon, type Sprite } from './farmArt';
+import { boosterIcon, breedSprite, faceSprite, itemIcon, objectSprite, parcelSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
+import { breed, rarityName } from './data/parcels';
+import { deliverMail, openParcel, placeWaitingBreed, type Opened } from './farmParcels';
 import { buyBooster, fertilize, hurry, water } from './farmBoosters';
 import { FARM_HELP } from './farmHelp';
 import { FarmHud, type SheetId } from './farmHud';
-import { buyAndPlace, buyParcel, buyRefusal, canMove, canStand, canStore, clearObstacle, footprint, freeSpotNear, moveObject, newFarm, parcelOffers, storeObject } from './farmMap';
+import { buyAndPlace, buyParcel, buyRefusal, canMove, canStand, canStore, clearObstacle, ensureMailbox, footprint, freeSpotNear, moveObject, newFarm, parcelOffers, storeObject } from './farmMap';
 import { deliver, refillOrders, refuse } from './farmOrders';
 import {
   buyAnimal,
@@ -40,6 +43,7 @@ import {
 import { claimQuest, finishStage, gainXp, giveToProject, have, isUnlocked, openChest, settle, unlockText, type Notice } from './farmProgress';
 import {
   decoBubble,
+  mailboxBubble,
   fieldBubble,
   machineBubble,
   obstacleBubble,
@@ -69,6 +73,8 @@ export function renderFarm(root: HTMLElement): () => void {
   const now = Date.now();
   const saved = loadFarm();
   const save = saved ?? newFarm(now);
+  ensureMailbox(save);
+  deliverMail(save, now);
   const screen = new FarmScreen(root, save);
   screen.commit();
   openHelpOnFirstVisit(FARM_HELP);
@@ -104,6 +110,7 @@ class FarmScreen implements FarmUi {
   private commitTimer = 0;
   private pluckStep = 0;
   private pluckAt = 0;
+  private comboEl: HTMLElement | null = null;
 
   constructor(root: HTMLElement, save: FarmSave) {
     this.save = save;
@@ -179,6 +186,10 @@ class FarmScreen implements FarmUi {
 
   private tick(): void {
     const now = Date.now();
+    if (deliverMail(this.save, now) > 0) {
+      this.toast('Gaston est passé : un colis t’attend dans la boîte aux lettres !');
+      saveFarm(this.save);
+    }
     if (refillOrders(this.save, now) > 0) {
       saveFarm(this.save);
       if (this.sheet?.id === 'orders') this.renderSheet();
@@ -247,7 +258,9 @@ class FarmScreen implements FarmUi {
       if (emptyField) return this.openSeeds(target);
       return this.openBubble(target);
     }
+    if (kind === 'mailbox') return this.openMailbox(target);
     if (kind === 'pen') {
+      this.scene.cheer(target);
       if (readyAnimals(target, now) > 0) return this.collect(target);
       if (hungryAnimals(target) > 0 && have(this.save, penAnimal(target).feed) > 0 && this.bubble?.target !== target) return this.feed(target);
       return this.openBubble(target);
@@ -284,6 +297,7 @@ class FarmScreen implements FarmUi {
     if (kind === 'machine') return machineBubble(this, target);
     if (kind === 'tree') return treeBubble(this, target);
     if (kind === 'obstacle') return obstacleBubble(this, target);
+    if (kind === 'mailbox') return mailboxBubble(this);
     return decoBubble(target);
   }
 
@@ -458,7 +472,7 @@ class FarmScreen implements FarmUi {
 
   private levelDialog(n: Extract<Notice, { kind: 'level' }>): HTMLElement {
     playFanfare();
-    return el(
+    const box = el(
       'div',
       { class: 'farm-dialog-box farm-box' },
       el('div', { class: 'farm-big-level', text: String(n.level) }),
@@ -467,6 +481,8 @@ class FarmScreen implements FarmUi {
       ...(n.unlocks.length > 0 ? [el('p', { class: 'farm-note', text: 'Nouveau à la ferme :' }), el('ul', {}, ...n.unlocks.map((u) => el('li', { text: u })))] : []),
       el('button', { class: 'farm-btn is-wide', type: 'button', text: 'Super !' }),
     );
+    confetti(box, 30);
+    return box;
   }
 
   private speech(who: Parameters<typeof faceSprite>[0], title: string, text: string, ok: string, extra: Node[] = []): HTMLElement {
@@ -502,7 +518,9 @@ class FarmScreen implements FarmUi {
     this.pluckStep = t - this.pluckAt < 900 ? this.pluckStep + 1 : 0;
     this.pluckAt = t;
     playPluck(this.pluckStep);
+    this.scene.burstCrop(field, gain.item as CropId);
     this.showGain(field, gain);
+    if (this.pluckStep >= 2) this.combo(field, this.pluckStep + 1);
     if (this.bubble?.target === field) this.closeBubble();
     this.commitSoon();
   }
@@ -701,6 +719,7 @@ class FarmScreen implements FarmUi {
     const order = deliver(this.save, id, Date.now());
     if (!order) return;
     playCoinLand('small');
+    this.rainNuts(Math.min(10, 3 + Math.floor(order.nuts / 20)));
     this.toast(`${person(order.who).name} te remercie : +${order.nuts} Éloisettes, +${order.xp} XP`);
     this.commit();
   }
@@ -756,6 +775,99 @@ class FarmScreen implements FarmUi {
   buyBooster(id: BoosterId): void {
     if (!buyBooster(this.save, id, Date.now())) return this.toast('Pas assez de pièces, ou plus de stock aujourd’hui.');
     playPop();
+    this.commit();
+  }
+
+  /** "×5 !" growing over a harvest swipe. */
+  private combo(field: PlacedObject, count: number): void {
+    const at = this.screenOf(field);
+    this.comboEl?.remove();
+    const node = el('div', { class: `farm-combo${count >= 10 ? ' is-big' : ''}`, text: `×${count} !` });
+    node.style.left = `${at.x}px`;
+    node.style.top = `${at.y - 26}px`;
+    this.overlay.append(node);
+    this.comboEl = node;
+    window.setTimeout(() => node.remove(), 900);
+  }
+
+  /** Eloisettes falling into the purse at the top. */
+  private rainNuts(count: number): void {
+    if (prefersReducedMotion()) return;
+    const box = this.root.getBoundingClientRect();
+    const target = this.hud.nutsTarget();
+    const tx = target.left - box.left + target.width / 2 - 12;
+    const ty = target.top - box.top + target.height / 2 - 12;
+    for (let i = 0; i < count; i++) {
+      const node = spriteImage(uiIcon('nut'), 3);
+      node.classList.add('farm-fly');
+      const sx = box.width * (0.3 + Math.random() * 0.4);
+      const sy = box.height * (0.45 + Math.random() * 0.15);
+      node.style.transform = `translate(${sx}px, ${sy}px)`;
+      node.style.transitionDelay = `${i * 60}ms`;
+      this.overlay.append(node);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        node.style.transform = `translate(${tx}px, ${ty}px) scale(0.6)`;
+        node.style.opacity = '0.3';
+      }));
+      window.setTimeout(() => node.remove(), 800 + i * 60);
+    }
+  }
+
+  /** A rare animal waiting for room goes into its pen. */
+  placeBreed(id: Parameters<typeof placeWaitingBreed>[1]): void {
+    if (!placeWaitingBreed(this.save, id)) return this.toast('Pas encore de place pour elle.');
+    playCluck();
+    this.toast(`${breed(id).name} s’installe dans son enclos !`);
+    this.commit();
+  }
+
+  // -----------------------------------------------
+  // GASTON'S PARCELS
+  // -----------------------------------------------
+
+  /** Opens the mailbox: a parcel to unwrap, or when Gaston comes back. */
+  private openMailbox(mailbox: PlacedObject): void {
+    if (this.save.mail.waiting > 0) return this.queueDialog(() => this.parcelDialog());
+    this.openBubble(mailbox);
+  }
+
+  /** The parcel shakes when touched, then bursts open in the colour of its rarity. */
+  private parcelDialog(): HTMLElement {
+    const box = el('div', { class: 'farm-dialog-box farm-box farm-parcel' });
+    const stage = el('button', { class: 'farm-parcel-stage', type: 'button', 'aria-label': 'Ouvrir le colis' }, spriteImage(parcelSprite(null), 6));
+    box.append(el('h2', { text: 'Un colis de Gaston !' }), stage, el('p', { class: 'farm-note', text: 'Touche le colis pour l’ouvrir.' }));
+    let opening = false;
+    stage.addEventListener('click', () => {
+      if (opening) return;
+      opening = true;
+      playClack();
+      stage.classList.add('is-shaking');
+      window.setTimeout(() => this.revealParcel(box), prefersReducedMotion() ? 0 : 750);
+    });
+    return box;
+  }
+
+  private revealParcel(box: HTMLElement): void {
+    const opened = openParcel(this.save);
+    if (!opened) return;
+    const { icon, scale, name } = prizeLook(opened);
+    const rarity = opened.rarity;
+    [playPop, () => playCoinLand('big'), playBonusTrigger, () => playBigWin(2)][['common', 'rare', 'epic', 'legendary'].indexOf(rarity)]();
+    const more = this.save.mail.waiting;
+    const next = el('button', { class: 'farm-btn is-wide', type: 'button', text: `Ouvrir le suivant (${more})` });
+    next.addEventListener('click', () => this.queueDialog(() => this.parcelDialog()));
+    box.className = `farm-dialog-box farm-box farm-parcel is-open is-${rarity}`;
+    box.replaceChildren(
+      el('span', { class: 'farm-rarity', text: rarityName(rarity) }),
+      el('div', { class: 'farm-parcel-prize' }, el('span', { class: 'farm-rays', 'aria-hidden': 'true' }), spriteImage(icon, scale)),
+      el('h2', { text: name }),
+      ...(opened.isNew ? [el('span', { class: 'farm-new', text: 'Nouveau dans l’album !' })] : []),
+      ...(opened.waiting ? [el('p', { class: 'farm-note', text: 'Il n’y a pas de place pour elle : elle t’attend dans la Boutique, onglet Animaux.' })] : []),
+      ...(opened.prize.kind === 'decor' ? [el('p', { class: 'farm-note', text: 'Elle t’attend dans la Boutique, onglet Déco : pose-la où tu veux.' })] : []),
+      ...(more > 0 ? [next] : []),
+      el('button', { class: `farm-btn is-wide${more > 0 ? ' is-ghost' : ''}`, type: 'button', text: 'Super !' }),
+    );
+    if (rarity === 'epic' || rarity === 'legendary') confetti(box, rarity === 'legendary' ? 40 : 24);
     this.commit();
   }
 
@@ -934,9 +1046,41 @@ class FarmScreen implements FarmUi {
         }
         this.save.orderWaits = this.save.orderWaits.map(() => now);
       }),
+      button('+5 colis', () => (this.save.mail.waiting += 5)),
       button('+10 de chaque produit', () => {
         for (const id of ['wheat', 'corn', 'carrot', 'egg', 'milk', 'flour', 'chickenFeed', 'cowFeed'] as ItemId[]) this.save.stock[id] = have(this.save, id) + 10;
       }),
     );
+  }
+}
+
+/** The picture and the name of what a parcel held. */
+function prizeLook(opened: Opened): { icon: Sprite; scale: number; name: string } {
+  const prize = opened.prize;
+  if (prize.kind === 'nuts') return { icon: uiIcon('nut'), scale: 5, name: `${opened.nuts} Éloisettes` };
+  if (prize.kind === 'boosters') {
+    const entries = Object.entries(prize.boosters) as [BoosterId, number][];
+    return { icon: boosterIcon(entries[0][0]), scale: 5, name: entries.map(([id, n]) => `${n} ${n > 1 ? booster(id).plural : booster(id).name}`).join(' et ') };
+  }
+  if (prize.kind === 'decor') {
+    const sprite = objectSprite(prize.decor, 'face');
+    return { icon: sprite, scale: Math.max(2, Math.min(4, Math.floor(110 / sprite.height))), name: placeable(prize.decor).name };
+  }
+  return { icon: breedSprite(prize.breed, 0), scale: 6, name: breed(prize.breed).name };
+}
+
+/** Paper confetti falling over a box (transform and opacity only). */
+function confetti(host: HTMLElement, count: number): void {
+  if (prefersReducedMotion()) return;
+  const colours = ['#f48fb1', '#ffd84a', '#7cc456', '#6a9fd8', '#b9a2ff', '#ff9f5a'];
+  for (let i = 0; i < count; i++) {
+    const bit = el('i', { class: 'farm-confetti', 'aria-hidden': 'true' });
+    bit.style.left = `${Math.random() * 100}%`;
+    bit.style.background = colours[i % colours.length];
+    bit.style.animationDelay = `${Math.random() * 300}ms`;
+    bit.style.setProperty('--drift', `${(Math.random() - 0.5) * 80}px`);
+    bit.style.setProperty('--spin', `${Math.round((Math.random() - 0.5) * 720)}deg`);
+    host.append(bit);
+    window.setTimeout(() => bit.remove(), 2000);
   }
 }

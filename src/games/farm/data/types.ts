@@ -20,11 +20,18 @@ export type PenId = 'coop' | 'cowshed';
 export type TreeId = 'hazel';
 export type DecorId =
   | 'fence' | 'hedge' | 'flowersPink' | 'flowersYellow' | 'flowersWhite' | 'pathStone' | 'pathDirt'
-  | 'bench' | 'well' | 'scarecrow' | 'lantern' | 'wheelbarrow' | 'appleTree' | 'logPile' | 'birdhouse' | 'pond';
+  | 'bench' | 'well' | 'scarecrow' | 'lantern' | 'wheelbarrow' | 'appleTree' | 'logPile' | 'birdhouse' | 'pond'
+  // Treasures: found only in Gaston's parcels, never sold.
+  | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
 export type ObstacleId = 'bush' | 'stump' | 'rock' | 'bigRock';
 
-/** Everything that stands on the map. */
-export type PlaceableId = 'field' | MachineId | PenId | TreeId | DecorId | ObstacleId;
+/** Everything that stands on the map. The mailbox is Gaston's: one per farm, given, moved like the rest. */
+export type PlaceableId = 'field' | MachineId | PenId | TreeId | DecorId | ObstacleId | 'mailbox';
+
+/** Rare animals, found in parcels: they live in their kind's pen and sometimes give one product more. */
+export type BreedId = 'redHen' | 'goldenHen' | 'pinkCow';
+
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 export type BoosterId = 'fertilizer' | 'wateringCan' | 'hourglass' | 'helpingHand';
 
@@ -44,6 +51,8 @@ export interface Reward {
   xp?: number;
   boosters?: Partial<Record<BoosterId, number>>;
   decor?: Partial<Record<DecorId, number>>;
+  /** Gaston's parcels, straight to the mailbox. */
+  parcels?: number;
 }
 
 /**

@@ -3,7 +3,8 @@ import { crop } from './data/crops';
 import { item } from './data/items';
 import { MAX_QUEUE, RECIPES, queueSlotPrice, recipe, type Recipe } from './data/machines';
 import { HAZEL, placeable } from './data/placeables';
-import type { CropId, ItemId, MachineId, PenId } from './data/types';
+import { breed } from './data/parcels';
+import type { BreedId, CropId, ItemId, MachineId, PenId } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import { HUNGRY, type FarmSave, type PlacedObject } from './farmSave';
 import { penRoom } from './farmMap';
@@ -89,9 +90,15 @@ export function nextAnimalPrice(save: FarmSave, pen: PlacedObject): number {
 export function buyAnimal(save: FarmSave, pen: PlacedObject): boolean {
   const a = penAnimal(pen);
   if (!isUnlocked(save, a.unlock) || penRoom(pen) <= 0 || !spend(save, nextAnimalPrice(save, pen))) return false;
+  pen.breeds = [...breedsOf(pen), null];
   pen.animals!.push(HUNGRY);
   emit(save, { type: 'buy', target: a.id, kind: 'animal', count: 1 });
   return true;
+}
+
+/** Each animal's rare breed (null for a plain one), always as long as the pen's animals. */
+export function breedsOf(pen: PlacedObject): (BreedId | null)[] {
+  return (pen.animals ?? []).map((_, i) => pen.breeds?.[i] ?? null);
 }
 
 /** Feeds every hungry animal the barn can feed; returns how many ate. */
@@ -108,16 +115,24 @@ export function feedPen(save: FarmSave, pen: PlacedObject, now: number): number 
   return fed;
 }
 
-/** Collects every ready product; the animals are hungry again. */
-export function collectPen(save: FarmSave, pen: PlacedObject, now: number): Gain | null {
+/** Collects every ready product (a rare animal sometimes gives one more); the animals are hungry again. */
+export function collectPen(save: FarmSave, pen: PlacedObject, now: number, random: () => number = Math.random): Gain | null {
   const a = penAnimal(pen);
   const ready = readyAnimals(pen, now);
   if (ready === 0) return null;
-  pen.animals = pen.animals!.map((t) => (t !== HUNGRY && t <= now ? HUNGRY : t));
-  addItem(save, a.product, ready);
+  const breeds = breedsOf(pen);
+  let bonus = 0;
+  pen.animals = pen.animals!.map((t, i) => {
+    if (t === HUNGRY || t > now) return t;
+    const rare = breeds[i];
+    if (rare && random() < breed(rare).bonusChance) bonus++;
+    return HUNGRY;
+  });
+  const count = ready + bonus;
+  addItem(save, a.product, count);
   gainXp(save, a.xp * ready);
-  emit(save, { type: 'collect', target: a.product, kind: 'animal', count: ready });
-  return { item: a.product, count: ready, xp: a.xp * ready };
+  emit(save, { type: 'collect', target: a.product, kind: 'animal', count });
+  return { item: a.product, count, xp: a.xp * ready };
 }
 
 // -----------------------------------------------

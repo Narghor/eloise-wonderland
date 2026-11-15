@@ -38,5 +38,5 @@ export function dailyTaskReward(level: number): Reward {
 }
 
 export function dailyChestReward(level: number): Reward {
-  return { nuts: 10 * level, boosters: { hourglass: 1 } };
+  return { nuts: 10 * level, parcels: 1, boosters: { hourglass: 1 } };
 }
