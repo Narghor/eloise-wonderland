@@ -219,34 +219,82 @@
   pointer-events: none;
 }
 
+/* A plain count (what you own), not a call to act */
+.farm-count.is-neutral {
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  border-color: var(--ui-border);
+}
+
 .farm-count:empty {
   display: none;
 }
 
-/* Zoom and sound, on the right edge */
+/* Help, zoom and sound: one small button on the right edge, unfolding a menu */
 .farm-side {
   position: absolute;
   right: calc(env(safe-area-inset-right) + 8px);
-  bottom: calc(env(safe-area-inset-bottom) + 92px);
+  bottom: calc(env(safe-area-inset-bottom) + 90px);
   display: grid;
+  justify-items: end;
   gap: 6px;
 }
 
-.farm-side .farm-round {
-  width: 38px;
-  height: 38px;
-  opacity: 0.92;
+.farm-side-toggle {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font: 700 18px/1 var(--ui-font);
+  opacity: 0.9;
+  cursor: pointer;
 }
 
-.farm-side .fx-mute {
-  width: 38px;
-  height: 38px;
-  opacity: 0.92;
+.farm-side-toggle[aria-expanded='true'] {
+  background: var(--ui-soft);
+  opacity: 1;
+}
+
+.farm-side-menu {
+  display: grid;
+  gap: 2px;
+  padding: 4px;
   border-radius: 10px;
-  background: var(--ui-surface);
-  border: 3px solid var(--ui-border);
-  box-shadow: var(--ui-shadow);
-  font-size: 18px;
+}
+
+.farm-side-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: 500 13px/1.1 var(--ui-font);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.farm-side-item:hover {
+  background: var(--ui-soft);
+}
+
+.farm-side-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+
+.farm-side-item .fx-mute {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 16px;
   cursor: pointer;
 }
 
@@ -620,7 +668,7 @@
 }
 
 .farm.has-seeds .farm-side {
-  bottom: calc(env(safe-area-inset-bottom) + 214px);
+  bottom: calc(env(safe-area-inset-bottom) + 208px);
 }
 
 /* The seed riding above the finger during a swipe */

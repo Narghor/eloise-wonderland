@@ -299,6 +299,7 @@ export interface SheetContent {
 export function sheetContent(ui: FarmUi, id: SheetId, tab?: string): SheetContent {
   if (id === 'barn') return { title: 'Grange', tabs: [], tab: '', body: barnSheet(ui) };
   if (id === 'orders') return { title: 'Commandes', tabs: [], tab: '', body: ordersSheet(ui) };
+  if (id === 'bag') return { title: 'Mes boosters', tabs: [], tab: '', body: bagSheet(ui) };
   if (id === 'quests') {
     const t = tab ?? 'story';
     const storyNews = openQuests(ui.save).some((q) => isQuestReady(ui.save, q));
@@ -316,6 +317,28 @@ export function sheetContent(ui: FarmUi, id: SheetId, tab?: string): SheetConten
     tab: t,
     body: t === 'animals' ? animalsShop(ui) : t === 'decor' ? decorShop(ui) : t === 'boosters' ? boostersShop(ui) : buildingsShop(ui),
   };
+}
+
+/** What the player owns, and where each one is used; buying them stays in the shop. */
+function bagSheet(ui: FarmUi): Node[] {
+  const save = ui.save;
+  const now = ui.now();
+  const cards = BOOSTERS.map((b) => {
+    const count = save.boosters[b.id];
+    const use = b.id === 'wateringCan' && count > 0 ? [button(['Arroser maintenant'], () => ui.useBooster('wateringCan'), { disabled: growingFields(save, now).length === 0 })] : [];
+    return el(
+      'div',
+      { class: `farm-card${count === 0 ? ' is-locked' : ''}` },
+      el('div', { class: 'farm-who' }, img(boosterIcon(b.id), 3), el('span', {}, `${b.name} × ${count}`, el('small', { text: b.effect }))),
+      el('p', { class: 'farm-note', text: b.howTo }),
+      ...use,
+    );
+  });
+  return [
+    ...cards,
+    button(['En acheter à la Boutique'], () => ui.openSheet('shop', 'boosters'), { ghost: true, wide: true }),
+    el('p', { class: 'farm-note', text: 'Ils se gagnent aussi en jouant : niveaux, quêtes, tâches du jour, et parfois en finissant un niveau d’un autre jeu.' }),
+  ];
 }
 
 function barnSheet(ui: FarmUi): Node[] {
@@ -556,7 +579,6 @@ function boostersShop(ui: FarmUi): Node[] {
   const cards = BOOSTERS.map((b) => {
     const left = shopLeft(save, b.id, now);
     const canBuy = left > 0 && coins >= b.price;
-    const use = b.id === 'wateringCan' ? [button(['Utiliser'], () => ui.useBooster('wateringCan'), { ghost: true, disabled: save.boosters.wateringCan === 0 || growingFields(save, now).length === 0 })] : [];
     return el(
       'div',
       { class: 'farm-card' },
@@ -566,7 +588,6 @@ function boostersShop(ui: FarmUi): Node[] {
         { class: 'farm-row' },
         button([`Acheter · ${b.price} 🪙`], () => ui.buyBooster(b.id), { disabled: !canBuy }),
         el('span', { class: 'farm-note', text: left > 0 ? `encore ${left} aujourd’hui` : 'plus de stock aujourd’hui' }),
-        ...use,
       ),
     );
   });

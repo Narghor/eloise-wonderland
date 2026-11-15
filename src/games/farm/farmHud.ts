@@ -11,7 +11,7 @@ import type { FarmSave } from './farmSave';
 // THE TOP BAND AND THE BOTTOM BAR
 // -----------------------------------------------
 
-export type SheetId = 'barn' | 'orders' | 'quests' | 'shop';
+export type SheetId = 'barn' | 'orders' | 'quests' | 'shop' | 'bag';
 
 export interface HudActions {
   sheet(id: SheetId, tab?: string): void;
@@ -39,18 +39,19 @@ export class FarmHud {
   private readonly levelText = el('span');
   private readonly xpFill = el('i');
   private readonly nuts = el('b');
-  private readonly boosterCount = el('span', { class: 'farm-count' });
+  private readonly boosterCount = el('span', { class: 'farm-count is-neutral' });
   private readonly questFace = el('span', { class: 'farm-face' });
   private readonly questText = el('p');
   private readonly questBadge = el('span', { class: 'farm-count' });
   private readonly counts = new Map<string, HTMLElement>();
   private readonly tabs = new Map<string, HTMLButtonElement>();
-  private readonly zoomIcon = el('span');
+  private readonly zoomIcon = el('span', { class: 'farm-side-icon' });
+  private readonly zoomLabel = el('span');
 
   constructor(actions: HudActions) {
     const back = el('a', { class: 'farm-back', href: '#/', 'aria-label': 'Retour aux jeux' }, spriteImage(uiIcon('back'), 3));
-    const boosters = el('button', { class: 'farm-round farm-box', type: 'button', 'aria-label': 'Boosters' }, spriteImage(uiIcon('sack'), 3), this.boosterCount);
-    boosters.addEventListener('click', () => actions.sheet('shop', 'boosters'));
+    const boosters = el('button', { class: 'farm-round farm-box', type: 'button', 'aria-label': 'Mes boosters' }, spriteImage(uiIcon('sack'), 3), this.boosterCount);
+    boosters.addEventListener('click', () => actions.sheet('bag'));
     this.top = el(
       'div',
       { class: 'farm-top' },
@@ -72,11 +73,31 @@ export class FarmHud {
       this.bar.append(button);
     }
 
-    const help = el('button', { class: 'farm-round farm-box', type: 'button', 'aria-label': 'Comment jouer ?' }, el('b', { text: '?' }));
-    help.addEventListener('click', actions.help);
-    const zoom = el('button', { class: 'farm-round farm-box', type: 'button', 'aria-label': 'Zoom' }, this.zoomIcon);
-    zoom.addEventListener('click', actions.zoom);
-    this.side = el('div', { class: 'farm-side' }, help, zoom, muteButton());
+    // Help, zoom and sound fold behind one small button: on a phone the map needs the room.
+    const menu = el('div', { class: 'farm-side-menu farm-box', hidden: '' });
+    const toggle = el('button', { class: 'farm-side-toggle farm-box', type: 'button', 'aria-label': 'Options', 'aria-expanded': 'false', text: '⋯' });
+    const close = () => {
+      menu.hidden = true;
+      toggle.setAttribute('aria-expanded', 'false');
+    };
+    toggle.addEventListener('click', () => {
+      menu.hidden = !menu.hidden;
+      toggle.setAttribute('aria-expanded', String(!menu.hidden));
+    });
+    const item = (icon: Node, label: string | HTMLElement, action: () => void) => {
+      const b = el('button', { class: 'farm-side-item', type: 'button' }, icon, label);
+      b.addEventListener('click', () => {
+        action();
+        close();
+      });
+      return b;
+    };
+    menu.append(
+      item(el('b', { class: 'farm-side-icon', text: '?' }), 'Comment jouer', actions.help),
+      item(this.zoomIcon, this.zoomLabel, actions.zoom),
+      el('div', { class: 'farm-side-item is-sound' }, muteButton(), 'Son'),
+    );
+    this.side = el('div', { class: 'farm-side' }, menu, toggle);
     this.setZoom(false);
   }
 
@@ -86,7 +107,8 @@ export class FarmHud {
   }
 
   setZoom(far: boolean): void {
-    this.zoomIcon.replaceChildren(spriteImage(uiIcon(far ? 'zoomIn' : 'zoomOut'), 3));
+    this.zoomIcon.replaceChildren(spriteImage(uiIcon(far ? 'zoomIn' : 'zoomOut'), 2));
+    this.zoomLabel.textContent = far ? 'Vue proche' : 'Vue d’ensemble';
   }
 
   setPressed(id: string | null): void {

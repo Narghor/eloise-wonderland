@@ -1368,7 +1368,11 @@ const UI_MAPS: Record<UiIcon, PixelMap> = {
   orders: { rows: ['...aaaa...', '.bbaccabb.', '.bddddddb.', '.bdeeeedb.', '.bddddddb.', '.bdeeeddb.', '.bddddddb.', '.bdeeeedb.', '.bddddddb.', '.bdeedddb.', '.bddddddb.', '.bbbbbbbb.'], pal: { a: '#9c958d', b: '#c38a55', c: '#e8e0d2', d: '#fffaf2', e: '#bdb6ae' } },
   quests: { rows: ['..aaaaaaa..', '.abbbbbbba.', 'abbbbcbbbba', 'abbbbcbbbba', 'abbbbcbbbba', 'abbbbcbbbba', 'abbbbbbbbba', 'abbbbcbbbba', '.abbbbbbba.', '..aaaab.aa.', '......ba...', '......a....'], pal: { a: '#d9a339', b: '#fff1b8', c: '#c0582f' } },
   shop: { rows: ['abababababab', 'abababababab', '.cccccccccc.', '.c........c.', '.c.de..fg..c', '.c.de..fg..c', 'hhhhhhhhhhhh', 'hiiiiiiiiiih', '.h........h.', '.h........h.'], pal: { a: '#e0475b', b: '#fffaf2', c: '#9a6639', d: '#f08a4b', e: '#5aa54a', f: '#f2c94c', g: '#e0475b', h: '#9a6639', i: '#c38a55' } },
-  build: { rows: ['.aaaa.......', 'aabbaa......', 'aabbaa......', '.aaaac......', '.....cc.....', '......cc....', '.......cc...', '........cc..', '.........cc.', '..........cc'], pal: { a: '#9c958d', b: '#dad5ce', c: '#c38a55' } },
+  // "Amenager": a flower in its pot with a little sparkle, the cosy side of arranging the farm.
+  build: {
+    rows: ['.........s..', '...pp...sss.', '..pyyp...s..', '..pyyp......', '...pp.......', 'g...g...g...', 'gg..g..gg...', '.gg.g.gg....', 'rrrrrrrrrr..', '.tttttttdr..', '.tttttttdr..', '..ttttddd...'],
+    pal: { p: '#f48fb1', y: '#ffd84a', s: '#ffe07a', g: '#5aa54a', r: '#b4553a', t: '#d9744f', d: '#b4553a' },
+  },
   sack: { rows: ['..a..a..', '...aa...', '.bbbbbb.', 'bbcbbbbb', 'bcccbbbb', 'bbcbbbbb', 'bbbbbbbb', '.bbbbbb.'], pal: { a: '#9a6639', b: '#d98fb5', c: '#fff1b8' } },
   lock: { rows: ['..aaa..', '.a...a.', '.a...a.', 'bbbbbbb', 'bbbcbbb', 'bbcccbb', 'bbbcbbb', 'bbbbbbb'], pal: { a: '#9c958d', b: '#f2c94c', c: '#8a552b' } },
   sickle: { rows: ['..aaaa...', '.abb..a..', 'ab.....a.', 'a.......a', 'a........', '.a.......', '..aa.....', '....c....', '.....c...', '......c..', '.......c.'], pal: { a: '#cfd6dc', b: '#ffffff', c: '#9a6639' } },

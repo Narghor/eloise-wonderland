@@ -11,6 +11,8 @@ export interface Booster {
   name: string;
   plural: string;
   effect: string;
+  /** Where it is used, told in the bag. */
+  howTo: string;
   /** Site coins. */
   price: number;
   /** Bought in the shop per day at most. */
@@ -20,10 +22,10 @@ export interface Booster {
 }
 
 export const BOOSTERS: readonly Booster[] = [
-  { id: 'fertilizer', name: 'Engrais', plural: 'Engrais', effect: 'Un champ est mûr tout de suite.', price: 5, dailyStock: 5, gameWeight: 50 },
-  { id: 'wateringCan', name: 'Arrosoir', plural: 'Arrosoirs', effect: 'Tous les champs : le temps restant est divisé par deux.', price: 25, dailyStock: 1, gameWeight: 10 },
-  { id: 'hourglass', name: 'Sablier', plural: 'Sabliers', effect: 'Une machine ou un enclos : une heure de moins sur ce qui est en cours.', price: 15, dailyStock: 3, gameWeight: 25 },
-  { id: 'helpingHand', name: 'Coup de main', plural: 'Coups de main', effect: 'Une commande refusée est remplacée tout de suite.', price: 10, dailyStock: 2, gameWeight: 15 },
+  { id: 'fertilizer', name: 'Engrais', plural: 'Engrais', effect: 'Un champ est mûr tout de suite.', howTo: 'Touche un champ qui pousse, puis « Engrais ».', price: 5, dailyStock: 5, gameWeight: 50 },
+  { id: 'wateringCan', name: 'Arrosoir', plural: 'Arrosoirs', effect: 'Tous les champs : le temps restant est divisé par deux.', howTo: 'S’utilise d’ici, sur tous les champs qui poussent.', price: 25, dailyStock: 1, gameWeight: 10 },
+  { id: 'hourglass', name: 'Sablier', plural: 'Sabliers', effect: 'Une machine ou un enclos : une heure de moins sur ce qui est en cours.', howTo: 'Touche une machine ou un enclos au travail, puis « Sablier ».', price: 15, dailyStock: 3, gameWeight: 25 },
+  { id: 'helpingHand', name: 'Coup de main', plural: 'Coups de main', effect: 'Une commande refusée est remplacée tout de suite.', howTo: 'Dans « Commandes », touche « Changer de commande ».', price: 10, dailyStock: 2, gameWeight: 15 },
 ];
 
 export const BOOSTER_IDS = BOOSTERS.map((b) => b.id);
