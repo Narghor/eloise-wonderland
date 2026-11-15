@@ -315,7 +315,31 @@ export type DishId =
   | 'frostSorbet'
   | 'mandarinChocolate'
   | 'moonInfusion'
-  | 'goldenTurnover';
+  | 'goldenTurnover'
+  | 'tomatoBasilSalad'
+  | 'strawberryMilkshake'
+  | 'lemonSquash'
+  | 'mandarinJuice'
+  | 'tomatoSoup'
+  | 'pumpkinPuree'
+  | 'honeyToast'
+  | 'thymeHoneyTea'
+  | 'waffles'
+  | 'tomatoQuiche'
+  | 'pestoPasta'
+  | 'cheeseOmelette'
+  | 'chocolateMousse'
+  | 'mushroomPan'
+  | 'blackberryCrumble'
+  | 'mandarinCake'
+  | 'hazelnutRocks'
+  | 'gingerbread'
+  | 'vanillaIceCream'
+  | 'spicedPumpkinPie'
+  | 'moonflowerFondant'
+  | 'goldenTatin'
+  | 'gardenCurry'
+  | 'frostIceCream';
 
 export interface Dish {
   id: DishId;
@@ -364,6 +388,30 @@ export const DISHES: Dish[] = [
   { id: 'mandarinChocolate', name: 'Chocolat chaud à la mandarine', ingredients: ['mandarin', 'chocolate', 'milk'], level: 2, cookMinutes: 8, color: '#8a4b2a' },
   { id: 'moonInfusion', name: 'Infusion de fleur de lune', ingredients: ['moonflower', 'mint'], level: 1, cookMinutes: 4, color: '#c9c3ff' },
   { id: 'goldenTurnover', name: 'Chausson aux pommes dorées', ingredients: ['goldenApple', 'wheat', 'butter'], level: 2, cookMinutes: 14, color: '#f2c94c' },
+  { id: 'tomatoBasilSalad', name: 'Salade tomate-basilic', ingredients: ['tomato', 'basil'], level: 1, cookMinutes: 2, color: '#e8574f' },
+  { id: 'strawberryMilkshake', name: 'Milk-shake à la fraise', ingredients: ['strawberry', 'milk'], level: 1, cookMinutes: 2, color: '#ffb3cc' },
+  { id: 'lemonSquash', name: 'Citron pressé', ingredients: ['lemon', 'sugar'], level: 1, cookMinutes: 2, color: '#fff08a' },
+  { id: 'mandarinJuice', name: 'Jus de mandarine', ingredients: ['mandarin', 'mandarin'], level: 1, cookMinutes: 2, color: '#ffa53d' },
+  { id: 'tomatoSoup', name: 'Soupe de tomates', ingredients: ['tomato', 'tomato'], level: 1, cookMinutes: 3, color: '#d9473f' },
+  { id: 'pumpkinPuree', name: 'Purée de citrouille', ingredients: ['pumpkin', 'butter'], level: 1, cookMinutes: 4, color: '#f7a64a' },
+  { id: 'honeyToast', name: 'Tartine au miel', ingredients: ['wheat', 'honey'], level: 1, cookMinutes: 3, color: '#efb02e' },
+  { id: 'thymeHoneyTea', name: 'Tisane thym et miel', ingredients: ['thyme', 'honey'], level: 1, cookMinutes: 4, color: '#d9c070' },
+  { id: 'waffles', name: 'Gaufres', ingredients: ['wheat', 'eggs', 'milk'], level: 2, cookMinutes: 10, color: '#e6b45c' },
+  { id: 'tomatoQuiche', name: 'Quiche à la tomate', ingredients: ['eggs', 'cheese', 'tomato'], level: 2, cookMinutes: 14, color: '#eb8a5a' },
+  { id: 'pestoPasta', name: 'Pâtes au pesto', ingredients: ['pasta', 'basil', 'cheese'], level: 2, cookMinutes: 10, color: '#7fb04f' },
+  { id: 'cheeseOmelette', name: 'Omelette au fromage', ingredients: ['eggs', 'cheese'], level: 2, cookMinutes: 8, color: '#f5cf4f' },
+  { id: 'chocolateMousse', name: 'Mousse au chocolat', ingredients: ['chocolate', 'eggs', 'sugar'], level: 2, cookMinutes: 12, color: '#7b4a2e' },
+  { id: 'mushroomPan', name: 'Poêlée de champignons', ingredients: ['mushroom', 'butter', 'thyme'], level: 2, cookMinutes: 12, color: '#9a7350' },
+  { id: 'blackberryCrumble', name: 'Crumble aux mûres', ingredients: ['blackberry', 'wheat', 'butter'], level: 2, cookMinutes: 14, color: '#86579e' },
+  { id: 'mandarinCake', name: 'Gâteau à la mandarine', ingredients: ['mandarin', 'wheat', 'eggs'], level: 2, cookMinutes: 12, color: '#f7a23f' },
+  { id: 'hazelnutRocks', name: 'Rochers aux noisettes', ingredients: ['hazelnut', 'chocolate'], level: 2, cookMinutes: 8, color: '#6e432a' },
+  { id: 'gingerbread', name: 'Pain d’épices', ingredients: ['wheat', 'honey', 'spice'], level: 3, cookMinutes: 25, color: '#b8642d' },
+  { id: 'vanillaIceCream', name: 'Glace à la vanille', ingredients: ['milk', 'sugar', 'vanilla'], level: 3, cookMinutes: 25, color: '#f7ecc8' },
+  { id: 'spicedPumpkinPie', name: 'Tarte à la citrouille épicée', ingredients: ['pumpkin', 'wheat', 'butter', 'spice'], level: 3, cookMinutes: 30, color: '#d97a33' },
+  { id: 'moonflowerFondant', name: 'Fondant à la fleur de lune', ingredients: ['moonflower', 'chocolate', 'vanilla'], level: 3, cookMinutes: 25, color: '#8a6fb8' },
+  { id: 'goldenTatin', name: 'Tarte Tatin dorée', ingredients: ['goldenApple', 'wheat', 'butter', 'sugar'], level: 3, cookMinutes: 30, color: '#e8b33c' },
+  { id: 'gardenCurry', name: 'Curry du potager', ingredients: ['carrot', 'rice', 'spice'], level: 3, cookMinutes: 25, color: '#e09a2f' },
+  { id: 'frostIceCream', name: 'Glace à la fleur de givre', ingredients: ['frostflower', 'milk', 'vanilla'], level: 3, cookMinutes: 25, color: '#cdeefa' },
 ];
 
 export function dish(id: DishId): Dish {

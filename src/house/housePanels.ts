@@ -24,6 +24,7 @@ import {
   ingredient,
   plant,
   type Character,
+  type Dish,
   type DishId,
   type FurnitureId,
   type IngredientId,
@@ -40,7 +41,9 @@ import {
   chaptersUnlocked,
   coins,
   cook,
+  cookBlock,
   dishStars,
+  missingFor,
   harvest,
   openRoom,
   place,
@@ -96,7 +99,7 @@ const ROOM_ICONS: Record<RoomId, string> = {
 
 const ROOM_GUIDES: Record<RoomId, string> = {
   living: 'Tes visiteurs se promènent dans la maison. Quand l’un d’eux prend la pose ✨, touche-le quand le cercle doré rejoint le viseur en pointillés : le viseur brille, c’est le moment de la photo.',
-  kitchen: 'Mets des aliments dans la marmite puis « Cuisiner ». Un mélange qui ne donne rien ne coûte rien. Sers ensuite tes plats à tes visiteurs : ils gagnent de l’amitié.',
+  kitchen: 'Le livre de recettes montre tous les plats et leurs ingrédients : « Cuisiner » en lance un quand tu as tout. Sers ensuite tes plats à tes visiteurs : ils gagnent de l’amitié.',
   cafe: 'Un service de thé de 90 secondes : tes amis viennent s’attabler parmi les clients.',
   garden: 'Dans le jardin, touche une parcelle vide pour choisir où planter, une plante 💧 pour l’arroser (elle pousse deux fois plus vite) et une plante mûre pour la récolter. Les plantes poussent même quand le site est fermé.',
   bedroom: 'Une pièce calme : certains visiteurs ne viennent que si elle est ouverte.',
@@ -312,7 +315,8 @@ function gardenPart(ctx: PanelContext, now: number): HTMLElement[] {
 // -----------------------------------------------
 
 let pot: IngredientId[] = [];
-let kitchenExtra: 'grocery' | 'recipes' | null = null;
+let showGrocery = false;
+let bookTab: BookTab = 'ready';
 
 function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
   const { save } = ctx;
@@ -333,30 +337,6 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
     );
   }
 
-  // The pot: tap pantry slots to fill it, tap a filled place to take the food back.
-  pot = pot.filter((id, i) => pot.slice(0, i + 1).filter((x) => x === id).length <= (save.pantry[id] ?? 0)).slice(0, level.ingredients);
-  const places = Array.from({ length: level.ingredients }, (_, i) => {
-    const id = pot[i];
-    const placeButton = el('button', { class: `house-pot-place${id ? ' is-filled' : ''}`, type: 'button', 'aria-label': id ? `Retirer ${ingredient(id).name}` : 'Place libre' }, ...(id ? [foodIcon(id, 30)] : []));
-    placeButton.disabled = !id;
-    placeButton.addEventListener('click', () => {
-      pot.splice(i, 1);
-      ctx.commit();
-    });
-    return placeButton;
-  });
-  const cookButton = el('button', { class: 'button', type: 'button', text: 'Cuisiner' });
-  cookButton.disabled = pot.length < 2;
-  cookButton.addEventListener('click', () => {
-    const result = cook(save, pot, Date.now());
-    if (result.ok) {
-      ctx.say(result.discovered ? `Nouvelle recette : ${dish(result.dish).name} !` : `${dish(result.dish).name} au feu !`);
-      pot = [];
-    } else ctx.say(COOK_REFUSALS[result.reason]);
-    ctx.commit(true);
-  });
-  parts.push(el('div', { class: 'house-pot' }, el('strong', { text: 'Marmite' }), el('div', { class: 'house-pot-places' }, ...places), cookButton));
-
   if (save.cooking.length > 0) {
     parts.push(
       el(
@@ -365,26 +345,6 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
         ...save.cooking.map((c) => el('span', { class: 'house-burner' }, `🔥 ${dish(c.dish).name} · ${c.readyAt <= now ? 'prêt !' : duration(c.readyAt - now)}`)),
         el('small', { text: `${level.burners - save.cooking.length} feu${level.burners - save.cooking.length > 1 ? 'x' : ''} libre${level.burners - save.cooking.length > 1 ? 's' : ''}` }),
       ),
-    );
-  }
-
-  parts.push(sectionTitle('Garde-manger'));
-  const stocked = INGREDIENTS.filter((p) => (save.pantry[p.id] ?? 0) > 0);
-  if (stocked.length === 0) parts.push(el('p', { class: 'house-note', text: 'Vide pour l’instant : récolte le jardin ou passe à l’épicerie.' }));
-  else {
-    const slots = stocked.map((p) => {
-      const left = (save.pantry[p.id] ?? 0) - pot.filter((id) => id === p.id).length;
-      const slot = el('button', { class: `house-slot is-${p.kind}`, type: 'button', title: p.name, 'aria-label': `${p.name}, ${left}` }, foodIcon(p.id, 30), el('span', { class: 'house-slot-name', text: p.name }), el('span', { class: 'house-slot-count', text: `${left}` }));
-      slot.disabled = left <= 0 || pot.length >= level.ingredients;
-      slot.addEventListener('click', () => {
-        pot.push(p.id);
-        ctx.commit();
-      });
-      return slot;
-    });
-    parts.push(
-      el('div', { class: 'house-inventory' }, ...slots),
-      el('p', { class: 'house-legend' }, el('span', { class: 'is-garden', text: 'du jardin' }), el('span', { class: 'is-grocery', text: 'de l’épicerie' }), el('span', { class: 'is-rare', text: 'rare' })),
     );
   }
 
@@ -408,15 +368,12 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
   parts.push(...snackPart(ctx));
   if (save.table.length > 0) parts.push(el('p', { class: 'house-note', text: `Sur la table : ${save.table.map((id) => dish(id).name).join(', ')}. Les prochains visiteurs se régaleront.` }));
 
-  const toggle = (id: 'grocery' | 'recipes', label: string) => {
-    const button = el('button', { class: `button button-secondary${kitchenExtra === id ? ' is-on' : ''}`, type: 'button', text: label });
-    button.addEventListener('click', () => {
-      kitchenExtra = kitchenExtra === id ? null : id;
-      ctx.commit();
-    });
-    return button;
-  };
-  const tools = el('div', { class: 'house-actions' }, toggle('grocery', '🛒 Épicerie'), toggle('recipes', `📖 Recettes ${save.known.length}/${DISHES.length}`));
+  const grocery = el('button', { class: `button button-secondary${showGrocery ? ' is-on' : ''}`, type: 'button', text: '🛒 Épicerie' });
+  grocery.addEventListener('click', () => {
+    showGrocery = !showGrocery;
+    ctx.commit();
+  });
+  const tools = el('div', { class: 'house-actions' }, grocery);
   const nextLevel = KITCHEN_LEVELS[save.kitchenLevel + 1];
   if (nextLevel) {
     const upgrade = el('button', { class: 'button button-secondary', type: 'button' }, `⬆ ${nextLevel.name} · `, price(nextLevel.price));
@@ -429,9 +386,62 @@ function kitchenPart(ctx: PanelContext, now: number): HTMLElement[] {
     tools.append(upgrade);
   }
   parts.push(tools);
-  if (kitchenExtra === 'grocery') parts.push(...groceryPart(ctx));
-  if (kitchenExtra === 'recipes') parts.push(recipeBook(save));
+  if (showGrocery) parts.push(...groceryPart(ctx));
+
+  parts.push(...recipeBook(ctx));
+
+  // Free mixing: tap pantry slots to fill the pot, tap a filled place to take the food back.
+  pot = pot.filter((id, i) => pot.slice(0, i + 1).filter((x) => x === id).length <= (save.pantry[id] ?? 0)).slice(0, level.ingredients);
+  const places = Array.from({ length: level.ingredients }, (_, i) => {
+    const id = pot[i];
+    const placeButton = el('button', { class: `house-pot-place${id ? ' is-filled' : ''}`, type: 'button', 'aria-label': id ? `Retirer ${ingredient(id).name}` : 'Place libre' }, ...(id ? [foodIcon(id, 30)] : []));
+    placeButton.disabled = !id;
+    placeButton.addEventListener('click', () => {
+      pot.splice(i, 1);
+      ctx.commit();
+    });
+    return placeButton;
+  });
+  const cookButton = el('button', { class: 'button', type: 'button', text: 'Cuisiner' });
+  cookButton.disabled = pot.length < 2;
+  cookButton.addEventListener('click', () => {
+    if (startCooking(ctx, pot)) pot = [];
+    ctx.commit(true);
+  });
+  parts.push(
+    sectionTitle('Marmite libre'),
+    el('p', { class: 'house-note', text: 'Pour cuisiner sans le livre : mets des aliments du garde-manger dans la marmite.' }),
+    el('div', { class: 'house-pot' }, el('strong', { text: 'Marmite' }), el('div', { class: 'house-pot-places' }, ...places), cookButton),
+  );
+
+  parts.push(sectionTitle('Garde-manger'));
+  const stocked = INGREDIENTS.filter((p) => (save.pantry[p.id] ?? 0) > 0);
+  if (stocked.length === 0) parts.push(el('p', { class: 'house-note', text: 'Vide pour l’instant : récolte le jardin ou passe à l’épicerie.' }));
+  else {
+    const slots = stocked.map((p) => {
+      const left = (save.pantry[p.id] ?? 0) - pot.filter((id) => id === p.id).length;
+      const slot = el('button', { class: `house-slot is-${p.kind}`, type: 'button', title: p.name, 'aria-label': `${p.name}, ${left}` }, foodIcon(p.id, 30), el('span', { class: 'house-slot-name', text: p.name }), el('span', { class: 'house-slot-count', text: `${left}` }));
+      slot.disabled = left <= 0 || pot.length >= level.ingredients;
+      slot.addEventListener('click', () => {
+        pot.push(p.id);
+        ctx.commit();
+      });
+      return slot;
+    });
+    parts.push(
+      el('div', { class: 'house-inventory' }, ...slots),
+      el('p', { class: 'house-legend' }, el('span', { class: 'is-garden', text: 'du jardin' }), el('span', { class: 'is-grocery', text: 'de l’épicerie' }), el('span', { class: 'is-rare', text: 'rare' })),
+    );
+  }
   return parts;
+}
+
+/** Cooks and tells how it went; the caller commits. */
+function startCooking(ctx: PanelContext, ingredients: IngredientId[]): boolean {
+  const result = cook(ctx.save, ingredients, Date.now());
+  if (result.ok) ctx.say(result.discovered ? `Nouvelle recette : ${dish(result.dish).name} !` : `${dish(result.dish).name} au feu !`);
+  else ctx.say(COOK_REFUSALS[result.reason]);
+  return result.ok;
 }
 
 /** One dish for everyone at home, once per visit. */
@@ -488,17 +498,121 @@ function groceryPart(ctx: PanelContext): HTMLElement[] {
   ];
 }
 
-function recipeBook(save: HouseSave): HTMLElement {
-  const unknown = DISHES.length - save.known.length;
-  return el(
-    'div',
-    { class: 'house-recipes' },
-    sectionTitle('Livre de recettes'),
-    ...save.known.map((id) =>
-      el('div', { class: 'house-recipe' }, el('strong', { text: dish(id).name }), el('span', { class: 'house-recipe-foods' }, ...dish(id).ingredients.map((p) => foodIcon(p, 22))), el('small', { text: `+${dishStars(dish(id))} ♥` })),
-    ),
-    el('p', { class: 'house-note', text: unknown > 0 ? `${unknown} recette${unknown > 1 ? 's' : ''} à découvrir : essaie des mélanges !` : 'Toutes les recettes sont découvertes !' }),
+type BookTab = 'ready' | 'missing' | 'later';
+
+const BOOK_TABS: { id: BookTab; label: string; empty: string }[] = [
+  { id: 'ready', label: 'Prêtes', empty: 'Rien de prêt pour l’instant : « À compléter » dit quoi récolter ou acheter.' },
+  { id: 'missing', label: 'À compléter', empty: 'Tout est prêt à cuisiner !' },
+  { id: 'later', label: 'Plus tard', empty: 'Ta cuisine fait déjà toutes les recettes.' },
+];
+
+/** The tab a recipe falls in: cookable now, short of food, or waiting for a better kitchen. */
+function bookTabOf(save: HouseSave, d: Dish): BookTab {
+  if (d.level > save.kitchenLevel + 1) return 'later';
+  return missingFor(save, d).length > 0 ? 'missing' : 'ready';
+}
+
+/** Every recipe as a tile, under three tabs; a tile opens its card. */
+function recipeBook(ctx: PanelContext): HTMLElement[] {
+  const { save } = ctx;
+  const byTab = (tab: BookTab) => DISHES.filter((d) => bookTabOf(save, d) === tab);
+  const tabs = el('div', { class: 'house-tabs', role: 'tablist' });
+  for (const tab of BOOK_TABS) {
+    const button = el('button', { class: `house-tab${tab.id === bookTab ? ' is-active' : ''}`, type: 'button', role: 'tab', 'aria-selected': String(tab.id === bookTab) }, `${tab.label} `, el('span', { class: 'house-tab-count', text: `${byTab(tab.id).length}` }));
+    button.addEventListener('click', () => {
+      bookTab = tab.id;
+      ctx.commit();
+    });
+    tabs.append(button);
+  }
+  const shown = byTab(bookTab).sort((a, b) => (bookTab === 'later' ? a.level - b.level : missingFor(save, a).length - missingFor(save, b).length));
+  return [
+    sectionTitle(`📖 Livre de recettes · ${save.known.length}/${DISHES.length} cuisinées`),
+    tabs,
+    shown.length > 0
+      ? el('div', { class: 'house-recipe-grid' }, ...shown.map((d) => recipeTile(ctx, d)))
+      : el('p', { class: 'house-note', text: BOOK_TABS.find((t) => t.id === bookTab)!.empty }),
+  ];
+}
+
+function recipeTile(ctx: PanelContext, d: Dish): HTMLElement {
+  const { save } = ctx;
+  const missing = missingFor(save, d);
+  const foods = d.ingredients.map((id) => {
+    const icon = foodIcon(id, 20);
+    if (missing.includes(id)) icon.classList.add('is-missing');
+    return icon;
+  });
+  const hint = bookTabOf(save, d) === 'missing' ? `manque ${missing.length}` : bookTabOf(save, d) === 'later' ? KITCHEN_LEVELS[d.level - 1].name : `+${dishStars(d)} ♥`;
+  const tile = el(
+    'button',
+    { class: `house-recipe-tile is-${bookTabOf(save, d)}`, type: 'button', 'aria-label': d.name },
+    el('span', { class: 'house-recipe-foods' }, ...foods),
+    el('strong', { text: d.name }),
+    el('small', { text: hint }),
   );
+  tile.addEventListener('click', () => openRecipe(ctx, d));
+  return tile;
+}
+
+/** The recipe card: each ingredient, what is short and where to find it, and the button that cooks. */
+function openRecipe(ctx: PanelContext, d: Dish): void {
+  const { save } = ctx;
+  const block = cookBlock(save, d);
+  const needed = (id: IngredientId) => d.ingredients.filter((x) => x === id).length;
+  const rows = [...new Set(d.ingredients)].map((id) => {
+    const have = save.pantry[id] ?? 0;
+    const short = have < needed(id);
+    return el(
+      'li',
+      { class: `house-gift-row${short ? ' is-short' : ''}` },
+      foodIcon(id, 32),
+      el('span', {}, el('b', { text: `${needed(id) > 1 ? `${needed(id)} × ` : ''}${ingredient(id).name}` }), el('small', { text: short ? `il en manque · ${ingredientSource(save, id)}` : `✓ ${have} au garde-manger` })),
+    );
+  });
+  const status =
+    block === 'level' ? `Il faut « ${KITCHEN_LEVELS[d.level - 1].name} » pour ce plat.` : block === 'busy' ? 'Tous les feux sont occupés : attends qu’un plat soit prêt.' : null;
+  const close = el('button', { class: 'button button-secondary', type: 'button', text: 'Fermer' });
+  const actions = el('div', { class: 'house-actions' }, close);
+  if (block !== 'level' && block !== 'missing') {
+    const cookButton = el('button', { class: 'button', type: 'button', text: 'Cuisiner' });
+    cookButton.disabled = block === 'busy';
+    cookButton.addEventListener('click', () => {
+      dialog.remove();
+      startCooking(ctx, d.ingredients);
+      ctx.commit(true);
+    });
+    actions.prepend(cookButton);
+  }
+  const dialog = el(
+    'div',
+    { class: 'house-dialog', role: 'dialog', 'aria-label': d.name },
+    el(
+      'div',
+      { class: 'house-news' },
+      el('strong', {}, d.name, ...(save.known.includes(d.id) ? [] : [el('span', { class: 'house-recipe-new', text: 'jamais cuisinée' })])),
+      el('small', { class: 'house-recipe-meta', text: `+${dishStars(d)} ♥ à qui le mange · ${d.cookMinutes} min de cuisson` }),
+      el('ul', { class: 'house-gift-list' }, ...rows),
+      ...(status ? [el('p', { class: 'house-note', text: status })] : []),
+      actions,
+    ),
+  );
+  close.addEventListener('click', () => dialog.remove());
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) dialog.remove();
+  });
+  document.body.append(dialog);
+}
+
+/** Where an ingredient comes from, short enough for a recipe line. */
+function ingredientSource(save: HouseSave, id: IngredientId): string {
+  const garden = PLANTS.find((p) => p.id === id);
+  if (garden?.rare) return 'graine rare laissée par un visiteur';
+  if (garden) return garden.seasons ? `jardin, ${garden.seasons.map((s) => SEASON_NAMES[s].toLowerCase()).join(' et ')}` : 'jardin';
+  const staple = STAPLES.find((s) => s.id === id);
+  if (staple) return staple.level > save.kitchenLevel ? `épicerie, avec « ${KITCHEN_LEVELS[staple.level].name} »` : 'épicerie';
+  const giver = CHARACTERS.find((c) => c.rare === id);
+  return giver ? `cadeau de ${giver.name}` : 'rare';
 }
 
 const COOK_REFUSALS: Record<'nothing' | 'level' | 'missing' | 'busy', string> = {

@@ -18,6 +18,14 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-15',
+    date: '15 novembre',
+    news: [
+      '🍳 La maison : le livre de recettes est refait. Trois onglets (Prêtes, À compléter, Plus tard), et chaque recette dit ce qui manque et où le trouver.',
+      '🍳 La maison : 24 nouvelles recettes, 59 en tout.',
+    ],
+  },
+  {
     id: '2026-11-12',
     date: '12 novembre',
     news: [

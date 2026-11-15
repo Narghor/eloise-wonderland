@@ -156,9 +156,9 @@ export function harvest(save: HouseSave, index: number, now: number): number {
 // KITCHEN
 // -----------------------------------------------
 
-export type CookResult =
-  | { ok: true; dish: DishId; discovered: boolean }
-  | { ok: false; reason: 'nothing' | 'level' | 'missing' | 'busy' };
+export type CookBlock = 'level' | 'missing' | 'busy';
+
+export type CookResult = { ok: true; dish: DishId; discovered: boolean } | { ok: false; reason: 'nothing' | CookBlock };
 
 /** The recipe these ingredients make, whatever the kitchen level. */
 export function recipeFor(ingredients: IngredientId[]): Dish | undefined {
@@ -166,16 +166,28 @@ export function recipeFor(ingredients: IngredientId[]): Dish | undefined {
   return DISHES.find((dish) => [...dish.ingredients].sort().join('+') === key);
 }
 
+/** The ingredients short in the pantry for one batch of this dish, each named once. */
+export function missingFor(save: HouseSave, recipe: Dish): IngredientId[] {
+  const needed = new Map<IngredientId, number>();
+  for (const id of recipe.ingredients) needed.set(id, (needed.get(id) ?? 0) + 1);
+  return [...needed].filter(([id, count]) => (save.pantry[id] ?? 0) < count).map(([id]) => id);
+}
+
+/** Why this dish cannot start right now, or null when it can. */
+export function cookBlock(save: HouseSave, recipe: Dish): CookBlock | null {
+  if (recipe.level > save.kitchenLevel + 1) return 'level';
+  if (save.cooking.length >= KITCHEN_LEVELS[save.kitchenLevel].burners) return 'busy';
+  if (missingFor(save, recipe).length > 0) return 'missing';
+  return null;
+}
+
 /** Starts cooking. Nothing is used up unless a dish actually starts. */
 export function cook(save: HouseSave, ingredients: IngredientId[], now: number): CookResult {
   const recipe = recipeFor(ingredients);
   if (!recipe) return { ok: false, reason: 'nothing' };
-  if (recipe.level > save.kitchenLevel + 1) return { ok: false, reason: 'level' };
-  if (save.cooking.length >= KITCHEN_LEVELS[save.kitchenLevel].burners) return { ok: false, reason: 'busy' };
-  const needed = new Map<IngredientId, number>();
-  for (const id of ingredients) needed.set(id, (needed.get(id) ?? 0) + 1);
-  for (const [id, count] of needed) if ((save.pantry[id] ?? 0) < count) return { ok: false, reason: 'missing' };
-  for (const [id, count] of needed) save.pantry[id] = (save.pantry[id] ?? 0) - count;
+  const block = cookBlock(save, recipe);
+  if (block) return { ok: false, reason: block };
+  for (const id of recipe.ingredients) save.pantry[id] = (save.pantry[id] ?? 0) - 1;
   save.cooking.push({ dish: recipe.id, readyAt: now + recipe.cookMinutes * MINUTE_MS });
   const discovered = !save.known.includes(recipe.id);
   if (discovered) save.known.push(recipe.id);
