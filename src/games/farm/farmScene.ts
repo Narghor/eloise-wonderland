@@ -3,8 +3,14 @@ import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
 import { placeable } from './data/placeables';
 import type { PlaceableId } from './data/types';
 import {
+  GROUND_MARGIN,
+  OUTLINE,
   TILE,
   animalSprite,
+  butterflySprite,
+  chimneyOf,
+  cropSprite,
+  fernSprite,
   fieldSprite,
   hazelSprite,
   itemIcon,
@@ -14,6 +20,7 @@ import {
   paintGround,
   readyBubble,
   signSprite,
+  soilTile,
   uiIcon,
   wildTreeSprite,
   type Sprite,
@@ -65,12 +72,30 @@ interface WildThing {
   sprite: Sprite;
   x: number;
   y: number;
+  shadow: boolean;
+}
+
+interface Butterfly {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  colour: 0 | 1 | 2;
+  phase: number;
 }
 
 const DRAG_START_PX = 7;
 /** World pixels shown along the short side of the screen, close and far. */
 const VIEW_TILES = [12, 19];
 const WALK_SPEED = 0.012;
+/** The ground past the map's edge, under the forest. */
+const FOREST_FLOOR = '#3f6b35';
+/** The front lip of a tilled patch. */
+const SOIL_LIP = '#7a4c30';
+const BUTTERFLIES = 3;
+/** A bird's shadow crosses the screen this long, once in this many milliseconds. */
+const BIRD_FLIGHT_MS = 5000;
+const BIRD_EVERY_MS = 26000;
 
 export class FarmScene {
   readonly canvas = document.createElement('canvas');
@@ -90,6 +115,7 @@ export class FarmScene {
   private wild: WildThing[] = [];
   private signs: { parcel: number; x: number; y: number }[] = [];
   private readonly actors = new Map<number, Actor[]>();
+  private readonly butterflies: Butterfly[] = [];
   private cam = { x: 0, y: 0 };
   private zoom = 0;
   private dpr = 1;
@@ -143,26 +169,38 @@ export class FarmScene {
     });
     this.wild = [];
     const random = mulberry32(77);
+    const inMap = (x: number, y: number) => x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE;
     const free = (x: number, y: number) =>
-      x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE && !isOwned(this.save, x, y) && !isWater(x, y) && !this.signs.some((s) => Math.abs(s.x - x) <= 1 && Math.abs(s.y - y) <= 1);
+      !isWater(x, y) && (inMap(x, y) ? !isOwned(this.save, x, y) && !this.signs.some((s) => Math.abs(s.x - x) <= 1 && Math.abs(s.y - y) <= 1) : Math.abs(x - MAP_SIZE / 2) <= MAP_SIZE / 2 + GROUND_MARGIN);
     const taken = new Set<string>();
-    for (let y = -2; y < MAP_SIZE + 2; y++) {
-      for (let x = -2; x < MAP_SIZE + 2; x++) {
-        const roll = random();
-        const outside = x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE;
-        if (!outside && !free(x, y)) continue;
-        if (taken.has(`${x},${y}`)) continue;
-        if (roll < 0.17 && x % 2 === 0 && y % 2 === 1 && (outside || (free(x + 1, y) && free(x, y - 1) && free(x + 1, y - 1)))) {
-          for (const [dx, dy] of [[0, 0], [1, 0], [0, -1], [1, -1]]) taken.add(`${x + dx},${y + dy}`);
-          this.wild.push(this.placeWild(wildTreeSprite(Math.floor(random() * 3)), x, y - 1, 2, 2));
-        } else if (!outside && roll < 0.3) this.wild.push(this.placeWild(objectSprite('bush', 'face'), x, y, 1, 1));
-        else if (!outside && roll < 0.35) this.wild.push(this.placeWild(objectSprite('rock', 'face'), x, y, 1, 1));
-      }
-    }
+    const span = (visit: (x: number, y: number) => void) => {
+      for (let y = -GROUND_MARGIN; y < MAP_SIZE + GROUND_MARGIN; y++) for (let x = -GROUND_MARGIN; x < MAP_SIZE + GROUND_MARGIN; x++) visit(x, y);
+    };
+    // Trees first, so the undergrowth never sits under a trunk: a dense forest past the map, a few in the meadow.
+    span((x, y) => {
+      const roll = random();
+      const forest = !inMap(x, y);
+      // A positive modulo: the forest also grows left of and above the map, where x and y are negative.
+      const mod = (n: number, m: number) => ((n % m) + m) % m;
+      const onGrid = forest ? mod(x + (mod(y, 4) === 1 ? 1 : 0), 2) === 0 && mod(y, 2) === 1 : mod(x, 2) === 0 && mod(y, 2) === 1;
+      if (!onGrid || roll >= (forest ? 0.85 : 0.14)) return;
+      const tiles = [[0, 0], [1, 0], [0, -1], [1, -1]].map(([dx, dy]) => [x + dx, y + dy]);
+      if (!tiles.every(([tx, ty]) => free(tx, ty) && !taken.has(`${tx},${ty}`))) return;
+      for (const [tx, ty] of tiles) taken.add(`${tx},${ty}`);
+      this.wild.push(this.placeWild(wildTreeSprite(Math.floor(random() * 3)), x, y - 1, 2, 2, true));
+    });
+    // Then a light undergrowth and a few stones: enough to feel wild, not a grid of weeds.
+    span((x, y) => {
+      const roll = random();
+      if (!free(x, y) || taken.has(`${x},${y}`)) return;
+      const forest = !inMap(x, y);
+      if (roll < (forest ? 0.3 : 0.07)) this.wild.push(this.placeWild(fernSprite(Math.floor(random() * 3)), x, y, 1, 1, false));
+      else if (!forest && roll < 0.1) this.wild.push(this.placeWild(objectSprite('rock', 'face'), x, y, 1, 1, true));
+    });
   }
 
-  private placeWild(sprite: Sprite, x: number, y: number, w: number, h: number): WildThing {
-    return { sprite, x: x * TILE + Math.floor((w * TILE - sprite.width) / 2), y: (y + h) * TILE - sprite.height + 1 };
+  private placeWild(sprite: Sprite, x: number, y: number, w: number, h: number, shadow: boolean): WildThing {
+    return { sprite, x: x * TILE + Math.floor((w * TILE - sprite.width) / 2), y: (y + h) * TILE - sprite.height + 1, shadow };
   }
 
   // -----------------------------------------------
@@ -215,7 +253,7 @@ export class FarmScene {
   }
 
   private clampCamera(): void {
-    const margin = 3 * TILE;
+    const margin = 4 * TILE;
     const vw = this.width / this.scale;
     const vh = this.height / this.scale;
     const size = MAP_SIZE * TILE;
@@ -257,6 +295,7 @@ export class FarmScene {
     this.last = now;
     if (this.width > 0) {
       this.walk(dt);
+      this.flutter(dt);
       this.draw(now);
       this.onFrame?.();
     }
@@ -266,7 +305,7 @@ export class FarmScene {
   private spriteOf(o: PlacedObject, now: number): Sprite {
     if (o.type === 'field') {
       const state = fieldState(o, Date.now());
-      return fieldSprite(state === 'empty' ? null : o.crop!, state);
+      return state === 'empty' ? soilTile() : cropSprite(o.crop!, state, 0);
     }
     if (o.type === 'hazel') return hazelSprite(readyOn(o, Date.now()) !== null);
     void now;
@@ -297,39 +336,68 @@ export class FarmScene {
     const camY = Math.round(this.cam.y * this.pixel) / this.pixel;
     ctx.setTransform(this.pixel, 0, 0, this.pixel, -camX * this.pixel, -camY * this.pixel);
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#6ea957';
+    ctx.fillStyle = FOREST_FLOOR;
     ctx.fillRect(camX - 2, camY - 2, this.width / this.scale + 4, this.height / this.scale + 4);
-    if (this.ground) ctx.drawImage(this.ground, 0, 0);
-    if (this.editMode || this.ghost) this.drawGrid();
+    if (this.ground) ctx.drawImage(this.ground, -GROUND_MARGIN * TILE, -GROUND_MARGIN * TILE);
+    this.drawWater(now);
 
     const clock = Date.now();
     const view = { x0: camX - 3 * TILE, y0: camY - 3 * TILE, x1: camX + this.width / this.scale + 3 * TILE, y1: camY + this.height / this.scale + 5 * TILE };
     const visible = (x: number, y: number, w: number, h: number) => x + w > view.x0 && x < view.x1 && y + h > view.y0 && y < view.y1;
 
+    // Fields first, as one tilled patch: their soil joins, the edge is drawn only where the patch ends.
+    const fields = new Set<string>();
+    for (const o of this.save.objects) if (o.type === 'field' && this.ghost?.uid !== o.uid) fields.add(`${o.x},${o.y}`);
+    for (const o of this.save.objects) {
+      if (o.type !== 'field' || this.ghost?.uid === o.uid || !visible(o.x * TILE, o.y * TILE, TILE, TILE)) continue;
+      this.drawSoil(o.x, o.y, fields);
+    }
+    if (this.editMode || this.ghost) this.drawGrid();
+    this.drawBirdShadow(now, view);
+
     type Drawable = { base: number; draw: () => void };
     const flat: (() => void)[] = [];
     const list: Drawable[] = [];
-    for (const w of this.wild) if (visible(w.x, w.y, w.sprite.width, w.sprite.height)) list.push({ base: w.y + w.sprite.height, draw: () => ctx.drawImage(w.sprite, w.x, w.y) });
+    for (const w of this.wild) {
+      if (!visible(w.x, w.y, w.sprite.width, w.sprite.height)) continue;
+      list.push({
+        base: w.y + w.sprite.height,
+        draw: () => {
+          if (w.shadow) this.shadow(w.x + 3, w.y + w.sprite.height - 2, w.sprite.width - 6);
+          ctx.drawImage(w.sprite, w.x, w.y);
+        },
+      });
+    }
     const sign = signSprite();
     for (const s of this.signs) {
       const x = s.x * TILE + Math.floor((TILE - sign.width) / 2);
       const y = (s.y + 1) * TILE - sign.height + 1;
-      list.push({ base: y + sign.height, draw: () => ctx.drawImage(sign, x, y) });
+      list.push({ base: y + sign.height, draw: () => (this.shadow(x + 3, y + sign.height - 2, sign.width - 6), ctx.drawImage(sign, x, y)) });
     }
     for (const o of this.save.objects) {
       if (this.ghost?.uid === o.uid) continue;
+      const kind = placeable(o.type).kind;
+      if (kind === 'field') {
+        const state = fieldState(o, clock);
+        if (state === 'empty') continue;
+        const sway = state === 'ripe' && !this.reduced ? (Math.floor(now / 650 + o.x * 0.37 + o.y * 0.71) % 2 as 0 | 1) : 0;
+        const plants = cropSprite(o.crop!, state, sway);
+        const at = this.origin(o, plants);
+        list.push({ base: at.y + plants.height, draw: () => this.drawFieldPlants(o, plants, at, now) });
+        continue;
+      }
       const sprite = this.spriteOf(o, now);
       const at = this.origin(o, sprite);
       if (!visible(at.x, at.y, sprite.width, sprite.height)) continue;
-      const kind = placeable(o.type).kind;
       const paint = () => {
         const chosen = this.selected === o.uid;
         if (chosen) ctx.globalAlpha = 0.75 + 0.2 * Math.sin(now / 180);
-        if (kind === 'machine' || kind === 'pen' || kind === 'tree' || o.type === 'well' || o.type === 'appleTree') this.shadow(at.x + 3, at.y + sprite.height - 2, sprite.width - 6);
+        this.shadow(at.x + 3, at.y + sprite.height - 2, sprite.width - 6);
         this.stamp(sprite, at.x, at.y, o.rot === 3);
         if (o.type === 'mill') this.drawSails(o, at, now);
         ctx.globalAlpha = 1;
         if (chosen) this.outline(o, '#fff6c8');
+        this.drawSmoke(o, sprite, at, now);
       };
       if (placeable(o.type).flat) flat.push(paint);
       else list.push({ base: at.y + sprite.height, draw: paint });
@@ -339,10 +407,145 @@ export class FarmScene {
     for (const paint of flat) paint();
     list.sort((a, b) => a.base - b.base);
     for (const d of list) d.draw();
+    this.drawButterflies(now);
 
     // On top of everything: what is ready, and the ripe fields' sparkles.
     if (!this.editMode) {
       for (const o of this.save.objects) this.drawReady(o, clock, now);
+    }
+  }
+
+  // -----------------------------------------------
+  // FIELDS AS ONE PATCH
+  // -----------------------------------------------
+
+  private drawSoil(x: number, y: number, fields: Set<string>): void {
+    const ctx = this.ctx;
+    const px = x * TILE;
+    const py = y * TILE;
+    ctx.drawImage(soilTile(), px, py);
+    const has = (dx: number, dy: number) => fields.has(`${x + dx},${y + dy}`);
+    ctx.fillStyle = OUTLINE;
+    if (!has(0, -1)) ctx.fillRect(px, py, TILE, 1);
+    if (!has(-1, 0)) ctx.fillRect(px, py, 1, TILE);
+    if (!has(1, 0)) ctx.fillRect(px + TILE - 1, py, 1, TILE);
+    if (!has(0, 1)) {
+      // The patch's front edge: a darker lip of earth, so it sits in the ground instead of on it.
+      ctx.fillStyle = SOIL_LIP;
+      ctx.fillRect(px, py + TILE - 3, TILE, 2);
+      ctx.fillStyle = OUTLINE;
+      ctx.fillRect(px, py + TILE - 1, TILE, 1);
+    }
+  }
+
+  private drawFieldPlants(field: PlacedObject, plants: Sprite, at: { x: number; y: number }, now: number): void {
+    const chosen = this.selected === field.uid;
+    if (chosen) this.ctx.globalAlpha = 0.75 + 0.2 * Math.sin(now / 180);
+    this.ctx.drawImage(plants, at.x, at.y);
+    this.ctx.globalAlpha = 1;
+    if (chosen) this.outline(field, '#fff6c8');
+  }
+
+  // -----------------------------------------------
+  // LIFE: butterflies, a bird passing, chimney smoke, the stream glinting
+  // -----------------------------------------------
+
+  private drawButterflies(now: number): void {
+    if (this.reduced) return;
+    for (const b of this.butterflies) {
+      const frame = (Math.floor(now / 140 + b.phase * 7) % 2) as 0 | 1;
+      const bob = Math.round(Math.sin(now / 300 + b.phase * 6) * 2);
+      this.ctx.drawImage(butterflySprite(b.colour, frame), Math.round(b.x), Math.round(b.y) + bob);
+    }
+  }
+
+  private flutter(dt: number): void {
+    if (this.reduced) return;
+    const owned = this.ownedBox();
+    if (!owned) return;
+    while (this.butterflies.length < BUTTERFLIES) {
+      const x = owned.x0 + Math.random() * (owned.x1 - owned.x0);
+      const y = owned.y0 + Math.random() * (owned.y1 - owned.y0);
+      this.butterflies.push({ x, y, tx: x, ty: y, colour: (this.butterflies.length % 3) as 0 | 1 | 2, phase: Math.random() });
+    }
+    for (const b of this.butterflies) {
+      const dx = b.tx - b.x;
+      const dy = b.ty - b.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 2) {
+        b.tx = Math.min(Math.max(b.x + (Math.random() - 0.5) * 120, owned.x0), owned.x1);
+        b.ty = Math.min(Math.max(b.y + (Math.random() - 0.5) * 90, owned.y0), owned.y1);
+        continue;
+      }
+      const step = Math.min(distance, dt * 0.02);
+      b.x += (dx / distance) * step;
+      b.y += (dy / distance) * step;
+    }
+  }
+
+  /** The owned land's bounding box in world pixels, where butterflies stay. */
+  private ownedBox(): { x0: number; y0: number; x1: number; y1: number } | null {
+    if (this.save.parcels.length === 0) return null;
+    const xs = this.save.parcels.map((p) => (p % PARCELS_PER_SIDE) * PARCEL);
+    const ys = this.save.parcels.map((p) => Math.floor(p / PARCELS_PER_SIDE) * PARCEL);
+    return { x0: Math.min(...xs) * TILE, y0: Math.min(...ys) * TILE, x1: (Math.max(...xs) + PARCEL) * TILE - 8, y1: (Math.max(...ys) + PARCEL) * TILE - 8 };
+  }
+
+  /** Now and then the shadow of a bird glides over the farm. */
+  private drawBirdShadow(now: number, view: { x0: number; y0: number; x1: number; y1: number }): void {
+    if (this.reduced) return;
+    const cycle = (now % BIRD_EVERY_MS) / BIRD_FLIGHT_MS;
+    if (cycle > 1) return;
+    const run = Math.floor(now / BIRD_EVERY_MS);
+    const lane = mulberry32(run)();
+    const x = view.x0 + (view.x1 - view.x0) * cycle;
+    const y = view.y0 + (view.y1 - view.y0) * (0.2 + 0.6 * lane) - cycle * 40;
+    const flap = Math.floor(now / 220) % 2 === 0 ? 7 : 5;
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(40, 55, 30, 0.13)';
+    ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 2);
+    ctx.fillRect(Math.round(x) - flap, Math.round(y) - 1, flap - 1, 1);
+    ctx.fillRect(Math.round(x) + 2, Math.round(y) - 1, flap - 1, 1);
+  }
+
+  private drawSmoke(o: PlacedObject, sprite: Sprite, at: { x: number; y: number }, now: number): void {
+    if (this.reduced || pendingJobs(o, Date.now()) === 0) return;
+    const chimney = chimneyOf(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
+    if (!chimney) return;
+    const cx = at.x + (o.rot === 3 ? sprite.width - chimney.x : chimney.x);
+    const ctx = this.ctx;
+    for (let i = 0; i < 3; i++) {
+      const k = ((now / 1700 + i / 3) % 1);
+      ctx.globalAlpha = 0.85 * (1 - k);
+      ctx.fillStyle = '#fffaf2';
+      const sx = Math.round(cx + Math.sin(k * 5 + i) * 2 + k * 3);
+      const sy = Math.round(at.y + chimney.y - 2 - k * 16);
+      const size = k < 0.4 ? 2 : 3;
+      ctx.fillRect(sx - 1, sy, size, size - 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Little glints running down the stream. */
+  private drawWater(now: number): void {
+    if (this.reduced) return;
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    const x0 = Math.floor(this.cam.x / TILE) - 1;
+    const y0 = Math.floor(this.cam.y / TILE) - 1;
+    const x1 = x0 + Math.ceil(this.width / this.scale / TILE) + 2;
+    const y1 = y0 + Math.ceil(this.height / this.scale / TILE) + 2;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (!isWater(tx, ty) || (tx === 18 && (ty === 11 || ty === 12))) continue;
+        const seed = (tx * 73 + ty * 151) % 97;
+        const k = ((now / 2600 + seed / 97) % 1);
+        if (k > 0.5) continue;
+        const along = tx === 18 ? 'y' : 'x';
+        const gx = tx * TILE + (along === 'x' ? Math.floor(k * 2 * TILE) : 4 + (seed % 8));
+        const gy = ty * TILE + (along === 'y' ? Math.floor(k * 2 * TILE) : 5 + (seed % 6));
+        ctx.fillRect(gx, gy, 2, 1);
+      }
     }
   }
 

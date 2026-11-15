@@ -39,7 +39,9 @@ On ne reprend ni les noms, ni les dessins, ni les textes des jeux du commerce : 
 5. **Toujours quelque chose à faire en 2 minutes**, et toujours quelque chose de long à lancer avant de partir.
 6. **L'absence rapporte** : au retour, tout est prêt à ramasser, les noisetiers ont donné, de nouvelles commandes
    sont arrivées.
-7. **Chaque minuteur se lit** : « prêt à 18 h 40 », jamais une barre sans heure.
+7. **Chaque minuteur se lit** : jamais une barre seule. Un champ qui pousse montre une barre **et le temps restant**
+   (« Encore 1 min 58 », choix de Flo du 15/11 au premier test) ; les files des machines et les enclos disent
+   l'heure de fin (« prêt à 18 h 40 »).
 8. **Accélérer se gagne en jouant** (boosters), et ne devient jamais nécessaire pour avancer.
 
 ---
@@ -483,3 +485,16 @@ elle se teste et se simule seule.
 
 À regarder au premier vrai test (non vérifié sur téléphone) : la lisibilité des pousses (« sprout » se voit peu sur
 la terre), le pincement à deux doigts, la place des bulles sur un petit écran, le son.
+
+### Premier test de Flo sur téléphone (15/11 au soir)
+
+- **Les graines** : plus de bulle au-dessus du champ (elle cachait les champs). Une rangée de graines s'ouvre en bas,
+  au-dessus de la barre : par l'onglet « Graines », ou en touchant un champ vide (qui devient le champ choisi).
+  On fait glisser une graine sur les champs vides ; toucher une graine sème le champ choisi.
+- **Pas d'étiquettes sur la carte** (« Terrain » partout cassait le côté mignon) : seuls les panneaux en bois
+  dessinés, qu'on touche pour leur prix ; le vieux pont se touche directement.
+- **Passe graphique** (critique de Claude validée par Flo) : sol plus chaud et varié, lisière organique de la ferme,
+  forêt dense tout autour de la carte (marge `GROUND_MARGIN` de 6 cases), fougères dehors et ronces sur les buissons
+  à dégager, ombre sous tout objet posé, champs voisins raccordés en une parcelle labourée, papillons, ombre
+  d'oiseau, blé mûr qui ondule, fumée des cheminées qui travaillent, reflets du ruisseau (tout se coupe avec
+  « réduire les animations »), boutons latéraux plus petits, noisette peinte sur les panneaux.

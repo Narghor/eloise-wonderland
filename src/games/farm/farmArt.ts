@@ -32,6 +32,8 @@ interface Painter {
   disc(cx: number, cy: number, r: number, col: string): void;
   line(x0: number, y0: number, x1: number, y1: number, col: string): void;
   map(x: number, y: number, rows: readonly string[], pal: Record<string, string>): void;
+  /** Crops only: the row the next plant stands on (the wind leans what is high above it). */
+  foot?(y: number): void;
 }
 
 function canvas(w: number, h: number): HTMLCanvasElement {
@@ -159,22 +161,95 @@ export function fieldSprite(crop: CropId | null, stage: FieldStage): Sprite {
         P.rect(1, y - 1, 12, 1, C.soilLight);
       }
       if (!crop || shown === 'empty') return;
-      if (shown === 'sprout') {
-        for (const yc of RIDGES) for (const xc of [3, 7, 11]) {
-          P.px(xc, yc, C.leafLight);
-          P.px(xc - 1, yc - 1, C.leaf);
-          P.px(xc + 1, yc - 1, C.leafLight);
-        }
-        return;
-      }
-      CROP_PAINT[crop](P, shown === 'ripe');
+      if (shown === 'sprout') paintSprouts(P);
+      else CROP_PAINT[crop](P, shown === 'ripe');
     }),
   );
+}
+
+/** Seedlings in rows: a bright V of two leaves on a short stem, so a sown field reads at a glance. */
+function paintSprouts(P: Painter): void {
+  for (const yc of RIDGES) for (const xc of [3, 7, 11]) {
+    P.foot?.(yc);
+    P.px(xc, yc, C.leafDark);
+    P.px(xc, yc - 1, C.leaf);
+    P.px(xc - 1, yc - 2, C.leafLight);
+    P.px(xc, yc - 2, C.leaf);
+    P.px(xc + 1, yc - 2, C.leafLight);
+    P.px(xc - 1, yc - 3, '#a8e86f');
+    P.px(xc + 1, yc - 3, '#a8e86f');
+  }
+}
+
+/** One tile of tilled soil, no outline: neighbouring fields join into one ploughed patch. */
+export function soilTile(): Sprite {
+  return cached('soil', () =>
+    sprite(TILE, TILE, (P) => {
+      P.rect(0, 0, TILE, TILE, C.soil);
+      // Furrows on the same rows as the plants' feet (see cropSprite).
+      for (const y of [5, 9, 13]) {
+        P.rect(0, y, TILE, 1, C.soilDark);
+        P.rect(0, y - 1, TILE, 1, C.soilLight);
+      }
+      for (const [x, y] of [[3, 2], [11, 7], [6, 11], [13, 15], [1, 14]] as const) P.px(x, y, C.soilDark);
+      for (const [x, y] of [[9, 2], [2, 7], [14, 11]] as const) P.px(x, y, C.soilLight);
+    }, false, 0),
+  );
+}
+
+/**
+ * The plants of a field without their soil, standing on the tile bottom like other sprites (16 x 24 inside,
+ * soilTile under them). Frame 1 leans every plant's top one pixel to the right: the wind.
+ */
+export function cropSprite(crop: CropId, stage: 'sprout' | 'growing' | 'ripe', frame: 0 | 1): Sprite {
+  return cached(`crop-${crop}-${stage}-${frame}`, () =>
+    sprite(16, FIELD_H, (P) => {
+      // Pumpkins lie on the ground and never set a foot: they do not sway.
+      const L = leaning(P, 1, frame === 1);
+      if (stage === 'sprout') paintSprouts(L);
+      else CROP_PAINT[crop](L, stage === 'ripe');
+    }),
+  );
+}
+
+/** A painter shifted `dx` to the right; when `wind`, a plant's pixels 3 rows or more above its foot lean 1 px more. */
+function leaning(P: Painter, dx: number, wind: boolean): Painter {
+  let foot = Infinity;
+  const px = (x: number, y: number, col: string) => {
+    const lean = wind && foot !== Infinity && foot - Math.round(y) >= 3 ? 1 : 0;
+    P.px(x + dx + lean, y, col);
+  };
+  const L: Painter = {
+    px,
+    foot: (y) => (foot = y),
+    rect(x, y, w, h, col) {
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(x + i, y + j, col);
+    },
+    ellipse(cx, cy, rx, ry, col) {
+      for (let y = -ry; y <= ry; y++) {
+        for (let x = -rx; x <= rx; x++) {
+          if ((x * x) / ((rx + 0.45) * (rx + 0.45)) + (y * y) / ((ry + 0.45) * (ry + 0.45)) <= 1) px(cx + x, cy + y, col);
+        }
+      }
+    },
+    disc: (cx, cy, r, col) => L.ellipse(cx, cy, r, r, col),
+    line(x0, y0, x1, y1, col) {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) px(Math.round(x0 + ((x1 - x0) * i) / (steps || 1)), Math.round(y0 + ((y1 - y0) * i) / (steps || 1)), col);
+    },
+    map(x, y, rows, pal) {
+      rows.forEach((row, j) => [...row].forEach((ch, i) => {
+        if (ch !== '.' && pal[ch]) px(x + i, y + j, pal[ch]);
+      }));
+    },
+  };
+  return L;
 }
 
 const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   wheat(P, ripe) {
     for (const yc of RIDGES) for (const xc of [2, 6, 10]) {
+      P.foot?.(yc);
       if (ripe) {
         P.line(xc + 1, yc + 1, xc + 1, yc - 1, C.goldDark);
         P.rect(xc, yc - 5, 1, 4, C.gold);
@@ -191,6 +266,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
   corn(P, ripe) {
     for (const yc of RIDGES) for (const xc of [3, 9]) {
+      P.foot?.(yc);
       const h = ripe ? 8 : 5;
       P.line(xc, yc + 1, xc, yc + 1 - h, C.leafDark);
       P.px(xc - 1, yc - 2, C.leaf);
@@ -207,6 +283,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
   carrot(P, ripe) {
     for (const yc of RIDGES) for (const xc of [3, 9]) {
+      P.foot?.(yc);
       P.px(xc, yc - 2, C.leafDark);
       P.px(xc - 1, yc - 3, C.leaf);
       P.px(xc + 1, yc - 3, C.leafLight);
@@ -223,6 +300,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
   tomato(P, ripe) {
     for (const yc of [13, 20]) for (const xc of [3, 10]) {
+      P.foot?.(yc);
       P.ellipse(xc, yc - 2, 2, 2, C.leaf);
       P.px(xc - 1, yc - 3, C.leafLight);
       P.px(xc + 1, yc - 1, C.leafDark);
@@ -236,6 +314,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
   strawberry(P, ripe) {
     for (const yc of RIDGES) for (const xc of [3, 10]) {
+      P.foot?.(yc);
       P.ellipse(xc, yc - 1, 2, 1, C.leaf);
       P.px(xc - 1, yc - 2, C.leafLight);
       P.px(xc + 1, yc - 1, C.leafDark);
@@ -252,6 +331,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
   sunflower(P, ripe) {
     for (const yc of [14, 21]) for (const xc of [3, 10]) {
+      P.foot?.(yc);
       P.line(xc, yc, xc, yc - 8, C.leafDark);
       P.px(xc - 1, yc - 3, C.leaf);
       P.px(xc - 2, yc - 4, C.leafLight);
@@ -291,6 +371,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
   cotton(P, ripe) {
     for (const yc of [13, 17, 21]) for (const xc of [3, 10]) {
+      P.foot?.(yc);
       P.ellipse(xc, yc - 2, 2, 2, C.leafDark);
       P.px(xc - 1, yc - 3, C.leaf);
       P.px(xc + 1, yc - 2, C.leaf);
@@ -586,6 +667,16 @@ function spinning(view: View): Sprite {
       P.px(17, 43, C.gold);
     }
   });
+}
+
+/** Top of each chimney, in sprite pixels (margin included): where the scene lets smoke rise. */
+const CHIMNEYS: Partial<Record<PlaceableId, Partial<Record<View, { x: number; y: number }>>>> = {
+  bakery: { face: { x: 23, y: 0 }, profile: { x: 24, y: 0 } },
+  spinning: { face: { x: 6, y: 1 } },
+};
+
+export function chimneyOf(id: PlaceableId, view: View): { x: number; y: number } | null {
+  return CHIMNEYS[id]?.[view] ?? null;
 }
 
 // -----------------------------------------------
@@ -1065,14 +1156,27 @@ function pond(): Sprite {
   });
 }
 
+/** A bramble bush: thorny stems poking out tell it is something to clear, not a garden plant. */
 function bush(): Sprite {
-  return sprite(14, 11, (P) => {
-    P.disc(7, 6, 5, C.leafDark);
-    P.disc(4, 7, 3, C.leaf);
-    P.disc(9, 5, 4, C.leaf);
-    P.disc(7, 4, 2, C.leafLight);
-    P.px(5, 7, '#e86f9a');
-    P.px(10, 6, '#e86f9a');
+  return sprite(14, 12, (P) => {
+    P.disc(7, 7, 5, C.leafDark);
+    P.disc(4, 8, 3, C.leaf);
+    P.disc(9, 6, 4, C.leaf);
+    P.disc(7, 5, 2, C.leafLight);
+    const stem = '#8a4f3a';
+    P.line(1, 4, 3, 6, stem);
+    P.px(0, 3, stem);
+    P.px(2, 4, '#c9a07a');
+    P.line(12, 2, 11, 4, stem);
+    P.px(13, 1, stem);
+    P.px(12, 3, '#c9a07a');
+    P.line(6, 0, 7, 2, stem);
+    P.px(5, 1, '#c9a07a');
+    P.px(5, 8, '#7a2c4a');
+    P.px(6, 8, '#b0436e');
+    P.px(10, 7, '#7a2c4a');
+    P.px(11, 7, '#b0436e');
+    P.px(8, 10, '#7a2c4a');
   });
 }
 
@@ -1400,84 +1504,273 @@ export function signSprite(): Sprite {
       P.rect(0, 0, 16, 9, C.woodLight);
       P.rect(0, 8, 16, 1, C.wood);
       P.rect(1, 1, 14, 1, '#ecc58f');
-      P.rect(3, 3, 10, 1, C.wood);
-      P.rect(3, 5, 7, 1, C.wood);
+      P.px(0, 0, C.wood);
+      P.px(15, 0, C.wood);
+      // A painted Eloisette: this land is for sale.
+      P.map(5, 1, ['.a.a..', '.bbbb.', 'bccbbb', 'bcbbbd', '.bbdd.'], { a: '#5f8f33', b: '#b5763f', c: '#e6ad74', d: '#8a552b' });
     }),
   );
+}
+
+/** Wild undergrowth outside the farm: ferns and tall grass, never mistaken for a bramble to clear. */
+export function fernSprite(seed: number): Sprite {
+  const variant = ((seed % 3) + 3) % 3;
+  return cached(`fern-${variant}`, () =>
+    sprite(14, 12, (P) => {
+      const dark = '#3f7a45';
+      const mid = '#549450';
+      const light = '#79b465';
+      if (variant === 0) {
+        // A fern: arched fronds with little leaflets.
+        const frond = (x0: number, dir: 1 | -1, h: number) => {
+          for (let i = 0; i < h; i++) {
+            const x = x0 + Math.round(dir * (i * i) / (h * 1.6));
+            const y = 11 - i;
+            P.px(x, y, mid);
+            if (i > 1 && i % 2 === 0) {
+              P.px(x - 1, y, dark);
+              P.px(x + 1, y, light);
+            }
+          }
+        };
+        frond(6, -1, 10);
+        frond(7, 1, 11);
+        frond(4, -1, 7);
+        frond(9, 1, 8);
+        P.px(6, 1, light);
+        P.px(9, 0, light);
+      } else if (variant === 1) {
+        // Tall grass with a few seed heads.
+        for (const [x, h, lean] of [[2, 7, -1], [4, 10, 0], [6, 8, 1], [8, 11, 0], [10, 9, 1], [12, 6, 1]] as const) {
+          P.line(x, 11, x + lean, 11 - h, x % 4 === 0 ? mid : '#6f9a3a');
+          P.px(x + lean, 11 - h, '#c9b05a');
+        }
+        P.rect(1, 10, 12, 2, dark);
+      } else {
+        // Long pointed leaves fanning out from one foot, like a wild lily: nothing round like a bush.
+        for (const [x, top, lean] of [[2, 4, -1], [5, 1, 0], [8, 0, 0], [11, 3, 1]] as const) {
+          for (let y = top; y <= 11; y++) {
+            const t = (y - top) / (11 - top);
+            const cx = x + Math.round(lean * (1 - t) * 2) + (x < 7 ? Math.round(t * 2) : -Math.round(t * 2));
+            P.px(cx, y, t < 0.25 ? light : t < 0.7 ? mid : dark);
+            if (t > 0.2 && t < 0.75) P.px(cx + 1, y, t < 0.45 ? light : mid);
+          }
+        }
+      }
+    }),
+  );
+}
+
+const BUTTERFLY_COLORS: [string, string][] = [['#ff9ec4', '#ffd3e4'], ['#ffd84a', '#fff1a8'], ['#8fbfff', '#d3e6ff']];
+
+/** A tiny butterfly; frame 0 wings open, 1 wings closed. */
+export function butterflySprite(colour: 0 | 1 | 2, frame: 0 | 1): Sprite {
+  return cached(`butterfly-${colour}-${frame}`, () => {
+    const [wing, spot] = BUTTERFLY_COLORS[colour];
+    const rows = frame === 0 ? ['aa.aa', 'abxba', '.axa.', '..x..'] : ['.a.a.', '.axa.', '..x..', '.....'];
+    return mapSprite(rows, { a: wing, b: spot, x: OUTLINE });
+  });
 }
 
 // -----------------------------------------------
 // GROUND
 // -----------------------------------------------
 
+/** Tiles of ground drawn around the map on every side (forest edge, no more flat colour past the map). */
+export const GROUND_MARGIN = 6;
+
+const GROUND = {
+  mown: [0xa0, 0xcc, 0x6c], mownLight: [0xb2, 0xd7, 0x7c], mownDark: [0x8e, 0xbb, 0x5e], clover: [0x98, 0xc8, 0x6e],
+  meadow: [0x80, 0xae, 0x58], meadowLight: [0x8f, 0xbb, 0x63], meadowDark: [0x6d, 0x9b, 0x4b], meadowShade: [0x78, 0xa6, 0x53],
+  forest: [0x4e, 0x7a, 0x44], forestLight: [0x5b, 0x88, 0x4d], forestDark: [0x40, 0x68, 0x3a],
+  water: [0x5c, 0x9f, 0xd6], waterDark: [0x4a, 0x86, 0xbd], mud: [0x8f, 0x6a, 0x44], mudLight: [0xa8, 0x83, 0x56],
+} as const;
+
+/** A repeatable pseudo-random value in [0, 1) for a grid point. */
+function hash2(x: number, y: number, seed: number): number {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Smooth value noise in [0, 1): patches about `scale` pixels wide. */
+function noise(x: number, y: number, scale: number, seed: number): number {
+  const fx = x / scale;
+  const fy = y / scale;
+  const ix = Math.floor(fx);
+  const iy = Math.floor(fy);
+  const tx = fx - ix;
+  const ty = fy - iy;
+  const sx = tx * tx * (3 - 2 * tx);
+  const sy = ty * ty * (3 - 2 * ty);
+  const a = hash2(ix, iy, seed) + (hash2(ix + 1, iy, seed) - hash2(ix, iy, seed)) * sx;
+  const b = hash2(ix, iy + 1, seed) + (hash2(ix + 1, iy + 1, seed) - hash2(ix, iy + 1, seed)) * sx;
+  return a + (b - a) * sy;
+}
+
+/**
+ * The whole ground with GROUND_MARGIN tiles of forest floor around the map; map tile (0, 0) is at pixel
+ * (GROUND_MARGIN * TILE, GROUND_MARGIN * TILE). Mown grass on the farm, meadow outside, the farm's edge wobbling
+ * like real grass, the stream with its banks, the old bridge.
+ */
 export function paintGround(owned: (x: number, y: number) => boolean, bridgeDone: boolean): HTMLCanvasElement {
-  const size = MAP_SIZE * TILE;
+  const M = GROUND_MARGIN * TILE;
+  const size = MAP_SIZE * TILE + 2 * M;
   const c = canvas(size, size);
   const g = c.getContext('2d')!;
-  const r = mulberry32(21);
-  const dot = (x: number, y: number, w: number, h: number, col: string) => {
-    g.fillStyle = col;
-    g.fillRect(x, y, w, h);
-  };
-  const water = (x: number, y: number) => x >= MAP_SIZE || (x >= 0 && y >= 0 && y < MAP_SIZE && isWater(x, y));
+  const inMap = (tx: number, ty: number) => tx >= 0 && ty >= 0 && tx < MAP_SIZE && ty < MAP_SIZE;
+  const water = (tx: number, ty: number) => isWater(tx, ty);
+  type Region = 'mown' | 'meadow' | 'forest';
+  const regionOfTile = (tx: number, ty: number): Region => (!inMap(tx, ty) ? 'forest' : owned(tx, ty) ? 'mown' : 'meadow');
 
-  for (let ty = 0; ty < MAP_SIZE; ty++) {
-    for (let tx = 0; tx < MAP_SIZE; tx++) {
-      const X = tx * TILE;
-      const Y = ty * TILE;
-      if (isWater(tx, ty)) {
-        dot(X, Y, TILE, TILE, C.water);
-        for (let i = 0; i < 3; i++) {
-          const x = X + 2 + Math.floor(r() * 10);
-          const y = Y + 2 + Math.floor(r() * 12);
-          dot(x, y, 3, 1, C.waterLight);
-        }
-        dot(X + Math.floor(r() * 12), Y + Math.floor(r() * 14), 2, 1, C.waterDark);
-        // Banks where the stream meets the land.
-        if (!water(tx - 1, ty)) { dot(X, Y, 2, TILE, '#8f6a44'); dot(X + 2, Y, 1, TILE, C.waterDark); }
-        if (!water(tx + 1, ty)) { dot(X + TILE - 2, Y, 2, TILE, '#8f6a44'); dot(X + TILE - 3, Y, 1, TILE, C.waterDark); }
-        if (!water(tx, ty - 1)) { dot(X, Y, TILE, 2, '#b08a5a'); dot(X, Y + 2, TILE, 1, C.waterDark); }
-        if (!water(tx, ty + 1)) { dot(X, Y + TILE - 2, TILE, 2, '#8f6a44'); }
-        continue;
+  // Pixels first, straight into the image: textures, the wobbling edges, water and banks.
+  const image = g.createImageData(size, size);
+  const data = image.data;
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const wx = px - M;
+      const wy = py - M;
+      const tx = Math.floor(wx / TILE);
+      const ty = Math.floor(wy / TILE);
+      const h = hash2(px, py, 7);
+      let col: readonly number[];
+      if (water(tx, ty)) {
+        const lx = wx - tx * TILE;
+        const ly = wy - ty * TILE;
+        // A bank of uneven width wherever the water meets land.
+        const bank = 2 + Math.floor(noise(wx, wy, 5, 11) * 2.5);
+        const nearLand = (!water(tx - 1, ty) && lx < bank) || (!water(tx + 1, ty) && lx >= TILE - bank) || (!water(tx, ty - 1) && ly < bank) || (!water(tx, ty + 1) && ly >= TILE - bank);
+        const nearBank = (!water(tx - 1, ty) && lx < bank + 1) || (!water(tx + 1, ty) && lx >= TILE - bank - 1) || (!water(tx, ty - 1) && ly < bank + 1) || (!water(tx, ty + 1) && ly >= TILE - bank - 1);
+        col = nearLand ? (h < 0.3 ? GROUND.mudLight : GROUND.mud) : nearBank ? GROUND.waterDark : noise(wx, wy * 2, 7, 12) > 0.72 ? GROUND.waterDark : GROUND.water;
+      } else {
+        // The region of a jittered point: borders between grass kinds wobble and dither instead of running straight.
+        const jx = wx + Math.round((noise(wx, wy, 11, 1) - 0.5) * 14 + (noise(wx, wy, 4, 4) - 0.5) * 5) + (h < 0.25 ? 1 : 0);
+        const jy = wy + Math.round((noise(wx, wy, 11, 2) - 0.5) * 14 + (noise(wx, wy, 4, 5) - 0.5) * 5) + (h > 0.75 ? 1 : 0);
+        const sx = Math.floor(jx / TILE);
+        const sy = Math.floor(jy / TILE);
+        const region = water(sx, sy) ? regionOfTile(tx, ty) : regionOfTile(sx, sy);
+        const patch = noise(wx, wy, 9, 3);
+        if (region === 'mown') col = h < 0.05 ? GROUND.mownLight : h > 0.95 ? GROUND.mownDark : patch > 0.72 ? GROUND.clover : GROUND.mown;
+        else if (region === 'meadow') col = h < 0.07 ? GROUND.meadowLight : h > 0.92 ? GROUND.meadowDark : patch > 0.68 ? GROUND.meadowShade : GROUND.meadow;
+        else col = patch > 0.6 ? GROUND.forestDark : h < 0.06 ? GROUND.forestLight : GROUND.forest;
       }
-      const mine = owned(tx, ty);
-      dot(X, Y, TILE, TILE, mine ? '#8ccb68' : '#6ea957');
-      for (let i = 0; i < 9; i++) {
-        const col = mine ? (r() < 0.5 ? '#9ad574' : '#7fbe5d') : r() < 0.5 ? '#79b462' : '#5f9a4b';
-        dot(X + Math.floor(r() * TILE), Y + Math.floor(r() * TILE), 1, 1, col);
-      }
-      if (!mine) {
-        for (let i = 0; i < 3; i++) {
-          const x = X + Math.floor(r() * 14);
-          const y = Y + 2 + Math.floor(r() * 13);
-          dot(x, y, 1, 2, '#558f43');
-          dot(x + 2, y, 1, 2, '#558f43');
-          dot(x + 1, y - 1, 1, 3, '#558f43');
-        }
-      } else if (r() < 0.1) {
-        const x = X + 2 + Math.floor(r() * 12);
-        const y = Y + 2 + Math.floor(r() * 12);
-        const col = r() < 0.5 ? '#fff6e0' : '#ffc0d6';
-        dot(x, y, 1, 1, col);
-        dot(x - 1, y + 1, 1, 1, col);
-        dot(x + 1, y + 1, 1, 1, col);
-        dot(x, y + 2, 1, 1, col);
-        dot(x, y + 1, 1, 1, '#f2c94c');
-      }
+      const i = (py * size + px) * 4;
+      data[i] = col[0];
+      data[i + 1] = col[1];
+      data[i + 2] = col[2];
+      data[i + 3] = 255;
     }
   }
+  g.putImageData(image, 0, 0);
 
-  // The edge of the farm: a lighter rim inside, a darker one outside.
-  for (let ty = 0; ty < MAP_SIZE; ty++) {
-    for (let tx = 0; tx < MAP_SIZE; tx++) {
-      if (!owned(tx, ty) || isWater(tx, ty)) continue;
+  // Then the details, drawn tile by tile with a fixed seed: the ground looks the same at every visit.
+  const r = mulberry32(21);
+  const dot = (x: number, y: number, w: number, hh: number, col: string) => {
+    g.fillStyle = col;
+    g.fillRect(x + M, y + M, w, hh);
+  };
+  const tuft = (x: number, y: number, tall: number, dark: string, light: string) => {
+    dot(x, y - tall + 1, 1, tall, dark);
+    dot(x - 1, y - tall + 2, 1, tall - 1, dark);
+    dot(x + 1, y - tall + 3, 1, tall - 2, dark);
+    dot(x, y - tall + 1, 1, 1, light);
+  };
+  const flower = (x: number, y: number, petal: string) => {
+    dot(x, y - 1, 1, 1, petal);
+    dot(x - 1, y, 1, 1, petal);
+    dot(x + 1, y, 1, 1, petal);
+    dot(x, y + 1, 1, 1, petal);
+    dot(x, y, 1, 1, '#f2c94c');
+  };
+  const FLOWERS = ['#ffc0d6', '#fff6e0', '#ffe27a', '#d7c2ff'];
+  for (let ty = -GROUND_MARGIN; ty < MAP_SIZE + GROUND_MARGIN; ty++) {
+    for (let tx = -GROUND_MARGIN; tx < MAP_SIZE + GROUND_MARGIN; tx++) {
       const X = tx * TILE;
       const Y = ty * TILE;
-      const edge = (nx: number, ny: number) => nx >= 0 && ny >= 0 && nx < MAP_SIZE && ny < MAP_SIZE && !owned(nx, ny) && !isWater(nx, ny);
-      if (edge(tx, ty - 1)) { dot(X, Y, TILE, 1, 'rgba(255,255,255,.3)'); dot(X, Y - 1, TILE, 1, '#5a9147'); }
-      if (edge(tx, ty + 1)) { dot(X, Y + TILE - 1, TILE, 1, 'rgba(255,255,255,.3)'); dot(X, Y + TILE, TILE, 1, '#5a9147'); }
-      if (edge(tx - 1, ty)) { dot(X, Y, 1, TILE, 'rgba(255,255,255,.3)'); dot(X - 1, Y, 1, TILE, '#5a9147'); }
-      if (edge(tx + 1, ty)) { dot(X + TILE - 1, Y, 1, TILE, 'rgba(255,255,255,.3)'); dot(X + TILE, Y, 1, TILE, '#5a9147'); }
+      const at = () => [X + 2 + Math.floor(r() * 12), Y + 3 + Math.floor(r() * 11)] as const;
+      if (water(tx, ty)) {
+        for (let i = 0; i < 2; i++) {
+          const [x, y] = at();
+          dot(x, y, 3, 1, C.waterLight);
+        }
+        if (r() < 0.3) dot(X + 4 + Math.floor(r() * 8), Y + 4 + Math.floor(r() * 8), 1, 1, '#ffffff');
+        continue;
+      }
+      const region = regionOfTile(tx, ty);
+      if (region === 'mown') {
+        if (r() < 0.16) {
+          const petal = FLOWERS[Math.floor(r() * FLOWERS.length)];
+          const [x, y] = at();
+          flower(x, y, petal);
+          if (r() < 0.6) flower(x + 3 - Math.floor(r() * 7), y + 3, petal);
+        }
+        if (r() < 0.12) {
+          const [x, y] = at();
+          dot(x, y, 2, 1, '#b8955f');
+          dot(x + 1, y + 1, 1, 1, '#a3814f');
+        }
+        for (let i = 0; i < 2; i++) {
+          const [x, y] = at();
+          dot(x, y, 1, 2, '#bfe08a');
+        }
+      } else if (region === 'meadow') {
+        for (let i = 0; i < 3; i++) {
+          const [x, y] = at();
+          tuft(x, y, 3 + Math.floor(r() * 2), '#5c8a40', '#9cc46a');
+        }
+        if (r() < 0.08) {
+          const [x, y] = at();
+          flower(x, y, r() < 0.5 ? '#fff6e0' : '#ffe27a');
+        }
+        // Taller grass all along the farm's edge, on the meadow side.
+        const edges: [number, number, (i: number) => [number, number]][] = [
+          [tx, ty - 1, (i) => [X + i, Y + 4]], [tx, ty + 1, (i) => [X + i, Y + 14]],
+          [tx - 1, ty, (i) => [X + 3, Y + i]], [tx + 1, ty, (i) => [X + 12, Y + i]],
+        ];
+        for (const [nx, ny, spot] of edges) {
+          if (!inMap(nx, ny) || !owned(nx, ny) || water(nx, ny)) continue;
+          for (let i = 1 + Math.floor(r() * 3); i < TILE - 1; i += 3 + Math.floor(r() * 5)) {
+            if (r() < 0.25) continue;
+            const [x, y] = spot(i);
+            tuft(x, y + Math.floor(r() * 4) - 1, 4 + Math.floor(r() * 3), r() < 0.5 ? '#5f8f3e' : '#6b9a45', '#a8d070');
+          }
+        }
+      } else {
+        for (let i = 0; i < 5; i++) {
+          const [x, y] = at();
+          dot(x, y, 1 + Math.floor(r() * 2), 1, r() < 0.5 ? '#7a6a3a' : '#8f7a44');
+        }
+        for (let i = 0; i < 2; i++) {
+          const [x, y] = at();
+          tuft(x, y, 4, '#355a31', '#5f8f4f');
+        }
+        if (r() < 0.04) {
+          const [x, y] = at();
+          dot(x, y, 3, 1, '#d9534f');
+          dot(x + 1, y - 1, 1, 1, '#d9534f');
+          dot(x + 1, y + 1, 1, 2, '#f3e9d8');
+          dot(x, y, 1, 1, '#ffffff');
+        }
+      }
+      // Pebbles and reeds on land along the stream.
+      const touchesWater = water(tx - 1, ty) || water(tx + 1, ty) || water(tx, ty - 1) || water(tx, ty + 1);
+      if (touchesWater) {
+        const side = water(tx + 1, ty) ? [X + 13, Y] : water(tx - 1, ty) ? [X + 1, Y] : water(tx, ty + 1) ? [X, Y + 13] : [X, Y + 1];
+        const alongX = water(tx, ty + 1) || water(tx, ty - 1);
+        for (let i = 0; i < 3; i++) {
+          const k = 2 + Math.floor(r() * 12);
+          const [x, y] = alongX ? [side[0] + k, side[1]] : [side[0], side[1] + k];
+          dot(x, y, 2, 1, r() < 0.5 ? '#c9c1b4' : '#a59d90');
+        }
+        if (r() < 0.7) {
+          const k = 2 + Math.floor(r() * 11);
+          const [x, y] = alongX ? [side[0] + k, side[1] + 2] : [side[0], side[1] + k + 2];
+          for (const dx of [0, 2]) {
+            dot(x + dx, y - 4, 1, 5, '#5f8a3a');
+            dot(x + dx, y - 6, 1, 2, '#7a4f2e');
+          }
+        }
+      }
     }
   }
 
@@ -1586,8 +1879,24 @@ export function artBoard(): HTMLElement {
     }
     board.append(h, row);
   };
-  const stages: FieldStage[] = ['sprout', 'growing', 'ripe'];
-  section('Champs', [[fieldSprite(null, 'empty'), 'vide'], ...BOARD_CROPS.flatMap((crop) => stages.map((st): [Sprite, string] => [fieldSprite(crop, st), `${crop} ${st}`]))]);
+  const stages = ['sprout', 'growing', 'ripe'] as const;
+  // A field as the scene stacks it: three soil tiles side by side, the plants on each, frame 0 / 1 / 0.
+  const plot = (crop: CropId, stage: (typeof stages)[number]): Sprite => {
+    const c = canvas(3 * TILE + 2, 26);
+    const g = c.getContext('2d')!;
+    for (let i = 0; i < 3; i++) {
+      g.drawImage(soilTile(), 1 + i * TILE, 9);
+      g.drawImage(cropSprite(crop, stage, (i % 2) as 0 | 1), i * TILE, 0);
+    }
+    return c;
+  };
+  section('Champs (sol + plantes, vent au milieu)', [[soilTile(), 'sol'], ...BOARD_CROPS.flatMap((crop) => stages.map((st): [Sprite, string] => [plot(crop, st), `${crop} ${st}`]))]);
+  section('Champs (boutique, fantôme)', [[fieldSprite(null, 'empty'), 'vide'], ...BOARD_CROPS.map((crop): [Sprite, string] => [fieldSprite(crop, 'ripe'), crop])]);
+  section('Sauvage, papillons', [
+    [fernSprite(0), 'fougère'], [fernSprite(1), 'hautes herbes'], [fernSprite(2), 'touffe'], [objectSprite('bush', 'face'), 'ronces (à dégager)'],
+    ...([0, 1, 2] as const).flatMap((col): [Sprite, string][] => [[butterflySprite(col, 0), `papillon ${col}`], [butterflySprite(col, 1), 'ailes fermées']]),
+    [signSprite(), 'panneau'],
+  ], 4);
   section('Objets (face / profil)', BOARD_OBJECTS.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
   section('Arbres, ailes, animaux', [
     [hazelSprite(false), 'noisetier'], [hazelSprite(true), 'noisetier prêt'],
@@ -1600,7 +1909,8 @@ export function artBoard(): HTMLElement {
   section('Boosters', BOARD_BOOSTERS.map((id): [Sprite, string] => [boosterIcon(id), id]));
   section('Interface', BOARD_UI.map((id): [Sprite, string] => [uiIcon(id), id]));
   section('Visages', BOARD_PEOPLE.map((id): [Sprite, string] => [faceSprite(id), id]), 4);
-  const own = (x: number, y: number) => x >= 6 && x < 18 && y >= 6 && y < 18;
+  // The starting farm plus one parcel bought to the west, to see an L-shaped edge.
+  const own = (x: number, y: number) => (x >= 6 && x < 18 && y >= 6 && y < 18) || (x >= 0 && x < 6 && y >= 6 && y < 12);
   section('Sol', [[paintGround(own, false), 'pont cassé'], [paintGround(own, true), 'pont réparé']], 1);
   return board;
 }
