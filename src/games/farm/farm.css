@@ -303,8 +303,8 @@
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
   padding: 7px calc(env(safe-area-inset-right) + 6px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 6px);
   background: var(--wood);
   border-top: 4px solid var(--ui-border);
@@ -320,15 +320,17 @@
   background: none;
   border: 0;
   padding: 3px 0 1px;
-  font: 500 11.5px/1.1 var(--ui-font);
+  font: 500 11px/1.1 var(--ui-font);
   color: var(--bar-ink) !important;
+  min-width: 0;
+  white-space: nowrap;
   cursor: pointer;
   border-radius: 10px;
   text-shadow: 0 1px 0 rgb(60 30 10 / 0.55);
 }
 
 .farm-tab-ico {
-  width: 42px;
+  width: 40px;
   height: 40px;
   display: grid;
   place-items: center;
@@ -558,25 +560,81 @@
   transition: transform 0.65s cubic-bezier(0.5, -0.2, 0.7, 1), opacity 0.65s ease-in;
 }
 
-/* Parcel signs */
-.farm-tag {
+/* ----------------------------------------------- */
+/* THE SEED ROW: docked above the bottom bar        */
+/* ----------------------------------------------- */
+
+.farm-seedbar {
   position: absolute;
-  transform: translate(-50%, -100%);
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font: 600 11.5px/1 var(--ui-font);
-  background: var(--ui-surface);
-  border: 2px solid var(--ui-border);
-  box-shadow: 0 2px 0 rgb(60 35 20 / 0.45);
-  padding: 4px 7px;
-  border-radius: 7px;
-  white-space: nowrap;
-  cursor: pointer;
+  left: 6px;
+  right: 6px;
+  bottom: calc(var(--bar-h) + 6px);
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 6px 8px 8px;
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  z-index: 2;
+  animation: farm-up 0.18s ease-out;
 }
 
-.farm-tag.is-locked {
+.farm-seedbar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.farm-seedbar-head p {
+  margin: 0;
+  flex: 1;
+  font-size: 12px;
   color: var(--ui-muted);
+  line-height: 1.2;
+}
+
+.farm-seedbar-head .farm-close {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+}
+
+.farm-seedbar-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.farm-seedbar-row .farm-seed {
+  flex: none;
+  width: 72px;
+}
+
+.farm.has-seeds .farm-side {
+  bottom: calc(env(safe-area-inset-bottom) + 214px);
+}
+
+/* The seed riding above the finger during a swipe */
+.farm-held {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none !important;
+  z-index: 9;
+}
+
+.farm-progress.is-big {
+  height: 12px;
+  border: 2px solid var(--ui-border);
+}
+
+.farm-countdown {
+  font-size: 14px !important;
+  font-weight: 600;
+  color: var(--ui-ink) !important;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ----------------------------------------------- */

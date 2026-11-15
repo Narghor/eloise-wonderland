@@ -24,9 +24,10 @@ export function duration(minutes: number): string {
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`;
 }
 
-/** What is left before `time`, short: "45 s", "12 min", "2 h 10". */
-export function remaining(time: number, now: number): string {
-  const ms = Math.max(0, time - now);
-  if (ms < MINUTE_MS) return `${Math.ceil(ms / (MINUTE_MS / 60))} s`;
-  return duration(ms / MINUTE_MS);
+/** Time left, to the second under an hour: "45 s", "1 min 05", "2 h 10". */
+export function countdown(time: number, now: number): string {
+  const seconds = Math.max(0, Math.ceil(((time - now) / MINUTE_MS) * 60));
+  if (seconds < 60) return `${seconds} s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, '0')}`;
+  return duration(seconds / 60);
 }

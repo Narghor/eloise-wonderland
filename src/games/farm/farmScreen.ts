@@ -37,7 +37,7 @@ import {
   trayJobs,
   type Gain,
 } from './farmProduction';
-import { claimQuest, finishStage, gainXp, giveToProject, have, openChest, settle, type Notice } from './farmProgress';
+import { claimQuest, finishStage, gainXp, giveToProject, have, isUnlocked, openChest, settle, unlockText, type Notice } from './farmProgress';
 import {
   decoBubble,
   fieldBubble,
@@ -47,6 +47,7 @@ import {
   parcelBubble,
   penBubble,
   rewardLine,
+  seedRow,
   sheetContent,
   treeBubble,
   type FarmUi,
@@ -87,9 +88,10 @@ class FarmScreen implements FarmUi {
   private readonly scene: FarmScene;
   private readonly hud: FarmHud;
   private readonly toasts = el('div', { class: 'farm-toasts', role: 'status' });
-  private readonly tags: { el: HTMLElement; anchor: () => { x: number; y: number } | null }[] = [];
   private bubble: { el: HTMLElement; target: Target } | null = null;
   private sheet: { el: HTMLElement; id: SheetId; tab: string } | null = null;
+  /** The seed row, and the empty field touched to open it (a tapped seed sows that one). */
+  private seeds: { el: HTMLElement; chosen: PlacedObject | null } | null = null;
   private editing = false;
   private placing: PlaceableId | null = null;
   private banner: HTMLElement | null = null;
@@ -120,6 +122,7 @@ class FarmScreen implements FarmUi {
         this.hud.setZoom(this.scene.isFar);
       },
       help: () => openHelp(FARM_HELP),
+      seeds: () => (this.seeds ? this.closeSeeds() : this.openSeeds(null)),
     });
     this.overlay.append(this.hud.top, this.hud.quest, this.hud.side, this.toasts, this.hud.bar);
     if (CASINO_TEST_BUTTONS) this.overlay.append(this.testBar()); // TEST-BUTTONS
@@ -180,43 +183,32 @@ class FarmScreen implements FarmUi {
       if (this.sheet?.id === 'orders') this.renderSheet();
     }
     this.hud.refresh(this.save);
+    const target = this.bubble?.target;
+    if (target && 'uid' in target && target.type === 'field') {
+      const state = fieldState(target, now);
+      if (state === 'ripe') this.closeBubble();
+      else if (state !== 'empty') this.bubble!.el.replaceChildren(...(this.bubbleContent(target) ?? []));
+    }
   }
 
   // -----------------------------------------------
   // THE MAP
   // -----------------------------------------------
 
+  /** The ground, the wild around the farm and the wooden signs of the land for sale (touched for their price). */
   private refreshLand(): void {
-    const offers = parcelOffers(this.save);
-    this.scene.refreshLand(offers);
-    for (const tag of this.tags) tag.el.remove();
-    this.tags.length = 0;
-    for (const offer of offers) {
-      const locked = this.save.level < offer.level;
-      const tag = el('button', { class: `farm-tag${locked ? ' is-locked' : ''}`, type: 'button' }, offer.river ? 'La rive' : 'Terrain', ' · ', String(offer.price), spriteImage(uiIcon('nut'), 1), ...(locked ? [' · ', spriteImage(uiIcon('lock'), 1), `niv. ${offer.level}`] : []));
-      tag.addEventListener('click', () => this.tap({ parcel: offer.parcel }, [0, 0]));
-      this.tags.push({ el: tag, anchor: () => this.scene.signAnchor(offer.parcel) });
-    }
-    if (!this.save.projectsDone.includes('bridge')) {
-      const [bx, by] = BRIDGE_TILES[0];
-      const tag = el('button', { class: 'farm-tag', type: 'button' }, spriteImage(uiIcon('bridge'), 1), 'Le vieux pont');
-      tag.addEventListener('click', () => {
-        if (this.save.level < 10) this.toast('Basile dit que le vieux pont se répare à partir du niveau 10.');
-        else this.openSheet('quests', 'project', true);
-      });
-      this.tags.push({ el: tag, anchor: () => this.scene.toScreen((bx + 0.5) * 16, by * 16 - 2) });
-    }
-    this.overlay.prepend(...this.tags.map((t) => t.el));
+    this.scene.refreshLand(parcelOffers(this.save));
+  }
+
+  /** The old bridge is part of the ground: touching it tells about the project. */
+  private tapBridge(): void {
+    if (!isUnlocked(this.save, project('bridge').unlock)) this.toast(`Le vieux pont est cassé. Basile le réparera avec toi ${unlockText(project('bridge').unlock)}.`);
+    else this.openSheet('quests', 'project', true);
   }
 
   /** Every frame: the HTML that sits on the map follows the camera. */
   private follow(): void {
     const box = this.root.getBoundingClientRect();
-    for (const tag of this.tags) {
-      const p = tag.anchor();
-      tag.el.hidden = !p || p.x < -60 || p.y < -20 || p.x > box.width + 60 || p.y > box.height + 40;
-      if (p && !tag.el.hidden) tag.el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -100%)`;
-    }
     if (this.bubble) this.placeBubble(box);
     if (this.tools && this.scene.ghost) {
       const a = this.scene.anchorOf(this.scene.ghost);
@@ -241,12 +233,17 @@ class FarmScreen implements FarmUi {
       return;
     }
     if (this.sheet) this.closeSheet();
+    const isField = !!target && 'uid' in target && target.type === 'field';
+    const emptyField = isField && fieldState(target as PlacedObject, Date.now()) === 'empty';
+    if (this.seeds && !isField) this.closeSeeds();
+    if (!target && !this.save.projectsDone.includes('bridge') && BRIDGE_TILES.some(([x, y]) => x === tile[0] && y === tile[1])) return this.tapBridge();
     if (!target) return this.closeBubble();
     if ('parcel' in target) return this.openBubble(target);
     const kind = placeable(target.type).kind;
     const now = Date.now();
     if (kind === 'field') {
       if (fieldState(target, now) === 'ripe') return this.harvestField(target);
+      if (emptyField) return this.openSeeds(target);
       return this.openBubble(target);
     }
     if (kind === 'pen') {
@@ -321,6 +318,7 @@ class FarmScreen implements FarmUi {
 
   openSheet(id: SheetId, tab?: string, fromButton = false): void {
     this.closeBubble();
+    this.closeSeeds();
     if (this.editing || this.placing) this.exitEdit();
     if (fromButton && this.sheet?.id === id && (tab === undefined || tab === this.sheet.tab)) return this.closeSheet();
     const keep = this.sheet?.id === id ? this.sheet.el.querySelector('.farm-sheet-body')?.scrollTop ?? 0 : 0;
@@ -369,6 +367,7 @@ class FarmScreen implements FarmUi {
 
   private refreshPanels(): void {
     if (this.sheet) this.renderSheet();
+    if (this.seeds) this.renderSeeds();
     if (this.bubble) {
       const content = this.bubbleContent(this.bubble.target);
       if (content) this.bubble.el.replaceChildren(...content);
@@ -514,22 +513,63 @@ class FarmScreen implements FarmUi {
     this.commit();
   }
 
-  seedSwipe(id: CropId, first: PlacedObject, event: PointerEvent): void {
-    // The bubble hides during the swipe: the finger is followed on the window, not on its button.
+  // -----------------------------------------------
+  // THE SEED ROW
+  // -----------------------------------------------
+
+  private openSeeds(chosen: PlacedObject | null): void {
+    this.closeBubble();
+    if (!this.seeds) {
+      this.seeds = { el: el('div', { class: 'farm-seedbar farm-box' }), chosen };
+      this.seeds.el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      this.overlay.append(this.seeds.el);
+      this.root.classList.add('has-seeds');
+    }
+    this.seeds.chosen = chosen;
+    this.hud.setPressed('seeds');
+    this.renderSeeds();
+  }
+
+  private renderSeeds(): void {
+    if (!this.seeds) return;
+    const chosen = this.seeds.chosen && fieldState(this.seeds.chosen, Date.now()) === 'empty' ? this.seeds.chosen : null;
+    this.seeds.chosen = chosen;
+    this.scene.selected = chosen?.uid ?? null;
+    const scroll = this.seeds.el.querySelector('.farm-seedbar-row')?.scrollLeft ?? 0;
+    this.seeds.el.replaceChildren(...seedRow(this, chosen, () => this.closeSeeds()));
+    const row = this.seeds.el.querySelector('.farm-seedbar-row');
+    if (row) row.scrollLeft = scroll;
+  }
+
+  private closeSeeds(): void {
+    if (!this.seeds) return;
+    this.seeds.el.remove();
+    this.seeds = null;
+    if (!this.editing) this.scene.selected = null;
+    this.root.classList.remove('has-seeds');
+    this.hud.setPressed(this.sheet?.id ?? (this.editing ? 'build' : null));
+  }
+
+  /** A seed pressed in the row: a tap sows the chosen field, a drag sows every empty field the finger crosses. */
+  seedSwipe(id: CropId, event: PointerEvent): void {
     const pointer = event.pointerId;
     (event.target as Element).releasePointerCapture?.(pointer);
     const start = { x: event.clientX, y: event.clientY };
+    const held = spriteImage(itemIcon(id), 3);
+    held.classList.add('farm-held');
     let swiping = false;
     let last = start;
     let step = 0;
     let spent = 0;
     let broke = false;
+    let where: PlacedObject | null = null;
     const sowOne = (field: PlacedObject) => {
       if (fieldState(field, Date.now()) !== 'empty') return;
       if (!sow(this.save, field, id, Date.now())) {
         broke = this.save.nuts < crop(id).seed;
         return;
       }
+      where = field;
       spent += crop(id).seed;
       playSeed(step++);
       this.hud.refresh(this.save);
@@ -538,10 +578,12 @@ class FarmScreen implements FarmUi {
       if (e.pointerId !== pointer) return;
       if (!swiping && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) {
         swiping = true;
-        if (this.bubble) this.bubble.el.style.visibility = 'hidden';
-        sowOne(first);
+        this.overlay.append(held);
       }
       if (!swiping) return;
+      // The seed rides just above the finger, so the finger never hides it.
+      const box = this.root.getBoundingClientRect();
+      held.style.transform = `translate(${e.clientX - box.left - 18}px, ${e.clientY - box.top - 48}px)`;
       for (const field of this.scene.fieldsAlong(last, { x: e.clientX, y: e.clientY })) sowOne(field);
       last = { x: e.clientX, y: e.clientY };
     };
@@ -550,9 +592,13 @@ class FarmScreen implements FarmUi {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (!swiping) sowOne(first);
-      this.closeBubble();
-      if (spent > 0) this.float(this.screenOf(first), `−${spent}`, uiIcon('nut'));
+      held.remove();
+      const chosen = this.seeds?.chosen ?? null;
+      if (!swiping) {
+        if (chosen) sowOne(chosen);
+        else this.toast('Fais glisser la graine sur un champ vide.');
+      }
+      if (where && spent > 0) this.float(this.screenOf(where), `−${spent}`, uiIcon('nut'));
       if (broke) this.toast('Plus assez d’Éloisettes pour semer.');
       this.commit();
     };
@@ -715,6 +761,7 @@ class FarmScreen implements FarmUi {
   // -----------------------------------------------
 
   private enterEdit(): void {
+    this.closeSeeds();
     this.closeSheet();
     this.closeBubble();
     this.editing = true;
@@ -776,6 +823,7 @@ class FarmScreen implements FarmUi {
   }
 
   startPlacing(id: PlaceableId): void {
+    this.closeSeeds();
     this.closeSheet();
     this.closeBubble();
     this.applySelection();

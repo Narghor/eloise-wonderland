@@ -18,12 +18,14 @@ export interface HudActions {
   edit(): void;
   zoom(): void;
   help(): void;
+  seeds(): void;
 }
 
-const TABS: { id: SheetId | 'build'; label: string; icon: UiIcon }[] = [
+const TABS: { id: SheetId | 'build' | 'seeds'; label: string; icon: UiIcon }[] = [
   { id: 'barn', label: 'Grange', icon: 'barn' },
   { id: 'orders', label: 'Commandes', icon: 'orders' },
   { id: 'quests', label: 'Quêtes', icon: 'quests' },
+  { id: 'seeds', label: 'Graines', icon: 'seed' },
   { id: 'shop', label: 'Boutique', icon: 'shop' },
   { id: 'build', label: 'Aménager', icon: 'build' },
 ];
@@ -64,7 +66,7 @@ export class FarmHud {
     for (const tab of TABS) {
       const count = el('span', { class: 'farm-count' });
       const button = el('button', { class: 'farm-tab', type: 'button', 'aria-pressed': 'false' }, el('span', { class: 'farm-tab-ico' }, spriteImage(uiIcon(tab.icon), 3), count), tab.label);
-      button.addEventListener('click', () => (tab.id === 'build' ? actions.edit() : actions.sheet(tab.id)));
+      button.addEventListener('click', () => (tab.id === 'build' ? actions.edit() : tab.id === 'seeds' ? actions.seeds() : actions.sheet(tab.id)));
       this.counts.set(tab.id, count);
       this.tabs.set(tab.id, button);
       this.bar.append(button);

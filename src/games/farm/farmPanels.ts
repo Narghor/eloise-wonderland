@@ -44,7 +44,7 @@ import {
   unlockText,
 } from './farmProgress';
 import { canHurry, growingFields, shopLeft, siteCoins } from './farmBoosters';
-import { clockAt, duration } from './farmTime';
+import { MINUTE_MS, clockAt, countdown, duration } from './farmTime';
 import type { FarmSave, PlacedObject } from './farmSave';
 
 // -----------------------------------------------
@@ -61,7 +61,7 @@ export interface FarmUi {
   toast(text: string): void;
   startPlacing(id: PlaceableId): void;
   /** Starts a seed swipe from a seed button of the field bubble. */
-  seedSwipe(crop: CropId, field: PlacedObject, event: PointerEvent): void;
+  seedSwipe(crop: CropId, event: PointerEvent): void;
   sow(field: PlacedObject, crop: CropId): void;
   collect(object: PlacedObject): void;
   queue(machine: PlacedObject, itemId: ItemId): void;
@@ -132,39 +132,52 @@ export function placeableArt(id: PlaceableId): HTMLElement {
 // BUBBLES: the card next to a thing on the map
 // -----------------------------------------------
 
+/** A progress bar and the time left; the screen refreshes it every second while the bubble is open. */
+function growth(readyAt: number, total: number, now: number): HTMLElement[] {
+  const done = Math.min(1, Math.max(0, 1 - (readyAt - now) / total));
+  return [
+    el('div', { class: 'farm-progress is-big' }, el('i', { style: `width:${(100 * done).toFixed(1)}%` })),
+    el('p', { class: 'farm-countdown', text: `Encore ${countdown(readyAt, now)}` }),
+  ];
+}
+
+/** The seed row docked above the bottom bar: a seed is dragged onto the empty fields, or tapped for the chosen one. */
+export function seedRow(ui: FarmUi, chosen: PlacedObject | null, close: () => void): Node[] {
+  const seeds = CROPS.map((c) => {
+    const open = isUnlocked(ui.save, c.unlock);
+    const affordable = ui.save.nuts >= c.seed;
+    const b = el(
+      'button',
+      { class: `farm-seed${c.id === ui.save.lastSeed ? ' is-last' : ''}`, type: 'button', ...(open && affordable ? {} : { disabled: '' }) },
+      open ? img(itemIcon(c.id), 2) : img(uiIcon('lock'), 2),
+      item(c.id).name,
+      el('small', { text: open ? `${duration(c.minutes)} · ${c.seed}` : unlockText(c.unlock) }),
+    );
+    b.addEventListener('pointerdown', (e) => {
+      if (!open || !affordable) return;
+      e.preventDefault();
+      ui.seedSwipe(c.id, e);
+    });
+    return b;
+  });
+  const shut = el('button', { class: 'farm-close', type: 'button', 'aria-label': 'Fermer les graines', text: '×' });
+  shut.addEventListener('click', close);
+  return [
+    el('div', { class: 'farm-seedbar-head' }, el('p', { text: chosen ? 'Touche une graine pour ce champ, ou fais-la glisser sur les champs vides.' : 'Fais glisser une graine sur les champs vides.' }), shut),
+    el('div', { class: 'farm-seedbar-row' }, ...seeds),
+  ];
+}
+
 export function fieldBubble(ui: FarmUi, field: PlacedObject): Node[] {
   const now = ui.now();
   const state = fieldState(field, now);
-  if (state === 'empty') {
-    const seeds = CROPS.map((c) => {
-      const open = isUnlocked(ui.save, c.unlock);
-      const affordable = ui.save.nuts >= c.seed;
-      const b = el(
-        'button',
-        { class: `farm-seed${c.id === ui.save.lastSeed ? ' is-last' : ''}`, type: 'button', ...(open && affordable ? {} : { disabled: '' }) },
-        open ? img(itemIcon(c.id), 2) : img(uiIcon('lock'), 2),
-        item(c.id).name,
-        el('small', { text: open ? `${duration(c.minutes)} · ${c.seed}` : unlockText(c.unlock) }),
-      );
-      b.addEventListener('pointerdown', (e) => {
-        if (!open || !affordable) return;
-        e.preventDefault();
-        ui.seedSwipe(c.id, field, e);
-      });
-      return b;
-    });
-    return [
-      el('h3', {}, img(uiIcon('seed')), 'Semer'),
-      el('div', { class: 'farm-seeds' }, ...seeds),
-      el('p', { text: 'Touche une graine, ou fais-la glisser sur les champs vides pour tous les semer d’un coup. Prix en Éloisettes.' }),
-    ];
-  }
+  if (state === 'empty') return [el('h3', { text: 'Champ vide' }), el('p', { text: 'Ouvre les graines en bas pour le semer.' })];
   const c = crop(field.crop!);
   if (state === 'ripe') return [el('h3', { text: `${item(c.id).name} : c’est mûr !` }), el('p', { text: 'Touche le champ, ou glisse le doigt sur les champs mûrs.' })];
   const fertilizers = ui.save.boosters.fertilizer;
   return [
     el('h3', {}, img(itemIcon(c.id)), `${item(c.id).name} en train de pousser`),
-    el('p', { text: `Prêt à ${clockAt(field.readyAt!, now)}.` }),
+    ...growth(field.readyAt!, c.minutes * MINUTE_MS, now),
     el(
       'div',
       { class: 'farm-row' },
