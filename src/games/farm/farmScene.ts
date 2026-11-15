@@ -115,7 +115,8 @@ interface Butterfly {
 
 const DRAG_START_PX = 7;
 /** World pixels shown along the short side of the screen, close and far. */
-const VIEW_TILES = [12, 19];
+/** Tiles shown along the short side of the screen: the close and far views of the button, and the pinch limits. */
+const ZOOM_TILES = { near: 12, far: 22, closest: 7, farthest: 26 };
 const WALK_SPEED = 0.012;
 /** The ground past the map's edge, under the forest. */
 const FOREST_FLOOR = '#3f6b35';
@@ -147,7 +148,10 @@ export class FarmScene {
   private readonly butterflies: Butterfly[] = [];
   private particles: Particle[] = [];
   private cam = { x: 0, y: 0 };
-  private zoom = 0;
+  /** The zoom, as tiles across the short side of the screen: continuous, so pinching follows the fingers. */
+  private viewTiles = ZOOM_TILES.near;
+  /** Where the zoom button glides to, a few frames at a time. */
+  private zoomGoal: number | null = null;
   private dpr = 1;
   private scale = 2;
   private pixel = 2;
@@ -159,7 +163,7 @@ export class FarmScene {
   private pointers = new Map<number, { x: number; y: number }>();
   private gesture:
     | { mode: 'pending' | 'pan' | 'harvest' | 'ghost'; x: number; y: number; last: { x: number; y: number }; camX: number; camY: number; target: PlacedObject | { parcel: number } | null; grab: [number, number] }
-    | { mode: 'pinch'; distance: number; done: boolean }
+    | { mode: 'pinch'; distance: number; tiles: number; anchor: { x: number; y: number } }
     | null = null;
   private centred = false;
 
@@ -252,23 +256,52 @@ export class FarmScene {
     }
   }
 
+  /**
+   * The drawing scale follows the zoom continuously. Pixel art stays sharp: sprites are drawn without smoothing, and
+   * at a phone's 2 to 3 screen pixels per point the uneven pixel widths do not show.
+   */
   private applyZoom(): void {
     const short = Math.min(this.width, this.height);
-    this.pixel = Math.max(1, Math.round((short / (VIEW_TILES[this.zoom] * TILE)) * this.dpr));
+    this.viewTiles = Math.min(this.farthestTiles(), Math.max(ZOOM_TILES.closest, this.viewTiles));
+    this.pixel = (short / (this.viewTiles * TILE)) * this.dpr;
     this.scale = this.pixel / this.dpr;
     this.clampCamera();
   }
 
-  /** Close or far view; keeps the centre of the screen where it is. */
-  toggleZoom(): void {
-    const [cx, cy] = this.viewCentre();
-    this.zoom = 1 - this.zoom;
+  /** The farthest view whose long side still ends inside the painted forest, never past it. */
+  private farthestTiles(): number {
+    const long = Math.max(this.width, this.height);
+    const short = Math.min(this.width, this.height);
+    return Math.min(ZOOM_TILES.farthest, ((MAP_SIZE + 2 * GROUND_MARGIN - 2) * short) / long);
+  }
+
+  /** Zooms keeping the world point under (clientX, clientY) where it is on the screen. */
+  private zoomAround(tiles: number, clientX: number, clientY: number): void {
+    const box = this.canvas.getBoundingClientRect();
+    const world = this.toWorld(clientX, clientY);
+    this.viewTiles = tiles;
     this.applyZoom();
-    this.centreOn(cx, cy);
+    this.cam.x = world.x - (clientX - box.left) / this.scale;
+    this.cam.y = world.y - (clientY - box.top) / this.scale;
+    this.clampCamera();
+  }
+
+  /** Glides between the close and the far view, around the middle of the screen. */
+  toggleZoom(): void {
+    this.zoomGoal = this.isFar ? ZOOM_TILES.near : Math.min(ZOOM_TILES.far, this.farthestTiles());
   }
 
   get isFar(): boolean {
-    return this.zoom === 1;
+    return (this.zoomGoal ?? this.viewTiles) > (ZOOM_TILES.near + ZOOM_TILES.far) / 2;
+  }
+
+  private glideZoom(dt: number): void {
+    if (this.zoomGoal === null) return;
+    const box = this.canvas.getBoundingClientRect();
+    const left = this.zoomGoal - this.viewTiles;
+    const tiles = Math.abs(left) < 0.03 || this.reduced ? this.zoomGoal : this.viewTiles + left * Math.min(1, dt / 90);
+    if (tiles === this.zoomGoal) this.zoomGoal = null;
+    this.zoomAround(tiles, box.left + this.width / 2, box.top + this.height / 2);
   }
 
   /** The tile at the middle of the screen. */
@@ -325,6 +358,7 @@ export class FarmScene {
     this.last = now;
     if (this.width > 0) {
       this.walk(dt);
+      this.glideZoom(dt);
       this.flutter(dt);
       this.updateParticles(dt);
       this.draw(now);
@@ -880,7 +914,9 @@ export class FarmScene {
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
-        this.gesture = { mode: 'pinch', distance: Math.hypot(a.x - b.x, a.y - b.y), done: false };
+        this.zoomGoal = null;
+        // The world point between the two fingers stays under them: pinching zooms and pans at once.
+        this.gesture = { mode: 'pinch', distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), tiles: this.viewTiles, anchor: this.toWorld((a.x + b.x) / 2, (a.y + b.y) / 2) };
         return;
       }
       if (this.pointers.size > 2) return;
@@ -897,12 +933,13 @@ export class FarmScene {
       if (!g) return;
       if (g.mode === 'pinch') {
         const [a, b] = [...this.pointers.values()];
-        if (!a || !b || g.done) return;
-        const ratio = Math.hypot(a.x - b.x, a.y - b.y) / g.distance;
-        if ((ratio > 1.25 && this.isFar) || (ratio < 0.8 && !this.isFar)) {
-          this.toggleZoom();
-          g.done = true;
-        }
+        if (!a || !b) return;
+        const box = this.canvas.getBoundingClientRect();
+        this.viewTiles = (g.tiles * g.distance) / Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+        this.applyZoom();
+        this.cam.x = g.anchor.x - ((a.x + b.x) / 2 - box.left) / this.scale;
+        this.cam.y = g.anchor.y - ((a.y + b.y) / 2 - box.top) / this.scale;
+        this.clampCamera();
         return;
       }
       const dx = e.clientX - g.x;
@@ -950,7 +987,8 @@ export class FarmScene {
       'wheel',
       (e) => {
         e.preventDefault();
-        if ((e.deltaY < 0 && this.isFar) || (e.deltaY > 0 && !this.isFar)) this.toggleZoom();
+        this.zoomGoal = null;
+        this.zoomAround(this.viewTiles * Math.exp(e.deltaY * 0.0015), e.clientX, e.clientY);
       },
       { passive: false },
     );

@@ -2007,7 +2007,7 @@ export function butterflySprite(colour: 0 | 1 | 2, frame: 0 | 1): Sprite {
 // -----------------------------------------------
 
 /** Tiles of ground drawn around the map on every side (forest edge, no more flat colour past the map). */
-export const GROUND_MARGIN = 6;
+export const GROUND_MARGIN = 12;
 
 const GROUND = {
   mown: [0xa0, 0xcc, 0x6c], mownLight: [0xb2, 0xd7, 0x7c], mownDark: [0x8e, 0xbb, 0x5e], clover: [0x98, 0xc8, 0x6e],

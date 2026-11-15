@@ -535,3 +535,11 @@ Convertis des WAV d'origine (20 Mo) en MP3 96 kb/s (1,3 Mo chacun) avec lamejs, 
 Web Audio : sur iPhone, Safari ignore le volume d'un élément audio. Elle démarre au premier toucher (règle des
 navigateurs) et se met en pause quand l'onglet est caché. Le menu « ⋯ » a deux curseurs : **Musique** (propre à la
 ferme) et **Effets** (le volume du kit de sons, valable pour tout le site ; 0 = coupé).
+
+### Zoom continu (15/11 au soir, demande de Flo)
+
+Le zoom n'est plus à deux crans : le pincement suit les doigts (le point entre eux reste sous eux, on zoome et on se
+déplace d'un même geste), la molette zoome autour du curseur, et le bouton du menu glisse en douceur entre vue
+proche (12 cases) et vue d'ensemble (22). Les pixels ne sont plus à l'échelle entière : sur téléphone (2 à 3 pixels
+d'écran par point) ça ne se voit pas. La forêt autour de la carte passe à 12 cases (`GROUND_MARGIN`) et le dézoom
+s'arrête avant d'en sortir.

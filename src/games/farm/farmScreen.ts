@@ -112,6 +112,7 @@ class FarmScreen implements FarmUi {
   private pluckStep = 0;
   private pluckAt = 0;
   private comboEl: HTMLElement | null = null;
+  private shownFar = false;
   private readonly music = new FarmMusic();
 
   constructor(root: HTMLElement, save: FarmSave) {
@@ -193,6 +194,11 @@ class FarmScreen implements FarmUi {
 
   private tick(): void {
     const now = Date.now();
+    // A pinch can cross from close to far: the menu says the other view.
+    if (this.scene.isFar !== this.shownFar) {
+      this.shownFar = this.scene.isFar;
+      this.hud.setZoom(this.shownFar);
+    }
     if (deliverMail(this.save, now) > 0) {
       this.toast('Gaston est passé : un colis t’attend dans la boîte aux lettres !');
       saveFarm(this.save);
