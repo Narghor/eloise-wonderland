@@ -1376,3 +1376,18 @@
     animation: none;
   }
 }
+
+/* Music and effects volume, in the options menu */
+.farm-volume {
+  cursor: default;
+}
+
+.farm-volume-label {
+  min-width: 58px;
+}
+
+.farm-volume input[type='range'] {
+  width: 110px;
+  accent-color: var(--ui-accent);
+  touch-action: pan-x;
+}

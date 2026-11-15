@@ -9,6 +9,9 @@ const MUTE_KEY = 'casino-sound-muted';
 let context: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = readMuted();
+const VOLUME_KEY = 'sound-effects-volume';
+/** The effects' volume chosen by the player, 0 to 1 (1 = the kit's normal level). */
+let effectsVolume = readVolume();
 let unlockArmed = false;
 
 function readMuted(): boolean {
@@ -38,11 +41,40 @@ function ensureContext(): AudioContext | null {
     if (!Ctor) return null;
     context = new Ctor();
     master = context.createGain();
-    master.gain.value = muted ? 0 : 0.5;
+    master.gain.value = masterLevel();
     master.connect(context.destination);
   }
   if (context.state === 'suspended') void context.resume();
   return context;
+}
+
+function readVolume(): number {
+  try {
+    const saved = Number(localStorage.getItem(VOLUME_KEY));
+    return localStorage.getItem(VOLUME_KEY) === null || !Number.isFinite(saved) ? 1 : Math.min(1, Math.max(0, saved));
+  } catch {
+    return 1;
+  }
+}
+
+function masterLevel(): number {
+  return muted ? 0 : 0.5 * effectsVolume;
+}
+
+/** The effects' volume as the player sees it: 0 when muted. */
+export function getEffectsVolume(): number {
+  return muted ? 0 : effectsVolume;
+}
+
+/** Sets the effects' volume (0 to 1) for the whole site; 0 is the same as muting. */
+export function setEffectsVolume(value: number): void {
+  effectsVolume = Math.min(1, Math.max(0, value));
+  try {
+    localStorage.setItem(VOLUME_KEY, String(effectsVolume));
+  } catch {
+    // storage blocked: the choice lasts for this session only
+  }
+  setMuted(effectsVolume === 0);
 }
 
 /** True when the player turned the casino sound off. */
@@ -58,7 +90,7 @@ export function setMuted(value: boolean): void {
   } catch {
     // storage blocked: the choice lasts for this session only
   }
-  if (master && context) master.gain.setValueAtTime(value ? 0 : 0.5, context.currentTime);
+  if (master && context) master.gain.setValueAtTime(masterLevel(), context.currentTime);
 }
 
 /** A small button that toggles the sound (speaker icon). */

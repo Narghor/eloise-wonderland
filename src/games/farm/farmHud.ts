@@ -1,5 +1,5 @@
 import { el } from '../../dom';
-import { muteButton } from '../casino/fx/sound';
+import { getEffectsVolume, playPop, setEffectsVolume } from '../casino/fx/sound';
 import { xpToNext } from './data/levels';
 import { person } from './data/people';
 import { faceSprite, spriteImage, uiIcon, type UiIcon } from './farmArt';
@@ -19,6 +19,8 @@ export interface HudActions {
   zoom(): void;
   help(): void;
   seeds(): void;
+  musicVolume(): number;
+  setMusicVolume(value: number): void;
 }
 
 const TABS: { id: SheetId | 'build' | 'seeds'; label: string; icon: UiIcon }[] = [
@@ -96,7 +98,8 @@ export class FarmHud {
     menu.append(
       item(el('b', { class: 'farm-side-icon', text: '?' }), 'Comment jouer', actions.help),
       item(this.zoomIcon, this.zoomLabel, actions.zoom),
-      el('div', { class: 'farm-side-item is-sound' }, muteButton(), 'Son'),
+      volumeRow('🎵', 'Musique', actions.musicVolume(), (v) => actions.setMusicVolume(v)),
+      volumeRow('🔔', 'Effets', getEffectsVolume(), (v) => setEffectsVolume(v), playPop),
     );
     this.side = el('div', { class: 'farm-side' }, menu, toggle);
     this.setZoom(false);
@@ -158,4 +161,12 @@ export class FarmHud {
       el('span', { text: ready.length > 0 ? `${person(shown.who).name} t’attend` : `${person(shown.who).name} · ${todo ? `${objectiveProgress(save, todo, starts)} / ${todo.count}` : ''}` }),
     );
   }
+}
+
+/** A labelled slider from 0 to 100 %; `done` plays once the finger lets go (to hear the new level). */
+function volumeRow(icon: string, label: string, value: number, change: (value: number) => void, done?: () => void): HTMLElement {
+  const slider = el('input', { type: 'range', min: '0', max: '100', step: '5', value: String(Math.round(value * 100)), 'aria-label': label });
+  slider.addEventListener('input', () => change(Number(slider.value) / 100));
+  if (done) slider.addEventListener('change', done);
+  return el('label', { class: 'farm-side-item farm-volume' }, el('span', { class: 'farm-side-icon', text: icon }), el('span', { class: 'farm-volume-label', text: label }), slider);
 }

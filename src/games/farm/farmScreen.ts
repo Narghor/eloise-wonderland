@@ -58,6 +58,7 @@ import {
 } from './farmPanels';
 import { FarmScene, type Ghost } from './farmScene';
 import { swipeToClose } from './farmSwipe';
+import { FarmMusic, musicVolume } from './farmMusic';
 import { loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
 import { MINUTE_MS } from './farmTime';
 
@@ -111,6 +112,7 @@ class FarmScreen implements FarmUi {
   private pluckStep = 0;
   private pluckAt = 0;
   private comboEl: HTMLElement | null = null;
+  private readonly music = new FarmMusic();
 
   constructor(root: HTMLElement, save: FarmSave) {
     this.save = save;
@@ -131,12 +133,16 @@ class FarmScreen implements FarmUi {
       },
       help: () => openHelp(FARM_HELP),
       seeds: () => (this.seeds ? this.closeSeeds() : this.openSeeds(null)),
+      musicVolume: () => musicVolume(),
+      setMusicVolume: (v) => this.music.setVolume(v),
     });
     this.overlay.append(this.hud.top, this.hud.quest, this.hud.side, this.toasts, this.hud.bar);
     if (CASINO_TEST_BUTTONS) this.overlay.append(this.testBar()); // TEST-BUTTONS
     this.root.append(this.overlay);
     this.scene.onFrame = () => this.follow();
     this.timer = window.setInterval(() => this.tick(), 1000);
+    // The music waits for a first touch (browsers forbid sound before one).
+    this.root.addEventListener('pointerdown', () => this.music.start(), { once: true });
   }
 
   dispose(): void {
@@ -145,6 +151,7 @@ class FarmScreen implements FarmUi {
     this.save.lastVisit = Date.now();
     saveFarm(this.save);
     this.scene.dispose();
+    this.music.dispose();
   }
 
   now(): number {

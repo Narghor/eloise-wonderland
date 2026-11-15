@@ -526,3 +526,12 @@ de niveau et sur les colis épiques/légendaires, un cœur quand on touche un en
 
 Prochaines idées notées, non faites : récoltes dorées rares (album), cadeau de première visite du jour (calendrier
 de 7 cases qui ne se perd pas), visiteurs spéciaux, musique (Flo peut en générer avec Suno).
+
+### Musique et volumes (15/11 au soir)
+
+Quatre morceaux générés par Flo avec Suno (offre payante) : deux pour le jour (7 h à 19 h), deux pour le soir,
+joués l'un après l'autre avec un fondu de 2,5 s (`farmMusic.ts`, provenance dans `src/games/farm/music/CREDITS.md`).
+Convertis des WAV d'origine (20 Mo) en MP3 96 kb/s (1,3 Mo chacun) avec lamejs, hors du projet. La musique passe par
+Web Audio : sur iPhone, Safari ignore le volume d'un élément audio. Elle démarre au premier toucher (règle des
+navigateurs) et se met en pause quand l'onglet est caché. Le menu « ⋯ » a deux curseurs : **Musique** (propre à la
+ferme) et **Effets** (le volume du kit de sons, valable pour tout le site ; 0 = coupé).
