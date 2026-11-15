@@ -32,7 +32,7 @@ export const SKINS: readonly Skin[] = [
 export const SKIN_IDS = SKINS.map((s) => s.id);
 
 /** The family's name inside a sentence: "Style de barrière : Ranch". */
-export const FAMILY_NAMES: Record<JoinFamily, string> = { fence: 'barrière' };
+export const FAMILY_NAMES: Record<JoinFamily, string> = { fence: 'barrière', hedge: 'haie', pathDirt: 'chemin de terre', pathStone: 'chemin pavé' };
 
 export function skin(id: SkinId): Skin {
   return SKINS.find((s) => s.id === id)!;
@@ -42,6 +42,7 @@ export function skinsOf(family: JoinFamily): Skin[] {
   return SKINS.filter((s) => s.family === family);
 }
 
-export function defaultSkin(family: JoinFamily): SkinId {
-  return skinsOf(family)[0].id;
+/** The skin a piece wears when it has none; null for a family without skins (it joins by family alone). */
+export function defaultSkin(family: JoinFamily): SkinId | null {
+  return skinsOf(family)[0]?.id ?? null;
 }

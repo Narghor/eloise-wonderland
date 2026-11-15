@@ -2,7 +2,7 @@ import { prefersReducedMotion } from '../casino/fx/effects';
 import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
 import { placeable } from './data/placeables';
 import type { PlaceableId, SkinId } from './data/types';
-import { isGate, joinIndex, joinMask, skinOf, type JoinCell } from './farmJoins';
+import { joinIndex, joinKey, joinMask, skinOf, type JoinCell } from './farmJoins';
 import { JOIN_CARRIES } from './data/skins';
 import {
   GROUND_MARGIN,
@@ -13,7 +13,7 @@ import {
   butterflySprite,
   chimneyOf,
   cropSprite,
-  fenceSprite,
+  joinedSprite,
   fernSprite,
   fieldSprite,
   hazelSprite,
@@ -558,10 +558,10 @@ export class FarmScene {
     }
     if (o.type === 'hazel') return hazelSprite(readyOn(o, Date.now()) !== null);
     if (o.type === 'mailbox') return mailboxSprite(this.save.mail.waiting > 0, o.rot % 2 === 1 ? 'profile' : 'face');
-    const skin = skinOf(o);
-    if (skin) {
+    const key = joinKey(o);
+    if (key) {
       const carries = this.carried.has(o.uid) || this.ghost?.on === o.uid;
-      return fenceSprite(skin, joinMask(this.joins, o.x, o.y, skin) | (carries ? JOIN_CARRIES : 0), isGate(o.type));
+      return joinedSprite(o.type, skinOf(o), joinMask(this.joins, o.x, o.y, key) | (carries ? JOIN_CARRIES : 0));
     }
     void now;
     return objectSprite(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
@@ -610,7 +610,9 @@ export class FarmScene {
   /** Top-left world pixel of an object's drawing: centred on its footprint, standing on its bottom edge. */
   private origin(o: { x: number; y: number; type: PlaceableId; rot: Rotation }, sprite: Sprite): { x: number; y: number } {
     const [w, h] = footprint(o);
-    return { x: o.x * TILE + Math.floor((w * TILE - sprite.width) / 2), y: (o.y + h) * TILE - sprite.height + 1 };
+    // A flat piece (a path) lies exactly on its tile; the others stand one pixel lower, on their outline.
+    const lower = placeable(o.type).flat ? 0 : 1;
+    return { x: o.x * TILE + Math.floor((w * TILE - sprite.width) / 2), y: (o.y + h) * TILE - sprite.height + lower };
   }
 
   private stamp(sprite: Sprite, x: number, y: number, mirrored: boolean): void {
@@ -968,10 +970,10 @@ export class FarmScene {
       return;
     }
     const [w, h] = footprint(ghost);
-    const skin = skinOf(ghost);
+    const key = joinKey(ghost);
     const sprite = ghost.type === 'field' ? fieldSprite(null, 'empty')
       : ghost.type === 'hazel' ? hazelSprite(false)
-      : skin ? fenceSprite(skin, joinMask(this.joins, ghost.x, ghost.y, skin), isGate(ghost.type))
+      : key ? joinedSprite(ghost.type, skinOf(ghost), joinMask(this.joins, ghost.x, ghost.y, key))
       : objectSprite(ghost.type, ghost.rot % 2 === 1 ? 'profile' : 'face');
     const at = this.origin(ghost, sprite);
     ctx.globalAlpha = 0.8;

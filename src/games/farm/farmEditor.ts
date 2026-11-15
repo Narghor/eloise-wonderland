@@ -1,7 +1,7 @@
 import { el } from '../../dom';
 import { playThunk } from '../casino/fx/sound';
 import { placeable } from './data/placeables';
-import { skin } from './data/skins';
+import { skin, skinsOf } from './data/skins';
 import { chosenSkin, lockedSkin, nextSkin, restyleRun, skinOf } from './farmJoins';
 import { unlockText } from './farmProgress';
 import type { PlaceableId } from './data/types';
@@ -151,7 +151,8 @@ export class FarmEditor {
     const spot = freeSpotNear(host.save, cx, cy, p.size[0], p.size[1]);
     if (!spot) return host.toast('Plus de place libre : dégage la friche ou achète un terrain.');
     this.placing = id;
-    host.scene.ghost = { type: id, x: spot[0], y: spot[1], rot: 0, ...(p.joins ? { skin: chosenSkin(host.save, p.joins) } : {}) };
+    const skin = p.joins ? chosenSkin(host.save, p.joins) : null;
+    host.scene.ghost = { type: id, x: spot[0], y: spot[1], rot: 0, ...(skin ? { skin } : {}) };
     host.scene.editMode = true;
     host.hud.setEditing(true);
     this.placedInRow = 0;
@@ -191,7 +192,9 @@ export class FarmEditor {
     this.tools = null;
     const ghost = host.scene.ghost;
     if (!ghost) return;
-    const buttons: HTMLElement[] = [placeable(ghost.type).joins ? this.styleButton(ghost) : this.turnButton(ghost)];
+    // A joined piece is never turned: its shape comes from its neighbours; it changes style when its family has some.
+    const family = placeable(ghost.type).joins;
+    const buttons: HTMLElement[] = !family ? [this.turnButton(ghost)] : skinsOf(family).length > 0 ? [this.styleButton(ghost)] : [];
     if (this.placing) {
       const leave = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('cross'), 2), this.placedInRow > 0 ? 'Fini' : 'Annuler');
       leave.addEventListener('click', () => this.exit());
@@ -243,7 +246,7 @@ export class FarmEditor {
   private styleButton(ghost: Ghost): HTMLElement {
     const { host } = this;
     const family = placeable(ghost.type).joins!;
-    const current = ghost.skin ?? chosenSkin(host.save, family);
+    const current = (ghost.skin ?? chosenSkin(host.save, family))!;
     const button = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('brush'), 2), skin(current).name);
     button.addEventListener('click', () => {
       const next = nextSkin(host.save, family, current);

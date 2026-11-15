@@ -132,7 +132,8 @@ function newObject(save: FarmSave, id: PlaceableId, x: number, y: number, rot: R
   const object: PlacedObject = { uid: save.nextUid++, type: id, x, y, rot };
   if (p.joins) {
     object.rot = 0;
-    object.skin = chosenSkin(save, p.joins);
+    const skin = chosenSkin(save, p.joins);
+    if (skin) object.skin = skin;
   }
   if (p.kind === 'pen') {
     object.animals = [];

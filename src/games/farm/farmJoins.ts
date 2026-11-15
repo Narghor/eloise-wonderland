@@ -12,14 +12,20 @@ import type { FarmSave, PlacedObject } from './farmSave';
 
 type Piece = { type: PlaceableId; x: number; y: number; skin?: SkinId; uid?: number };
 
-/** The skin a piece wears, or null for anything that does not join. */
+/** The skin a piece wears, or null for anything that does not join or whose family has no skins. */
 export function skinOf(o: { type: PlaceableId; skin?: SkinId }): SkinId | null {
   const family = placeable(o.type).joins;
   return family ? o.skin ?? defaultSkin(family) : null;
 }
 
+/** What two pieces must share to join: the skin, or the family when it has none; null when it does not join. */
+export function joinKey(o: { type: PlaceableId; skin?: SkinId }): string | null {
+  const family = placeable(o.type).joins;
+  return family ? skinOf(o) ?? family : null;
+}
+
 export interface JoinCell {
-  skin: SkinId;
+  key: string;
   gate: boolean;
 }
 
@@ -31,26 +37,26 @@ export function isGate(type: PlaceableId): boolean {
 export function joinIndex(objects: readonly PlacedObject[], ghost?: Piece | null): Map<string, JoinCell> {
   const index = new Map<string, JoinCell>();
   const add = (o: Piece) => {
-    const skin = skinOf(o);
-    if (skin) index.set(`${o.x},${o.y}`, { skin, gate: isGate(o.type) });
+    const key = joinKey(o);
+    if (key) index.set(`${o.x},${o.y}`, { key, gate: isGate(o.type) });
   };
   for (const o of objects) if (o.uid !== ghost?.uid) add(o);
   if (ghost) add(ghost);
   return index;
 }
 
-export function joinMask(index: ReadonlyMap<string, JoinCell>, x: number, y: number, skin: SkinId): number {
+export function joinMask(index: ReadonlyMap<string, JoinCell>, x: number, y: number, key: string): number {
   const at = (dx: number, dy: number) => {
     const cell = index.get(`${x + dx},${y + dy}`);
-    return cell?.skin === skin ? cell : null;
+    return cell?.key === key ? cell : null;
   };
   const north = at(0, -1);
   return (north ? JOIN_NORTH | (north.gate ? JOIN_NORTH_GATE : 0) : 0)
     | (at(1, 0) ? JOIN_EAST : 0) | (at(0, 1) ? JOIN_SOUTH : 0) | (at(-1, 0) ? JOIN_WEST : 0);
 }
 
-/** What a new piece of the family wears: the last skin chosen. */
-export function chosenSkin(save: FarmSave, family: JoinFamily): SkinId {
+/** What a new piece of the family wears: the last skin chosen; null for a family without skins. */
+export function chosenSkin(save: FarmSave, family: JoinFamily): SkinId | null {
   return save.lastSkins[family] ?? defaultSkin(family);
 }
 

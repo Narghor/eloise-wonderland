@@ -25,8 +25,8 @@ export type DecorId =
   // Treasures: found only in Gaston's parcels, never sold.
   | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
 
-/** Pieces that join their neighbours of the same family (a fence and its gate). */
-export type JoinFamily = 'fence';
+/** Pieces that join their neighbours of the same family: a fence and its gate, a hedge, each kind of path. */
+export type JoinFamily = 'fence' | 'hedge' | 'pathDirt' | 'pathStone';
 
 /** The looks a joined piece can wear (data/skins.ts). */
 export type SkinId = 'fenceRanch' | 'fencePicket' | 'fenceWattle';

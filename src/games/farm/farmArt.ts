@@ -44,9 +44,19 @@ function canvas(w: number, h: number): HTMLCanvasElement {
   return c;
 }
 
-/** A drawing of w x h pixels; `margin` pixels are added around it for the outline. */
-export function sprite(w: number, h: number, paint: (P: Painter) => void, outline = true, margin = 1): Sprite {
+/**
+ * A drawing of w x h pixels; `margin` pixels are added around it for the outline. `glaze` paints after the outline,
+ * for what must stay light and thin (water jets): it gets no outline.
+ */
+export function sprite(w: number, h: number, paint: (P: Painter) => void, outline = true, margin = 1, glaze?: (P: Painter) => void): Sprite {
   const c = canvas(w + 2 * margin, h + 2 * margin);
+  paint(painterOn(c, margin));
+  if (outline) addOutline(c);
+  if (glaze) glaze(painterOn(c, margin));
+  return c;
+}
+
+function painterOn(c: HTMLCanvasElement, margin: number): Painter {
   const g = c.getContext('2d', { willReadFrequently: true })!;
   const fill = (x: number, y: number, ww: number, hh: number, col: string) => {
     g.fillStyle = col;
@@ -89,9 +99,7 @@ export function sprite(w: number, h: number, paint: (P: Painter) => void, outlin
       }));
     },
   };
-  paint(P);
-  if (outline) addOutline(c);
-  return c;
+  return P;
 }
 
 function addOutline(c: HTMLCanvasElement): void {
@@ -390,50 +398,153 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
 };
 
 // -----------------------------------------------
+// BUILDING KIT: one light from the top left, three or four tones per material (docs/ferme.md 16, step 3)
+// -----------------------------------------------
+
+/** Light, base, dark, deep. */
+type Tones = readonly [string, string, string, string];
+
+const ROOF_RED: Tones = ['#f6a98a', '#de7a5c', '#bb5a42', '#9c4634'];
+const ROOF_BLUE: Tones = ['#a4c8ee', '#6a98cc', '#4f78ab', '#3d5f8c'];
+const ROOF_BROWN: Tones = ['#c39064', '#9a6644', '#7a4c31', '#5e3824'];
+const ROOF_SLATE: Tones = ['#a08b8b', '#7a6666', '#5e4d4d', '#463939'];
+const DOOR: Tones = ['#c08657', '#a46c46', '#8d5a3c', '#6b4430'];
+const DOOR_BLUE: Tones = ['#a4c8ee', '#5b86b8', '#45699a', '#2f4f78'];
+const TIMBER = '#7a4b33';
+const TIMBER_LIGHT = '#9a6542';
+const WARM_STONE = ['#efe1c8', '#d9c4a2', '#b49a76'] as const;
+const GLINT = '#ffffff';
+
+/** A front roof in scalloped tiles, narrowing towards its ridge; its right end in shade. */
+function tiledRoof(P: Painter, top: number, rows: number, width: number, t: Tones): void {
+  const inset = (row: number) => Math.max(0, 6 - Math.floor(row * 0.5));
+  for (let i = 0; i < rows; i++) P.rect(inset(i), top + i, width - 2 * inset(i), 1, i === 0 ? t[0] : t[1]);
+  for (let i = 2; i < rows; i += 3) {
+    const shift = Math.floor(i / 3) % 2 ? 2 : 0;
+    const right = width - inset(i);
+    for (let x = inset(i) + shift; x < right; x += 4) {
+      P.rect(x, top + i, Math.min(3, right - x), 1, t[2]);
+      if (x + 3 < width - inset(i - 1) - 3) P.px(x + 3, top + i - 1, t[2]);
+      if (x + 1 < width - inset(i - 2) - 3) P.px(x + 1, top + i - 2, t[0]);
+    }
+  }
+  for (let i = 0; i < rows; i++) P.rect(width - inset(i) - 3, top + i, 3, 1, i % 3 === 2 ? t[3] : t[2]);
+}
+
+/** The thick front edge of a roof, and the shade it casts on the wall under it. */
+function eave(P: Painter, x: number, y: number, w: number, t: Tones, wallShade: string): void {
+  P.rect(x, y, w, 2, t[3]);
+  P.rect(x, y, w, 1, t[2]);
+  P.rect(x + 1, y + 2, w - 2, 1, wallShade);
+}
+
+/** A gable end: a triangle of wall between two barge boards, light on the left, dark on the right. */
+function tiledGable(P: Painter, cx: number, top: number, rows: number, slope: number, t: Tones, wall: string): void {
+  for (let i = 0; i < rows; i++) {
+    const half = Math.round(i * slope) + 1;
+    P.rect(cx - half - 1, top + i, 2 * half + 3, 1, i < 2 ? t[0] : t[1]);
+    if (half > 2) P.rect(cx - half + 2, top + i, 2 * half - 3, 1, wall);
+    P.px(cx - half - 1, top + i, t[0]);
+    P.px(cx + half + 1, top + i, t[3]);
+    if (half > 1) P.px(cx + half, top + i, t[2]);
+  }
+}
+
+/** Cut stones: dark joints, light tops; clipped to the band. */
+function stones(P: Painter, x0: number, y0: number, w: number, h: number, [light, base, dark]: readonly [string, string, string]): void {
+  P.rect(x0, y0, w, h, base);
+  const clip = (x: number, y: number, ww: number, hh: number, col: string) => {
+    const r = Math.min(x + ww, x0 + w);
+    const b = Math.min(y + hh, y0 + h);
+    if (r > x && b > y) P.rect(x, y, r - x, b - y, col);
+  };
+  for (let y = y0; y < y0 + h; y += 3) {
+    clip(x0, y, w, 1, dark);
+    const odd = Math.floor((y - y0) / 3) % 2 === 1;
+    for (let x = x0 + (odd ? 2 : 5); x < x0 + w; x += 6) clip(x, y + 1, 1, 2, dark);
+    for (let x = x0 + (odd ? 3 : 0); x < x0 + w; x += 6) clip(x, y + 1, 2, 1, light);
+  }
+}
+
+interface WindowLook {
+  /** A box of flowers under the sill. */
+  flowers?: boolean;
+  frame?: string;
+  glass?: string;
+}
+
+/** A window set into the wall: frame, glass shaded on its top and left, cross bars, a glint. */
+function framedWindow(P: Painter, x: number, y: number, w: number, h: number, look: WindowLook = {}): void {
+  const glass = look.glass ?? C.glow;
+  const inner = look.glass ? '#a9c9de' : '#e8b54a';
+  P.rect(x - 1, y - 1, w + 2, h + 2, look.frame ?? C.woodDark);
+  P.rect(x, y, w, h, glass);
+  P.rect(x, y, w, 1, inner);
+  P.rect(x, y, 1, h, inner);
+  if (w > 3) P.rect(x + Math.floor(w / 2), y, 1, h, look.frame ?? C.woodDark);
+  if (h > 4) P.rect(x, y + Math.floor(h / 2), w, 1, look.frame ?? C.woodDark);
+  P.px(x + 1, y + 1, GLINT);
+  if (w > 3 && h > 3) P.px(x + 2, y + 2, '#fff3c4');
+  if (look.flowers) {
+    P.rect(x - 1, y + h + 1, w + 2, 1, C.woodLight);
+    P.rect(x - 1, y + h + 2, w + 2, 1, C.wood);
+    for (let i = 0; i < w; i += 2) {
+      P.px(x + i, y + h + 1, i % 4 === 0 ? '#ff8fb8' : C.gold);
+      if (i + 1 < w) P.px(x + i + 1, y + h + 1, C.leaf);
+    }
+  }
+}
+
+/** A plank door set into the wall, its top rounded; the knob on the right. */
+function plankDoor(P: Painter, x: number, y: number, w: number, h: number, t: Tones = DOOR): void {
+  P.rect(x - 1, y + 1, w + 2, h - 1, t[3]);
+  P.rect(x, y, w, 1, t[3]);
+  P.rect(x, y + 2, w, h - 2, t[1]);
+  P.rect(x + 1, y + 1, w - 2, 1, t[1]);
+  P.rect(x, y + 2, 1, h - 2, t[2]);
+  for (let px = x + 2; px < x + w - 1; px += 2) P.rect(px, y + 3, 1, h - 3, t[2]);
+  P.rect(x + 1, y + 2, 1, 1, t[0]);
+  P.px(x + w - 2, y + Math.floor(h / 2) + 1, C.gold);
+}
+
+// -----------------------------------------------
 // MACHINES (2 x 2)
 // -----------------------------------------------
 
-/** Rows of a pitched roof seen from the front: a trapezoid, darker every third row. */
-function frontRoof(P: Painter, top: number, rows: number, width: number, colors: [string, string, string]): void {
-  for (let i = 0; i < rows; i++) {
-    const inset = Math.max(0, 6 - Math.floor(i * 0.5));
-    P.rect(inset, top + i, width - 2 * inset, 1, i % 3 === 2 ? colors[1] : i < 2 ? colors[2] : colors[0]);
-  }
-}
-
-/** A gable end: a triangle of wall framed by the roof's edge. */
-function gable(P: Painter, cx: number, top: number, rows: number, slope: number, roof: [string, string, string], wall: string): void {
-  for (let i = 0; i < rows; i++) {
-    const half = Math.round(i * slope) + 1;
-    P.rect(cx - half - 1, top + i, 2 * half + 3, 1, i < 2 ? roof[2] : roof[0]);
-    if (half > 2) P.rect(cx - half + 2, top + i, 2 * half - 3, 1, wall);
-    P.px(cx - half - 1, top + i, roof[1]);
-    P.px(cx + half + 1, top + i, roof[1]);
-  }
-}
-
+/** The mill's stone tower, widening to its foot: clean courses, the right side in shade, a gallery under the sails. */
 function millTower(P: Painter, door: boolean): void {
   for (let y = 14; y < 50; y++) {
     const w = Math.round(16 + ((y - 14) * 10) / 36);
-    P.rect(15 - Math.floor(w / 2), y, w, 1, C.stone);
-    P.px(15 + Math.ceil(w / 2) - 2, y, C.stoneDark);
+    const left = 15 - Math.floor(w / 2);
+    P.rect(left, y, w, 1, '#efe7da');
+    P.rect(left, y, 2, 1, '#fbf7ef');
+    P.rect(left + w - 5, y, 5, 1, '#d9cdb9');
+    P.rect(left + w - 2, y, 2, 1, '#c5b79f');
   }
-  for (let y = 17; y < 50; y += 4) {
+  for (let y = 16; y < 48; y += 4) {
     const w = Math.round(16 + ((y - 14) * 10) / 36);
-    const left = 15 - Math.floor(w / 2) + 1;
-    const right = left + w - 3;
-    for (let x = left + ((y / 4) % 2) * 3; x + 3 <= right; x += 6) P.rect(x, y, 3, 1, C.stoneDark);
+    const left = 15 - Math.floor(w / 2);
+    P.rect(left + 1, y, w - 2, 1, '#d4c7b1');
+    for (let x = left + 2 + (Math.floor(y / 4) % 2) * 3; x < left + w - 2; x += 6) P.rect(x, y + 1, 1, 2, '#d4c7b1');
   }
   if (door) {
-    P.rect(12, 39, 6, 11, C.door);
-    P.rect(13, 38, 4, 1, C.door);
-    P.px(16, 44, C.gold);
-    P.rect(13, 25, 4, 4, C.glow);
-    P.rect(15, 25, 1, 4, C.woodDark);
+    plankDoor(P, 12, 38, 6, 12);
+    framedWindow(P, 14, 28, 2, 3);
   } else {
-    P.rect(14, 30, 3, 4, C.glow);
-    P.rect(14, 41, 3, 4, C.glow);
-    P.px(15, 41, C.woodDark);
+    framedWindow(P, 14, 29, 2, 3);
+    framedWindow(P, 14, 39, 2, 3);
+  }
+  // The wooden gallery round the tower.
+  P.rect(5, 22, 20, 2, C.wood);
+  P.rect(5, 22, 20, 1, C.woodLight);
+  P.rect(5, 24, 20, 1, C.woodDark);
+  for (let x = 6; x < 25; x += 3) P.rect(x, 19, 1, 3, C.woodDark);
+  P.rect(5, 19, 20, 1, C.wood);
+  // Stones at the foot, a few flowers.
+  stones(P, 5, 47, 20, 3, WARM_STONE);
+  for (const [x, col] of [[7, '#ff8fb8'], [9, C.gold], [20, '#ff8fb8'], [22, GLINT]] as const) {
+    P.px(x, 46, col);
+    P.px(x, 47, C.leaf);
   }
 }
 
@@ -441,19 +552,24 @@ function mill(view: View): Sprite {
   return sprite(30, 50, (P) => {
     if (view === 'face') {
       millTower(P, true);
-      P.ellipse(15, 12, 9, 5, '#9a5b3f');
-      P.rect(6, 12, 19, 4, '#9a5b3f');
-      P.rect(6, 15, 19, 1, '#7d4630');
-      P.ellipse(13, 10, 4, 2, '#b8744f');
-      P.disc(15, 11, 1, C.woodDark);
+      // The cap in scalloped shingles, the axle hub.
+      P.ellipse(15, 12, 9, 5, '#6a3a27');
+      P.ellipse(15, 11, 9, 5, '#9a5b3f');
+      for (let y = 9; y < 16; y += 3) for (let x = 7 + (y % 2) * 2; x < 24; x += 4) P.rect(x, y, 3, 1, '#7d4630');
+      P.ellipse(12, 8, 4, 2, '#c07b55');
+      P.rect(6, 15, 19, 2, '#6a3a27');
+      P.disc(15, 11, 2, C.woodDark);
+      P.px(15, 11, C.wood);
     } else {
       millTower(P, false);
       // The cap seen from the side, its axle sticking out to the left towards the sails.
-      P.rect(12, 7, 9, 1, '#b8744f');
+      P.rect(12, 7, 9, 1, '#c07b55');
       P.rect(9, 8, 16, 6, '#9a5b3f');
-      P.rect(10, 14, 14, 2, '#7d4630');
-      P.rect(10, 9, 6, 1, '#b8744f');
-      P.rect(21, 9, 3, 3, '#7d4630');
+      for (let x = 10; x < 24; x += 3) P.rect(x, 10, 2, 1, '#7d4630');
+      for (let x = 11; x < 24; x += 3) P.rect(x, 12, 2, 1, '#7d4630');
+      P.rect(10, 14, 14, 2, '#6a3a27');
+      P.rect(10, 9, 6, 1, '#c07b55');
+      P.rect(21, 9, 3, 3, '#6a3a27');
       P.rect(3, 10, 7, 2, C.woodDark);
       P.px(3, 10, C.wood);
     }
@@ -511,105 +627,121 @@ export function millHub(view: View): { x: number; y: number } {
 }
 
 function bakery(view: View): Sprite {
+  const wallShade = '#ecd5b1';
   return sprite(30, 44, (P) => {
     if (view === 'face') {
+      // The chimney.
       P.rect(20, 0, 5, 12, C.brick);
-      P.rect(20, 3, 5, 1, C.brickDark);
-      P.rect(20, 7, 5, 1, C.brickDark);
+      for (const y of [3, 7, 10]) P.rect(20, y, 5, 1, C.brickDark);
+      P.rect(20, 1, 1, 11, '#e08a6a');
       P.rect(19, 0, 7, 2, C.brickDark);
-      P.rect(1, 18, 28, 26, C.cream);
-      frontRoof(P, 6, 12, 30, ['#cf6d4c', '#b8573c', '#e48a68']);
-      P.rect(0, 18, 30, 2, C.brickDark);
-      P.rect(1, 38, 28, 6, C.brick);
-      for (let x = 2; x < 29; x += 5) P.rect(x, 40, 1, 2, C.brickDark);
-      P.rect(1, 41, 28, 1, C.brickDark);
-      P.rect(4, 27, 7, 17, '#8d5a3c');
-      P.rect(5, 26, 5, 1, '#8d5a3c');
-      P.px(9, 35, C.gold);
-      P.rect(15, 26, 11, 8, C.glow);
-      P.rect(20, 26, 1, 8, C.woodDark);
-      P.rect(15, 29, 11, 1, C.woodDark);
-      for (let x = 14; x < 28; x += 2) P.rect(x, 22, 2, 3, x % 4 === 2 ? C.red : C.white);
-      P.rect(14, 25, 14, 1, C.roofDark);
-      // A loaf on the window sill.
-      P.rect(17, 33, 4, 2, '#e6a85a');
-      P.px(18, 33, '#f6d08c');
+      // Plaster in a timber frame, the right bay in shade.
+      P.rect(1, 18, 28, 21, C.cream);
+      P.rect(22, 20, 6, 19, wallShade);
+      P.rect(1, 18, 2, 21, TIMBER);
+      P.rect(27, 18, 2, 21, TIMBER);
+      P.rect(13, 20, 2, 19, TIMBER);
+      P.rect(1, 37, 28, 2, TIMBER);
+      P.rect(13, 20, 1, 19, TIMBER_LIGHT);
+      tiledRoof(P, 4, 13, 30, ROOF_RED);
+      eave(P, 0, 17, 30, ROOF_RED, '#d9bf98');
+      // The shop window under its awning, a loaf behind the glass, flowers on the sill.
+      for (let x = 15; x < 27; x += 2) P.rect(x, 20, 2, 3, x % 4 === 3 ? C.red : C.white);
+      for (let x = 15; x < 27; x += 2) P.px(x + 1, 23, x % 4 === 3 ? C.red : C.white);
+      framedWindow(P, 17, 26, 8, 7, { flowers: true });
+      P.rect(18, 31, 3, 2, '#e6a85a');
+      P.px(19, 31, '#f6d08c');
+      plankDoor(P, 5, 23, 6, 15);
+      // The footing in warm stone, the doorstep.
+      stones(P, 1, 39, 28, 5, WARM_STONE);
+      P.rect(3, 39, 10, 2, '#cdb48d');
+      P.rect(3, 39, 10, 1, '#e8d8bb');
     } else {
       P.rect(21, 0, 4, 14, C.brick);
       P.rect(21, 4, 4, 1, C.brickDark);
       P.rect(21, 9, 4, 1, C.brickDark);
+      P.rect(21, 1, 1, 13, '#e08a6a');
       P.rect(20, 0, 6, 2, C.brickDark);
-      P.rect(4, 20, 22, 24, C.cream);
-      gable(P, 15, 4, 16, 0.75, ['#cf6d4c', '#b8573c', '#e48a68'], C.cream);
-      P.disc(15, 13, 2, C.glow);
-      P.px(15, 13, C.woodDark);
-      P.rect(3, 19, 24, 2, C.brickDark);
-      P.rect(8, 25, 8, 7, C.glow);
-      P.rect(12, 25, 1, 7, C.woodDark);
-      P.rect(6, 25, 2, 7, C.roofDark);
-      P.rect(16, 25, 2, 7, C.roofDark);
-      P.rect(4, 38, 22, 6, C.brick);
-      for (let x = 5; x < 25; x += 5) P.rect(x, 40, 1, 2, C.brickDark);
-      P.rect(4, 41, 22, 1, C.brickDark);
+      P.rect(4, 20, 22, 19, C.cream);
+      P.rect(20, 21, 5, 18, wallShade);
+      P.rect(4, 20, 2, 19, TIMBER);
+      P.rect(24, 20, 2, 19, TIMBER);
+      P.rect(4, 37, 22, 2, TIMBER);
+      tiledGable(P, 15, 4, 16, 0.75, ROOF_RED, C.cream);
+      P.disc(15, 13, 2, C.woodDark);
+      P.disc(15, 13, 1, C.glow);
+      P.px(14, 12, GLINT);
+      eave(P, 3, 19, 24, ROOF_RED, '#d9bf98');
+      // A shuttered window with its flowers.
+      P.rect(7, 25, 2, 7, '#b4553f');
+      P.rect(19, 25, 2, 7, '#b4553f');
+      P.px(7, 27, '#9c4634');
+      P.px(20, 29, '#9c4634');
+      framedWindow(P, 10, 26, 8, 5, { flowers: true });
+      stones(P, 4, 39, 22, 5, WARM_STONE);
       // Bread cooling on a small table.
-      P.rect(19, 33, 9, 2, C.woodLight);
-      P.rect(20, 35, 1, 5, C.woodDark);
-      P.rect(26, 35, 1, 5, C.woodDark);
-      P.rect(20, 31, 3, 2, '#e6a85a');
-      P.rect(24, 31, 3, 2, '#c9813f');
-      P.px(21, 31, '#f6d08c');
+      P.rect(21, 33, 8, 2, C.woodLight);
+      P.rect(21, 34, 8, 1, C.wood);
+      P.rect(22, 35, 1, 5, C.woodDark);
+      P.rect(27, 35, 1, 5, C.woodDark);
+      P.rect(22, 31, 3, 2, '#e6a85a');
+      P.rect(25, 31, 3, 2, '#c9813f');
+      P.px(23, 31, '#f6d08c');
     }
   });
 }
 
 function dairy(view: View): Sprite {
-  const roof: [string, string, string] = [C.blue, C.blueDark, C.blueLight];
   const wall = '#fbf7ef';
-  const wallShade = '#e6e0d4';
+  const board = '#e6e0d4';
+  const shade = '#ece6da';
   const milkCan = (P: Painter, x: number, y: number) => {
     P.rect(x + 1, y, 3, 2, '#aab3bb');
     P.rect(x, y + 2, 5, 7, '#c9d0d6');
-    P.rect(x, y + 2, 5, 1, '#e8edf1');
-    P.rect(x + 3, y + 3, 1, 6, '#aab3bb');
+    P.rect(x, y + 2, 5, 1, '#eef2f5');
+    P.px(x, y + 3, '#eef2f5');
+    P.rect(x + 3, y + 3, 2, 6, '#aab3bb');
     P.rect(x, y + 5, 5, 1, '#9aa4ad');
+  };
+  // White clapboards: a shadow line under each board, the right end in shade.
+  const clapboards = (P: Painter, x: number, y: number, w: number, h: number) => {
+    P.rect(x, y, w, h, wall);
+    P.rect(x + w - 5, y, 5, h, shade);
+    for (let by = y + 2; by < y + h; by += 3) P.rect(x, by, w, 1, board);
   };
   return sprite(30, 42, (P) => {
     if (view === 'face') {
-      frontRoof(P, 6, 12, 30, roof);
-      P.rect(0, 18, 30, 2, C.blueDark);
-      P.rect(1, 20, 28, 22, wall);
-      P.rect(1, 20, 28, 2, wallShade);
-      P.rect(1, 37, 28, 5, '#bcd3ea');
-      P.rect(1, 37, 28, 1, C.blueLight);
-      P.rect(4, 27, 7, 15, C.blue);
-      P.rect(5, 26, 5, 1, C.blue);
-      P.rect(5, 29, 5, 1, C.blueDark);
-      P.rect(5, 34, 5, 1, C.blueDark);
-      P.px(9, 36, C.gold);
-      P.disc(7, 23, 2, C.white);
-      P.px(7, 23, '#6a9fd8');
-      P.px(7, 22, '#6a9fd8');
-      P.rect(15, 26, 10, 7, '#cfe6f2');
-      P.rect(20, 26, 1, 7, C.blueDark);
-      P.rect(15, 29, 10, 1, C.blueDark);
-      P.px(16, 27, C.white);
-      for (let x = 14; x < 26; x += 2) P.rect(x, 22, 2, 3, x % 4 === 2 ? C.blue : C.white);
-      P.rect(14, 25, 12, 1, C.blueDark);
-      milkCan(P, 22, 33);
+      tiledRoof(P, 6, 12, 30, ROOF_BLUE);
+      clapboards(P, 1, 20, 28, 17);
+      eave(P, 0, 18, 30, ROOF_BLUE, '#d9d2c4');
+      stones(P, 1, 37, 28, 5, WARM_STONE);
+      plankDoor(P, 5, 26, 6, 12, DOOR_BLUE);
+      P.rect(7, 29, 2, 2, '#cfe6f2');
+      // The milk-drop sign over the door.
+      P.disc(8, 23, 2, C.white);
+      P.px(8, 23, '#6a9fd8');
+      P.px(8, 22, '#6a9fd8');
+      // The window under a blue and white awning.
+      for (let x = 14; x < 26; x += 2) P.rect(x, 21, 2, 3, x % 4 === 2 ? C.blue : C.white);
+      for (let x = 14; x < 26; x += 2) P.px(x + 1, 24, x % 4 === 2 ? C.blue : C.white);
+      framedWindow(P, 15, 26, 9, 5, { flowers: true, frame: C.blueDark, glass: '#cfe6f2' });
+      milkCan(P, 24, 33);
     } else {
-      P.rect(4, 20, 22, 22, wall);
-      gable(P, 15, 4, 16, 0.75, roof, wall);
-      P.disc(15, 13, 2, '#cfe6f2');
-      P.px(15, 13, C.blueDark);
-      P.rect(3, 19, 24, 2, C.blueDark);
-      P.rect(4, 37, 22, 5, '#bcd3ea');
-      P.rect(4, 37, 22, 1, C.blueLight);
-      P.rect(11, 25, 8, 7, '#cfe6f2');
-      P.rect(15, 25, 1, 7, C.blueDark);
+      clapboards(P, 4, 20, 22, 17);
+      tiledGable(P, 15, 4, 16, 0.75, ROOF_BLUE, wall);
+      P.disc(15, 13, 2, C.blueDark);
+      P.disc(15, 13, 1, '#cfe6f2');
+      P.px(14, 12, GLINT);
+      eave(P, 3, 19, 24, ROOF_BLUE, '#d9d2c4');
+      stones(P, 4, 37, 22, 5, WARM_STONE);
+      // Blue shutters on each side of the window.
       P.rect(8, 25, 3, 7, C.blue);
       P.rect(19, 25, 3, 7, C.blue);
-      P.px(9, 27, C.blueDark);
-      P.px(20, 29, C.blueDark);
+      for (let y = 26; y < 32; y += 2) {
+        P.px(9, y, C.blueDark);
+        P.px(20, y, C.blueDark);
+      }
+      framedWindow(P, 12, 26, 6, 5, { flowers: true, frame: C.blueDark, glass: '#cfe6f2' });
       milkCan(P, 0, 33);
       milkCan(P, 24, 33);
     }
@@ -617,29 +749,30 @@ function dairy(view: View): Sprite {
 }
 
 function spinning(view: View): Sprite {
-  const roof: [string, string, string] = ['#8a5a3b', '#6f4630', '#a8744c'];
   const plaster = '#efdcb6';
-  const beam = '#7a4f2e';
+  const plasterShade = '#e2cca3';
+  const beam = TIMBER;
   return sprite(30, 46, (P) => {
     if (view === 'face') {
       P.rect(4, 1, 3, 7, C.stoneDark);
+      P.rect(4, 1, 1, 7, C.stone);
       P.rect(3, 0, 5, 2, C.greyDark);
-      frontRoof(P, 6, 14, 30, roof);
-      P.rect(0, 20, 30, 2, '#5e3b25');
-      P.rect(1, 22, 28, 24, plaster);
+      tiledRoof(P, 6, 14, 30, ROOF_BROWN);
+      P.rect(1, 22, 28, 18, plaster);
+      P.rect(23, 22, 6, 18, plasterShade);
       P.rect(1, 22, 28, 2, beam);
       P.rect(1, 32, 28, 2, beam);
-      P.rect(1, 22, 2, 24, beam);
-      P.rect(13, 22, 2, 24, beam);
+      P.rect(1, 22, 2, 18, beam);
+      P.rect(13, 22, 2, 18, beam);
+      P.rect(13, 24, 1, 16, TIMBER_LIGHT);
       P.line(3, 24, 12, 31, beam);
-      P.rect(4, 35, 7, 11, C.door);
-      P.rect(5, 34, 5, 1, C.door);
-      P.px(9, 40, C.gold);
-      P.rect(5, 25, 5, 5, C.glow);
-      P.px(7, 25, beam);
-      P.rect(5, 27, 5, 1, beam);
+      eave(P, 0, 20, 30, ROOF_BROWN, '#d8c095');
+      stones(P, 1, 40, 28, 6, WARM_STONE);
+      framedWindow(P, 5, 25, 5, 5, { flowers: true });
+      plankDoor(P, 5, 34, 6, 12);
       // The big wooden wheel against the right wall.
       P.disc(21, 34, 8, beam);
+      P.disc(21, 34, 7, '#8a5a3b');
       P.disc(21, 34, 6, C.woodLight);
       P.disc(21, 34, 5, plaster);
       P.line(21, 28, 21, 40, C.wood);
@@ -647,25 +780,29 @@ function spinning(view: View): Sprite {
       P.line(17, 30, 25, 38, C.wood);
       P.line(25, 30, 17, 38, C.wood);
       P.disc(21, 34, 1, C.woodDark);
+      for (const [x, y] of [[17, 27], [15, 30], [14, 33]] as const) P.px(x, y, C.strawLight);
       for (const [x, y] of [[21, 26], [29, 34], [21, 42], [13, 34]] as const) P.px(x, y, C.woodLight);
     } else {
-      P.rect(3, 22, 24, 24, plaster);
-      gable(P, 15, 5, 17, 0.72, roof, plaster);
+      P.rect(3, 22, 24, 18, plaster);
+      P.rect(21, 23, 5, 17, plasterShade);
+      tiledGable(P, 15, 5, 17, 0.72, ROOF_BROWN, plaster);
       P.rect(14, 10, 2, 12, beam);
-      P.rect(2, 21, 26, 2, '#5e3b25');
-      P.rect(3, 22, 2, 24, beam);
-      P.rect(25, 22, 2, 24, beam);
-      P.rect(3, 43, 24, 1, beam);
-      P.rect(13, 13, 4, 3, C.glow);
+      P.rect(14, 10, 1, 12, TIMBER_LIGHT);
+      framedWindow(P, 13, 13, 4, 3);
+      eave(P, 2, 21, 26, ROOF_BROWN, '#d8c095');
+      P.rect(3, 23, 2, 17, beam);
+      P.rect(25, 23, 2, 17, beam);
+      stones(P, 3, 40, 24, 6, WARM_STONE);
       // The big spool hanging over the door.
       P.rect(8, 26, 14, 2, C.woodDark);
+      P.rect(8, 26, 14, 1, C.wood);
       P.rect(9, 28, 12, 9, '#e8789e');
       for (let y = 29; y < 37; y += 2) P.rect(9, y, 12, 1, '#f7a1c4');
-      P.rect(9, 28, 2, 9, '#c95a82');
+      P.rect(9, 28, 2, 9, '#ffc0d6');
+      P.rect(18, 28, 3, 9, '#c95a82');
       P.rect(8, 37, 14, 2, C.woodDark);
-      P.rect(14, 23, 2, 3, C.woodDark);
-      P.rect(11, 40, 8, 6, C.door);
-      P.px(17, 43, C.gold);
+      P.rect(14, 24, 2, 2, C.woodDark);
+      plankDoor(P, 12, 39, 6, 7);
     }
   });
 }
@@ -690,56 +827,94 @@ function yard(P: Painter, top: number, base: string, dark: string, light: string
   for (let i = 0; i < 90; i++) P.px(Math.floor(r() * 46), top + 2 + Math.floor(r() * (56 - top)), r() < 0.5 ? dark : light);
 }
 
+/** A ranch rail from x to x + w: light top, dark underside, like the ranch fences. */
+function rail(P: Painter, x: number, y: number, w: number): void {
+  P.rect(x, y, w, 2, C.wood);
+  P.rect(x, y, w, 1, C.woodLight);
+  P.rect(x, y + 1, w, 1, C.woodDark);
+}
+
+/** A ranch post: light face, shaded right edge, a straw-light cap. */
+function post(P: Painter, x: number, y: number, h: number): void {
+  P.rect(x, y, 2, h, C.woodLight);
+  P.px(x + 1, y + 1, C.wood);
+  P.rect(x + 1, y + 2, 1, h - 2, C.wood);
+  P.px(x, y, C.strawLight);
+}
+
+/** The pen's sides and front, in the ranch fence's style. */
 function sideAndFrontFence(P: Painter, from: number, bottom: number): void {
   for (let y = from; y < bottom; y += 6) {
     P.rect(0, y, 2, 4, C.wood);
     P.rect(44, y, 2, 4, C.wood);
+    P.px(0, y, C.woodLight);
   }
   P.rect(0, from, 1, bottom - from, C.woodDark);
   P.rect(45, from, 1, bottom - from, C.woodDark);
-  P.rect(0, bottom - 8, 46, 2, C.wood);
-  P.rect(0, bottom - 4, 46, 2, C.wood);
-  P.rect(0, bottom - 7, 46, 1, C.woodDark);
-  P.rect(0, bottom - 3, 46, 1, C.woodDark);
-  for (let x = 0; x < 46; x += 7) P.rect(x, bottom - 10, 2, 10, C.woodLight);
-  P.rect(44, bottom - 10, 2, 10, C.woodLight);
+  rail(P, 0, bottom - 8, 46);
+  rail(P, 0, bottom - 4, 46);
+  for (let x = 0; x < 46; x += 7) post(P, x, bottom - 10, 10);
+  post(P, 44, bottom - 10, 10);
+}
+
+/** The fence at the back of a pen. */
+function backFence(P: Painter, top: number): void {
+  rail(P, 0, top + 3, 46);
+  rail(P, 0, top + 6, 46);
+  for (let x = 0; x < 46; x += 7) post(P, x, top, 9);
+}
+
+/** Wooden planks: a dark line every few columns, the right end in shade. */
+function planks(P: Painter, x: number, y: number, w: number, h: number): void {
+  P.rect(x, y, w, h, C.wood);
+  P.rect(x + w - 4, y, 4, h, '#ad7645');
+  for (let px = x + 2; px < x + w; px += 4) P.rect(px, y, 1, h, C.woodDark);
+  P.rect(x, y, 1, h, C.woodLight);
+  P.rect(x, y + h - 1, w, 1, C.woodDark);
 }
 
 function coop(view: View): Sprite {
   return sprite(46, 58, (P) => {
     yard(P, 12, C.straw, C.strawDark, C.strawLight, 4);
-    P.rect(0, 12, 46, 2, C.woodDark);
-    P.rect(0, 16, 46, 1, C.woodDark);
-    for (let x = 0; x < 46; x += 7) P.rect(x, 9, 2, 9, C.wood);
+    backFence(P, 9);
     if (view === 'face') {
-      P.rect(3, 12, 22, 18, C.wood);
-      for (let x = 5; x < 25; x += 4) P.rect(x, 12, 1, 18, C.woodDark);
+      planks(P, 3, 12, 22, 18);
+      // A pitched roof in tile courses, the right side in shade.
       for (let i = 0; i <= 10; i++) {
         const half = Math.round(i * 1.35);
-        P.rect(14 - half, i, half * 2, 1, i < 3 ? C.roofLight : i > 8 ? C.roofDark : C.roof);
+        const row = i < 2 ? ROOF_RED[0] : i % 3 === 2 ? ROOF_RED[2] : ROOF_RED[1];
+        P.rect(14 - half, i, half * 2, 1, row);
+        if (half > 1) P.rect(14 + half - 2, i, 2, 1, ROOF_RED[2]);
+        if (half > 0) P.px(14 - half, i, ROOF_RED[0]);
       }
-      P.rect(0, 11, 28, 2, C.roofDark);
-      P.rect(11, 20, 6, 10, C.door);
-      P.rect(12, 19, 4, 1, C.door);
-      P.rect(17, 25, 6, 1, C.woodLight);
-      P.line(17, 25, 23, 29, C.woodLight);
+      eave(P, 0, 11, 28, ROOF_RED, '#a8743f');
+      plankDoor(P, 11, 20, 6, 10);
+      P.disc(20, 16, 2, C.woodDark);
       P.disc(20, 16, 1, C.glow);
+      // The ramp up to the door.
+      P.line(17, 26, 23, 30, C.woodLight);
+      P.line(17, 27, 23, 31, C.woodDark);
+      // A feeder of golden grain.
       P.rect(30, 40, 12, 4, C.woodDark);
+      P.rect(30, 40, 12, 1, C.wood);
       P.rect(31, 40, 10, 1, C.gold);
+      P.px(33, 40, C.goldLight);
+      P.px(38, 40, C.goldLight);
     } else {
-      P.rect(23, 14, 20, 16, C.wood);
-      for (let x = 25; x < 43; x += 4) P.rect(x, 14, 1, 16, C.woodDark);
-      gable(P, 33, 2, 12, 0.95, [C.roof, C.roofDark, C.roofLight], C.wood);
-      P.rect(21, 13, 24, 2, C.roofDark);
+      planks(P, 23, 14, 20, 16);
+      tiledGable(P, 33, 2, 12, 0.95, ROOF_RED, C.wood);
+      P.disc(33, 9, 2, C.woodDark);
       P.disc(33, 9, 1, C.glow);
-      P.rect(30, 21, 6, 9, C.door);
-      P.rect(31, 20, 4, 1, C.door);
+      eave(P, 21, 13, 24, ROOF_RED, '#a8743f');
+      plankDoor(P, 30, 21, 6, 9);
       P.line(29, 29, 23, 33, C.woodLight);
       P.line(29, 30, 23, 34, C.woodDark);
       P.rect(4, 40, 12, 4, C.woodDark);
+      P.rect(4, 40, 12, 1, C.wood);
       P.rect(5, 40, 10, 1, C.gold);
       P.rect(36, 40, 6, 3, C.greyDark);
       P.rect(37, 40, 4, 1, C.water);
+      P.px(38, 40, C.waterLight);
     }
     sideAndFrontFence(P, 16, 58);
   });
@@ -749,27 +924,42 @@ function cowshed(view: View): Sprite {
   const red = '#c9483f';
   const redDark = '#a5372f';
   const redLight = '#e06a5f';
-  const roof: [string, string, string] = ['#6b5a5a', '#4f4141', '#857171'];
+  const redShade = '#b33f37';
+  const roof = ROOF_SLATE;
   return sprite(46, 60, (P) => {
     yard(P, 24, '#e3cf8f', '#d1ba73', '#f0e1ab', 9);
+    // Hay showing through a loft door.
+    const hay = (x: number, y: number, w: number, h: number) => {
+      P.rect(x, y, w, h, '#e9c45a');
+      for (let hx = x; hx < x + w; hx += 2) P.px(hx, y, '#f5dc8a');
+      P.rect(x, y + h - 1, w, 1, '#c9a23a');
+    };
     if (view === 'face') {
-      // The barn's gable end: a gambrel roof framing a red wall, big white-crossed doors.
+      // The barn's gable end: a gambrel roof framing a red plank wall, white-crossed doors.
       const halves = [8, 10, 12, 14, 16, 17, 18, 19, 19, 20, 20, 21];
       for (let y = 0; y < 32; y++) {
         const half = y < halves.length ? halves[y] : 18;
         P.rect(23 - half, y, half * 2, 1, red);
+        P.rect(23 + half - 6, y, 6, 1, redShade);
         if (y < halves.length) {
-          P.rect(23 - half, y, 2, 1, y < 3 ? roof[2] : roof[0]);
-          P.rect(23 + half - 2, y, 2, 1, y < 3 ? roof[2] : roof[0]);
+          P.rect(23 - half, y, 2, 1, y < 3 ? roof[0] : roof[1]);
+          P.px(23 - half, y, roof[0]);
+          P.rect(23 + half - 2, y, 2, 1, y < 3 ? roof[1] : roof[2]);
+          P.px(23 + half - 1, y, roof[3]);
         }
       }
-      P.rect(15, 0, 16, 2, roof[2]);
-      P.rect(3, 12, 40, 1, roof[1]);
+      P.rect(15, 0, 16, 2, roof[0]);
+      P.rect(15, 1, 16, 1, roof[1]);
+      P.rect(3, 12, 40, 1, roof[2]);
       for (let x = 7; x < 40; x += 3) P.rect(x, 13, 1, 19, redDark);
       P.rect(5, 13, 1, 19, redLight);
-      P.rect(19, 4, 8, 6, C.door);
-      P.rect(18, 3, 10, 1, C.white);
-      P.rect(18, 10, 10, 1, C.white);
+      P.rect(5, 30, 36, 2, redDark);
+      // The hayloft, hay showing, a lamp under it.
+      P.rect(18, 3, 10, 8, C.white);
+      hay(19, 4, 8, 6);
+      P.px(23, 12, '#5b4a48');
+      P.rect(22, 13, 3, 2, C.glow);
+      // The big doors.
       P.rect(14, 17, 18, 15, redDark);
       P.rect(14, 17, 18, 1, C.white);
       P.rect(14, 17, 1, 15, C.white);
@@ -779,18 +969,25 @@ function cowshed(view: View): Sprite {
       P.line(21, 18, 15, 31, C.white);
       P.line(24, 18, 30, 31, C.white);
       P.line(30, 18, 24, 31, C.white);
+      P.px(21, 25, C.gold);
+      P.px(24, 25, C.gold);
     } else {
       for (let i = 0; i < 12; i++) {
         const inset = Math.max(0, 8 - i);
-        P.rect(1 + inset, 2 + i, 44 - 2 * inset, 1, i < 4 ? roof[2] : i % 3 === 0 ? roof[1] : roof[0]);
+        P.rect(1 + inset, 2 + i, 44 - 2 * inset, 1, i < 2 ? roof[0] : roof[1]);
+        if (i % 3 === 2) for (let x = 1 + inset + (Math.floor(i / 3) % 2) * 2; x < 45 - inset; x += 4) P.rect(x, 2 + i, 3, 1, roof[2]);
+        P.rect(45 - inset - 3, 2 + i, 3, 1, roof[2]);
+        P.px(1 + inset, 2 + i, roof[0]);
       }
       P.rect(3, 14, 40, 18, red);
+      P.rect(37, 14, 6, 18, redShade);
       for (let x = 5; x < 43; x += 3) P.rect(x, 15, 1, 17, redDark);
-      P.rect(3, 14, 40, 1, roof[1]);
+      P.rect(3, 15, 1, 17, redLight);
+      eave(P, 2, 13, 42, roof, redDark);
+      P.rect(3, 30, 40, 2, redDark);
       for (const x of [7, 15]) {
-        P.rect(x, 18, 5, 4, C.door);
-        P.rect(x - 1, 17, 7, 1, C.white);
-        P.rect(x - 1, 22, 7, 1, C.white);
+        P.rect(x - 1, 17, 7, 6, C.white);
+        hay(x, 18, 5, 4);
       }
       P.rect(28, 19, 9, 13, redDark);
       P.rect(28, 19, 9, 1, C.white);
@@ -798,15 +995,19 @@ function cowshed(view: View): Sprite {
       P.rect(36, 19, 1, 13, C.white);
       P.line(29, 20, 35, 31, C.white);
       P.line(35, 20, 29, 31, C.white);
+      P.px(26, 21, '#5b4a48');
+      P.rect(25, 22, 2, 2, C.glow);
     }
-    // Hay bale and water trough in the yard.
+    // A hay bale and a water trough in the yard.
     P.rect(4, 40, 9, 6, '#e9c45a');
     P.rect(4, 40, 9, 1, '#f5dc8a');
     P.rect(4, 42, 9, 1, '#c9a23a');
     P.rect(7, 40, 1, 6, '#c9a23a');
+    P.rect(11, 41, 2, 5, '#d6b048');
     P.rect(32, 42, 10, 4, C.woodDark);
-    P.rect(33, 42, 8, 1, C.water);
-    P.px(35, 42, C.waterLight);
+    P.rect(32, 42, 10, 1, C.wood);
+    P.rect(33, 43, 8, 1, C.water);
+    P.px(35, 43, C.waterLight);
     sideAndFrontFence(P, 24, 60);
   });
 }
@@ -1099,49 +1300,118 @@ const FENCE_ART: Record<SkinId, (P: Painter, sides: number, gate: boolean, climb
   fenceWattle: wattleFence,
 };
 
-function hedge(view: View): Sprite {
-  if (view === 'face') {
-    return sprite(TILE, 15, (P) => {
-      P.rect(0, 4, 16, 10, C.leafDark);
-      P.rect(0, 3, 16, 8, C.leaf);
-      for (const x of [0, 4, 8, 12]) P.rect(x, 2, 3, 2, C.leaf);
-      for (const x of [1, 5, 9, 13]) P.px(x, 2, C.leafLight);
-      for (const x of [3, 7, 11, 15]) P.px(x, 6, C.leafLight);
-      P.rect(0, 12, 16, 2, '#3d7a33');
-    }, true, 0);
-  }
-  return sprite(14, 25, (P) => {
-    P.rect(1, 0, 12, 22, C.leafDark);
-    P.rect(2, 0, 9, 20, C.leaf);
-    for (let y = 1; y < 20; y += 4) {
-      P.px(3, y, C.leafLight);
-      P.px(8, y + 2, C.leafLight);
-    }
-    P.rect(1, 20, 12, 2, '#3d7a33');
-  }, true, 0);
+// -----------------------------------------------
+// HEDGES AND PATHS: pieces that join, like the fences
+// -----------------------------------------------
+
+/** A piece that joins its neighbours (farmJoins.ts), drawn from the sides it joins. */
+export function joinedSprite(type: PlaceableId, skin: SkinId | null, mask: number): Sprite {
+  if (type === 'hedge') return hedgeSprite(mask);
+  if (type === 'pathDirt' || type === 'pathStone') return pathSprite(type === 'pathStone', mask);
+  return fenceSprite(skin ?? 'fenceRanch', mask, type === 'fenceGate');
 }
 
-function path(stone: boolean): Sprite {
-  return sprite(TILE, TILE, (P) => {
+const HEDGE_SHADE = '#3d7a33';
+
+/**
+ * One tile of hedge, as tall as a fence piece: its leafy top runs on into the neighbours; the front face shows only
+ * where the hedge ends southwards; free ends are rounded.
+ */
+function hedgeSprite(mask: number): Sprite {
+  const sides = mask & (ACROSS | ALONG);
+  return cached(`hedge-${sides}`, () => sprite(TILE, FENCE_H, (P) => {
+    const n = (sides & JOIN_NORTH) !== 0;
+    const e = (sides & JOIN_EAST) !== 0;
+    const s = (sides & JOIN_SOUTH) !== 0;
+    const w = (sides & JOIN_WEST) !== 0;
+    const top = n ? 0 : 6;
+    const face = 13;
+    const bottom = s ? FENCE_H : FENCE_H - 1;
+    for (let y = top; y < bottom; y++) {
+      const round = (!n && y === top) || (!s && y === bottom - 1);
+      const left = w ? 0 : round ? 2 : 1;
+      const right = e ? TILE : round ? TILE - 2 : TILE - 1;
+      const onTop = s || y < face;
+      P.rect(left, y, right - left, 1, onTop ? C.leaf : y >= bottom - 2 ? HEDGE_SHADE : C.leafDark);
+    }
+    // Leaf clumps on the top: a lit leaf and its shadow under it, row after row.
+    for (let y = top + 1; y < (s ? bottom - 1 : face - 1); y += 2) {
+      for (let x = 1 + (Math.floor(y / 2) % 2) * 2; x < TILE - 1; x += 4) {
+        P.px(x, y, C.leafLight);
+        P.px(x + 1, y + 1, C.leafDark);
+      }
+    }
+    // The face in rounded clumps, lit on top.
+    if (!s) {
+      for (const y of [face + 1, face + 4, face + 7]) {
+        for (let x = (y % 2) * 2; x < TILE; x += 4) {
+          P.rect(x, y, 3, 1, C.leaf);
+          P.px(x + 1, y - 1, C.leafLight);
+        }
+      }
+    }
+    // A few white flowers, always at the same spots so that a long hedge does not flicker.
+    P.px(5, top + 2, C.white);
+    P.px(11, s ? top + 9 : face + 3, C.white);
+    // Bumps along an open top edge.
+    if (!n) for (let x = w ? 0 : 2; x < (e ? TILE : TILE - 2); x += 4) P.rect(x, top - 1, 2, 1, C.leaf);
+  }, true, 0));
+}
+
+/** One tile of path: worn edges and rounded corners wherever no path of the same kind goes on. */
+function pathSprite(stone: boolean, mask: number): Sprite {
+  const sides = mask & (ACROSS | ALONG);
+  return cached(`path-${stone ? 'stone' : 'dirt'}-${sides}`, () => sprite(TILE, TILE, (P) => {
+    const openN = (sides & JOIN_NORTH) === 0;
+    const openE = (sides & JOIN_EAST) === 0;
+    const openS = (sides & JOIN_SOUTH) === 0;
+    const openW = (sides & JOIN_WEST) === 0;
+    const pal = stone ? { base: '#d8c4a0', edge: '#c3aa82', rim: '#a88d66' } : { base: '#c99a66', edge: '#b5854f', rim: '#9c7044' };
+    const last = TILE - 1;
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        // A rounded outer corner: its tip stays grass.
+        const corner = (openN && openW && x + y < 2) || (openN && openE && last - x + y < 2) || (openS && openW && x + last - y < 2) || (openS && openE && 2 * last - x - y < 2);
+        if (corner) continue;
+        const d = Math.min(openN ? y : 9, openS ? last - y : 9, openW ? x : 9, openE ? last - x : 9);
+        P.px(x, y, d === 0 ? pal.rim : d === 1 ? pal.edge : pal.base);
+      }
+    }
+    // The inside, clear of the worn edges.
+    const x0 = openW ? 2 : 0;
+    const x1 = openE ? TILE - 2 : TILE;
+    const y0 = openN ? 2 : 0;
+    const y1 = openS ? TILE - 2 : TILE;
+    const inside = (x: number, y: number) => x >= x0 && x < x1 && y >= y0 && y < y1;
+    const clip = (x: number, y: number, w: number, h: number, col: string) => {
+      const l = Math.max(x, x0);
+      const t = Math.max(y, y0);
+      const r = Math.min(x + w, x1);
+      const b = Math.min(y + h, y1);
+      if (r > l && b > t) P.rect(l, t, r - l, b - t, col);
+    };
     const r = mulberry32(stone ? 31 : 37);
     if (stone) {
-      P.rect(0, 0, 16, 16, '#d8c4a0');
       for (const [x, y, w, h] of [[1, 1, 6, 5], [8, 0, 7, 6], [0, 8, 5, 6], [6, 7, 5, 5], [12, 8, 4, 6], [6, 13, 6, 3]]) {
-        P.rect(x, y + 1, w, h, '#c9b391');
-        P.rect(x, y, w, h, '#e6d6b6');
-        P.rect(x + 1, y, w - 2, 1, '#f3e8d2');
+        clip(x, y + 1, w, h, '#c9b391');
+        clip(x, y, w, h, '#e6d6b6');
+        clip(x + 1, y, w - 2, 1, '#f3e8d2');
       }
     } else {
-      P.rect(0, 0, 16, 16, '#c99a66');
-      for (let i = 0; i < 26; i++) P.px(Math.floor(r() * 16), Math.floor(r() * 16), r() < 0.5 ? '#b5854f' : '#dcb07a');
+      for (let i = 0; i < 26; i++) {
+        const x = Math.floor(r() * TILE);
+        const y = Math.floor(r() * TILE);
+        if (inside(x, y)) P.px(x, y, r() < 0.5 ? '#b5854f' : '#dcb07a');
+      }
       for (let i = 0; i < 4; i++) {
         const x = Math.floor(r() * 14);
         const y = Math.floor(r() * 14);
+        if (!inside(x, y) || !inside(x + 1, y + 1)) continue;
         P.rect(x, y, 2, 1, '#e6dccb');
         P.px(x, y + 1, '#a9906e');
       }
     }
-  }, false, 0);
+  }, false, 0));
 }
 
 const FLOWER_COLORS: Record<'flowersPink' | 'flowersYellow' | 'flowersWhite', [string, string, string]> = {
@@ -1155,9 +1425,16 @@ function flowerBed(id: keyof typeof FLOWER_COLORS): Sprite {
   return sprite(14, 12, (P) => {
     P.ellipse(7, 8, 7, 3, '#9a6a46');
     P.ellipse(7, 7, 6, 2, C.soil);
-    for (const [x, y] of [[3, 3], [7, 2], [11, 3], [5, 6], [9, 6], [2, 7], [12, 7]]) {
+    P.ellipse(6, 7, 3, 1, C.soilLight);
+    // A border of little stones along the front.
+    for (let x = 1; x < 13; x += 2) {
+      P.px(x, 10, C.greyLight);
+      P.px(x + 1, 10, C.grey);
+    }
+    for (const [x, y] of [[3, 3], [7, 2], [11, 3], [5, 6], [9, 6], [2, 7], [12, 7], [7, 8]]) {
       P.px(x, y + 2, C.leafDark);
       P.px(x - 1, y + 1, C.leaf);
+      P.px(x + 1, y + 2, C.leafLight);
       P.px(x - 1, y, main);
       P.px(x + 1, y, main);
       P.px(x, y - 1, light);
@@ -1167,27 +1444,52 @@ function flowerBed(id: keyof typeof FLOWER_COLORS): Sprite {
   });
 }
 
+const IRON = '#5b4a48';
+const IRON_LIGHT = '#7d6b68';
+
 function bench(view: View): Sprite {
   if (view === 'face') {
     return sprite(26, 13, (P) => {
+      // The backrest: two boards, light on top.
       P.rect(0, 0, 26, 3, C.wood);
-      P.rect(0, 1, 26, 1, C.woodDark);
-      P.rect(2, 3, 2, 3, C.woodDark);
-      P.rect(22, 3, 2, 3, C.woodDark);
+      P.rect(0, 0, 26, 1, C.woodLight);
+      P.rect(0, 2, 26, 1, C.woodDark);
+      P.rect(23, 0, 3, 3, C.woodDark);
+      P.rect(2, 3, 2, 3, IRON);
+      P.rect(22, 3, 2, 3, IRON);
+      P.px(2, 3, IRON_LIGHT);
+      // The seat, its boards, curled iron armrests and legs.
       P.rect(0, 6, 26, 3, C.woodLight);
+      P.rect(0, 6, 26, 1, '#ecc08a');
       P.rect(0, 8, 26, 1, C.wood);
-      P.rect(2, 9, 2, 4, C.woodDark);
-      P.rect(22, 9, 2, 4, C.woodDark);
+      for (const x of [8, 17]) P.px(x, 7, C.wood);
+      P.rect(23, 6, 3, 3, C.wood);
+      P.rect(0, 4, 3, 1, IRON);
+      P.rect(23, 4, 3, 1, IRON);
+      P.px(0, 5, IRON);
+      P.px(25, 5, IRON);
+      P.rect(2, 9, 2, 4, IRON);
+      P.rect(22, 9, 2, 4, IRON);
+      P.px(2, 9, IRON_LIGHT);
+      P.px(1, 12, IRON);
+      P.px(4, 12, IRON);
+      P.px(21, 12, IRON);
+      P.px(24, 12, IRON);
     });
   }
   return sprite(12, 30, (P) => {
     P.rect(8, 0, 3, 24, C.wood);
-    P.rect(9, 0, 1, 24, C.woodDark);
+    P.rect(8, 0, 1, 24, C.woodLight);
+    P.rect(10, 0, 1, 24, C.woodDark);
     P.rect(1, 6, 7, 20, C.woodLight);
+    P.rect(1, 6, 1, 20, '#ecc08a');
     for (let y = 9; y < 26; y += 4) P.rect(1, y, 7, 1, C.wood);
-    P.rect(1, 26, 2, 4, C.woodDark);
-    P.rect(1, 6, 2, 1, C.wood);
-    P.rect(8, 24, 2, 6, C.woodDark);
+    P.rect(6, 6, 2, 20, C.wood);
+    P.rect(1, 26, 2, 4, IRON);
+    P.rect(8, 24, 2, 6, IRON);
+    P.px(1, 26, IRON_LIGHT);
+    P.px(0, 29, IRON);
+    P.px(10, 29, IRON);
   });
 }
 
@@ -1195,49 +1497,78 @@ function well(view: View): Sprite {
   return sprite(26, 34, (P) => {
     if (view === 'face') {
       P.rect(3, 4, 2, 18, C.woodDark);
+      P.rect(3, 4, 1, 18, C.wood);
       P.rect(21, 4, 2, 18, C.woodDark);
-      for (let i = 0; i < 6; i++) P.rect(2, i, 22, 1, i < 2 ? C.roofLight : C.roof);
-      P.rect(0, 5, 26, 2, C.roofDark);
+      // A little tiled roof.
+      for (let i = 0; i < 6; i++) P.rect(2, i, 22, 1, i < 1 ? ROOF_RED[0] : ROOF_RED[1]);
+      for (const y of [2, 4]) for (let x = 3 + (y === 4 ? 2 : 0); x < 22; x += 4) P.rect(x, y, 3, 1, ROOF_RED[2]);
+      P.rect(21, 0, 3, 6, ROOF_RED[2]);
+      P.rect(0, 5, 26, 2, ROOF_RED[3]);
+      P.rect(0, 5, 26, 1, ROOF_RED[2]);
+      // The crossbar, the crank, the rope and a bucket with its bands.
       P.rect(5, 10, 16, 1, C.woodDark);
-      P.line(13, 11, 13, 15, C.door);
-      P.rect(11, 15, 5, 4, C.woodDark);
-      P.rect(11, 15, 5, 1, C.wood);
+      P.rect(23, 9, 1, 3, IRON);
+      P.px(24, 11, IRON);
+      P.line(13, 11, 13, 14, C.door);
+      P.rect(11, 15, 5, 4, C.wood);
+      P.rect(11, 15, 5, 1, C.woodLight);
+      P.rect(11, 17, 5, 1, IRON);
+      P.rect(15, 15, 1, 4, C.woodDark);
     } else {
       P.rect(12, 6, 2, 16, C.woodDark);
-      for (let i = 0; i < 7; i++) P.rect(13 - (i + 1) * 1.5, i, (i + 1) * 3, 1, i < 2 ? C.roofLight : C.roof);
-      P.rect(1, 7, 24, 1, C.roofDark);
+      P.rect(12, 6, 1, 16, C.wood);
+      for (let i = 0; i < 7; i++) P.rect(13 - (i + 1) * 1.5, i, (i + 1) * 3, 1, i < 2 ? ROOF_RED[0] : i % 3 === 2 ? ROOF_RED[2] : ROOF_RED[1]);
+      P.rect(1, 7, 24, 1, ROOF_RED[3]);
       P.rect(14, 10, 6, 1, C.woodDark);
-      P.rect(19, 10, 1, 3, C.woodDark);
-      P.line(16, 11, 16, 15, C.door);
-      P.rect(14, 15, 5, 4, C.woodDark);
+      P.rect(19, 10, 1, 3, IRON);
+      P.line(16, 11, 16, 14, C.door);
+      P.rect(14, 15, 5, 4, C.wood);
+      P.rect(14, 15, 5, 1, C.woodLight);
+      P.rect(14, 17, 5, 1, IRON);
     }
-    P.rect(2, 22, 22, 12, C.grey);
-    for (let y = 24; y < 34; y += 3) for (let x = 3 + (y % 2) * 3; x < 23; x += 6) P.rect(x, y, 4, 1, C.greyDark);
-    P.ellipse(13, 21, 11, 3, C.greyLight);
+    // Stones with a little moss, the rim, the water.
+    stones(P, 2, 22, 22, 12, [C.greyLight, C.grey, C.greyDark]);
+    P.rect(20, 23, 4, 11, C.greyDark);
+    for (const [x, y] of [[4, 31], [5, 30], [18, 27], [9, 33]] as const) P.px(x, y, '#7cbd5c');
+    P.ellipse(13, 21, 11, 3, '#ece8e1');
+    P.ellipse(13, 22, 10, 2, C.greyLight);
     P.ellipse(13, 21, 8, 2, '#4d7fb0');
-    P.px(10, 20, '#8ec6e8');
+    P.ellipse(12, 21, 5, 1, '#5c9fd6');
+    P.px(10, 20, '#bfe2f7');
+    P.px(11, 20, '#8ec6e8');
   });
 }
 
 function scarecrow(): Sprite {
   return sprite(14, 26, (P) => {
     P.line(7, 8, 7, 25, C.woodDark);
+    P.line(6, 18, 6, 25, C.wood);
     P.line(1, 12, 13, 12, C.wood);
+    P.line(1, 11, 13, 11, C.woodLight);
+    // The shirt with a patch, the straw at its cuffs and hem.
     P.rect(4, 11, 7, 8, '#6a9fd8');
     P.rect(4, 11, 7, 1, '#86b6e6');
+    P.rect(9, 12, 2, 7, '#5385bd');
     P.rect(5, 14, 2, 2, C.red);
-    P.px(1, 13, C.gold);
-    P.px(13, 13, C.gold);
-    P.px(0, 12, C.gold);
-    P.px(5, 19, C.gold);
-    P.px(9, 19, C.gold);
+    P.px(5, 14, '#ff8a96');
+    P.rect(7, 12, 1, 6, '#86b6e6');
+    for (const [x, y] of [[1, 13], [13, 13], [0, 12], [5, 19], [7, 19], [9, 19], [12, 13]] as const) P.px(x, y, C.gold);
+    // A burlap head with a stitched smile, a straw hat with a red band.
     P.disc(7, 6, 3, '#e8c98a');
+    P.px(5, 5, '#f3dcad');
+    P.rect(9, 5, 1, 3, '#d4ae6c');
     P.px(6, 6, OUTLINE);
     P.px(8, 6, OUTLINE);
-    P.px(7, 8, '#c49a5c');
-    P.rect(2, 3, 11, 1, C.bark);
-    P.rect(4, 0, 7, 3, C.bark);
+    P.rect(6, 8, 3, 1, '#a07a46');
+    P.rect(2, 3, 11, 1, '#c9a23a');
+    P.rect(4, 0, 7, 3, '#e9c45a');
+    P.rect(4, 0, 7, 1, '#f5dc8a');
     P.rect(4, 2, 7, 1, C.red);
+    // A crow resting on the arm.
+    P.rect(11, 9, 3, 2, '#3d3540');
+    P.px(13, 8, '#3d3540');
+    P.px(14, 8, C.orange);
+    P.px(12, 9, '#5a5060');
   });
 }
 
@@ -1315,28 +1646,38 @@ export function seatOf(id: PlaceableId, view: View, skin: SkinId | null): { x: n
 }
 
 function wheelbarrow(view: View): Sprite {
+  const flowers = (P: Painter, xs: readonly number[], y: number) => {
+    xs.forEach((x, i) => {
+      P.px(x, y, i % 2 ? '#ff8fb8' : C.gold);
+      P.px(x, y + 1, C.leaf);
+    });
+  };
   if (view === 'face') {
     return sprite(14, 13, (P) => {
       P.rect(1, 0, 1, 4, C.woodDark);
       P.rect(12, 0, 1, 4, C.woodDark);
       P.rect(0, 3, 14, 2, C.woodLight);
+      P.rect(0, 3, 14, 1, '#ecc08a');
       P.rect(1, 5, 12, 3, C.wood);
+      P.rect(10, 5, 3, 3, C.woodDark);
       P.rect(2, 8, 10, 1, C.woodDark);
-      P.rect(2, 3, 10, 1, '#7cc456');
-      P.px(4, 2, C.leafLight);
-      P.px(9, 2, C.leaf);
-      P.disc(7, 10, 2, '#5b4a48');
+      P.rect(2, 3, 10, 1, C.leaf);
+      flowers(P, [3, 5, 7, 9, 11], 2);
+      P.disc(7, 10, 2, IRON);
       P.px(7, 10, C.greyLight);
+      P.px(6, 9, IRON_LIGHT);
     });
   }
   return sprite(15, 11, (P) => {
     P.rect(3, 2, 9, 2, C.woodLight);
+    P.rect(3, 2, 9, 1, '#ecc08a');
     P.rect(4, 4, 7, 2, C.wood);
     P.rect(5, 6, 5, 1, C.woodDark);
-    P.rect(4, 1, 6, 1, '#7cc456');
+    P.rect(4, 1, 6, 1, C.leaf);
+    flowers(P, [4, 6, 8], 0);
     P.line(11, 3, 14, 1, C.woodDark);
     P.rect(10, 7, 1, 4, C.woodDark);
-    P.disc(3, 8, 2, '#5b4a48');
+    P.disc(3, 8, 2, IRON);
     P.px(3, 8, C.greyLight);
   });
 }
@@ -1346,24 +1687,31 @@ function logPile(view: View): Sprite {
     P.disc(x, y, 3, C.bark);
     P.disc(x, y, 2, '#e6b884');
     P.px(x, y, '#c38a55');
+    P.px(x + 1, y + 1, '#d3a06c');
     P.px(x - 1, y - 1, '#f3d2a2');
+    P.px(x + 2, y + 2, C.barkDark);
   };
   if (view === 'face') {
     return sprite(28, 12, (P) => {
       for (const x of [4, 11, 18, 25]) end(P, x, 8);
       for (const x of [8, 15, 22]) end(P, x, 3);
+      P.px(13, 0, C.leafLight);
+      P.px(14, 1, C.leaf);
     });
   }
   return sprite(12, 28, (P) => {
     P.rect(0, 5, 5, 22, C.bark);
     P.rect(6, 5, 5, 22, C.bark);
     P.rect(3, 1, 5, 22, '#9a6744');
+    P.rect(3, 1, 1, 22, '#b07a52');
+    P.rect(0, 5, 1, 22, '#9a6744');
     for (const x of [1, 7, 4]) {
-      for (let y = 6; y < 25; y += 5) P.px(x, y, C.barkDark);
+      for (let y = 6; y < 25; y += 5) P.rect(x, y, 2, 1, C.barkDark);
     }
     P.ellipse(2, 26, 2, 1, '#e6b884');
     P.ellipse(8, 26, 2, 1, '#e6b884');
     P.ellipse(5, 22, 2, 1, '#e6b884');
+    P.px(5, 22, '#c38a55');
   });
 }
 
@@ -1378,16 +1726,31 @@ function birdhouse(view: View): Sprite {
 /** The little house itself, on its pole or sitting on a support. */
 function birdhouseBox(P: Painter, view: View): void {
   if (view === 'face') {
+    // The box: blue boards, lit on the left, a perch under the round hole.
     P.rect(2, 4, 10, 7, '#6a9fd8');
+    P.rect(2, 4, 1, 7, '#8fbbe8');
+    P.rect(9, 4, 3, 7, '#5385bd');
+    for (const x of [5, 8]) P.rect(x, 5, 1, 5, '#5c8fc8');
     P.rect(2, 10, 10, 1, '#4d7fb0');
-    for (let i = 0; i < 5; i++) P.rect(6 - i - 1, i, 2 * i + 4, 1, i < 2 ? C.roofLight : C.roof);
+    for (let i = 0; i < 5; i++) {
+      P.rect(6 - i - 1, i, 2 * i + 4, 1, i < 2 ? ROOF_RED[0] : ROOF_RED[1]);
+      P.px(6 + i + 2, i, ROOF_RED[2]);
+    }
+    P.rect(1, 4, 12, 1, ROOF_RED[3]);
     P.disc(7, 7, 1, OUTLINE);
+    P.px(6, 6, '#3a2a2e');
+    P.rect(6, 9, 3, 1, C.woodLight);
     P.rect(6, 10, 3, 1, C.woodLight);
   } else {
     P.rect(4, 4, 6, 7, '#5c8fc8');
+    P.rect(4, 4, 1, 7, '#8fbbe8');
+    P.rect(8, 4, 2, 7, '#4d7fb0');
     P.rect(4, 10, 6, 1, '#4d7fb0');
-    for (let i = 0; i < 5; i++) P.rect(2 + i * 0, i, 10, 1, i < 2 ? C.roofLight : C.roof);
-    P.rect(2, 4, 10, 1, C.roofDark);
+    for (let i = 0; i < 5; i++) {
+      P.rect(2, i, 10, 1, i < 2 ? ROOF_RED[0] : ROOF_RED[1]);
+      if (i === 2) for (let x = 3; x < 12; x += 3) P.rect(x, i, 2, 1, ROOF_RED[2]);
+    }
+    P.rect(2, 4, 10, 1, ROOF_RED[3]);
     P.px(6, 7, '#86b6e6');
   }
 }
@@ -1398,22 +1761,42 @@ function appleTree(): Sprite {
 
 function pond(): Sprite {
   return sprite(30, 24, (P) => {
-    P.ellipse(15, 15, 14, 8, C.grey);
-    P.ellipse(15, 14, 14, 7, C.greyLight);
+    // A ring of stones, then the water.
+    P.ellipse(15, 15, 14, 8, C.greyDark);
+    P.ellipse(15, 14, 14, 7, C.grey);
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2;
+      P.ellipse(Math.round(15 + Math.cos(a) * 13), Math.round(14 + Math.sin(a) * 6.5), 1, 1, i % 2 ? C.greyLight : '#e2ddd5');
+    }
     P.ellipse(15, 15, 12, 6, C.waterDark);
     P.ellipse(15, 15, 11, 5, C.water);
-    P.rect(8, 13, 4, 1, C.waterLight);
-    P.rect(17, 18, 3, 1, C.waterLight);
+    P.ellipse(13, 14, 7, 3, '#6aaee0');
+    // Lily pads, one in flower, one with a frog.
     P.ellipse(10, 16, 3, 2, C.leaf);
-    P.px(11, 15, '#5c9fd6');
+    P.px(11, 15, C.water);
     P.px(9, 16, C.leafLight);
     P.px(9, 15, '#ff8fb8');
     P.px(10, 14, '#ffc0d6');
+    P.ellipse(19, 18, 2, 1, C.leafDark);
+    P.rect(18, 16, 3, 2, '#6cbf4a');
+    P.px(18, 16, '#9ad574');
+    P.px(20, 16, '#9ad574');
+    P.px(18, 15, OUTLINE);
+    P.px(20, 15, OUTLINE);
+    // Reeds with their brown heads.
     for (const [x, h] of [[23, 10], [25, 12], [27, 8]] as const) {
       P.line(x, 14, x, 14 - h, C.leafDark);
       P.rect(x, 14 - h, 1, 3, C.bark);
+      P.px(x, 14 - h, '#b07a52');
     }
     P.px(22, 9, C.leaf);
+    P.px(24, 6, C.leafLight);
+  }, true, 1, (P) => {
+    // Glints on the water, never outlined.
+    P.rect(8, 13, 4, 1, C.waterLight);
+    P.px(9, 12, '#ffffff');
+    P.rect(16, 18, 3, 1, C.waterLight);
+    P.rect(13, 11, 2, 1, '#d6eefc');
   });
 }
 
@@ -1444,21 +1827,32 @@ function bush(): Sprite {
 function stump(): Sprite {
   return sprite(12, 10, (P) => {
     P.rect(1, 3, 10, 7, C.bark);
+    P.rect(1, 3, 1, 7, '#a06c48');
     P.rect(3, 3, 1, 7, C.barkDark);
     P.rect(8, 3, 1, 7, C.barkDark);
+    P.rect(9, 3, 2, 7, C.barkDark);
     P.px(0, 9, C.bark);
     P.px(11, 9, C.barkDark);
     P.ellipse(6, 3, 5, 2, C.woodLight);
-    P.ellipse(6, 3, 2, 1, C.wood);
+    P.ellipse(6, 3, 3, 1, '#e8bb83');
+    P.ellipse(6, 3, 1, 0, C.wood);
     P.px(9, 1, C.leafLight);
+    // A little red mushroom at its foot.
+    P.rect(9, 7, 2, 1, C.red);
+    P.px(10, 7, '#ff8a96');
+    P.px(10, 8, C.cream);
   });
 }
 
 function rock(): Sprite {
   return sprite(13, 9, (P) => {
     P.ellipse(6, 5, 6, 4, C.grey);
+    P.ellipse(8, 6, 4, 2, C.greyDark);
     P.ellipse(5, 4, 4, 2, C.greyLight);
+    P.px(3, 3, '#ece8e1');
     P.rect(3, 7, 8, 1, C.greyDark);
+    P.px(9, 4, C.greyDark);
+    P.px(2, 6, '#7cbd5c');
   });
 }
 
@@ -1466,14 +1860,20 @@ function bigRock(): Sprite {
   return sprite(28, 20, (P) => {
     P.ellipse(18, 13, 9, 6, C.greyDark);
     P.ellipse(18, 12, 8, 5, C.grey);
+    P.ellipse(20, 14, 5, 3, C.greyDark);
     P.ellipse(11, 10, 10, 8, C.grey);
+    P.ellipse(14, 13, 6, 4, '#a9a29a');
     P.ellipse(10, 8, 7, 5, C.greyLight);
+    P.ellipse(8, 6, 3, 2, '#ece8e1');
     P.rect(4, 16, 20, 2, C.greyDark);
     P.line(12, 6, 14, 11, C.greyDark);
     P.line(14, 11, 13, 14, C.greyDark);
     P.rect(5, 4, 4, 2, '#7cbd5c');
     P.rect(6, 3, 2, 1, '#9ad574');
     P.rect(20, 8, 3, 1, '#7cbd5c');
+    P.px(21, 7, '#9ad574');
+    P.px(3, 15, C.leaf);
+    P.px(25, 16, C.leaf);
   });
 }
 
@@ -1720,56 +2120,85 @@ function swing(view: View): Sprite {
   });
 }
 
-/** The legendary one: stone and gold, water falling from a golden bowl, a golden bird on top. */
+/** The legendary one: a royal fountain, stone and gold, a golden swan whose jet falls into a high bowl, then two falls. */
 function fountain(): Sprite {
-  return sprite(30, 40, (P) => {
-    // The basin: its wall, a gold band, the rim and the water.
-    P.rect(1, 30, 28, 8, C.stone);
-    P.rect(1, 37, 28, 1, C.stoneDark);
-    for (let y = 32; y < 37; y += 2) for (let x = 2 + (y % 4 === 0 ? 3 : 0); x < 28; x += 6) P.rect(x, y, 3, 1, C.stoneDark);
-    P.rect(1, 31, 28, 1, C.gold);
-    P.ellipse(15, 30, 14, 4, C.stoneDark);
-    P.ellipse(15, 29, 14, 4, C.stone);
-    P.ellipse(15, 29, 12, 3, C.waterDark);
-    P.ellipse(15, 29, 11, 2, C.water);
-    P.rect(6, 28, 4, 1, C.waterLight);
-    P.rect(19, 30, 3, 1, C.waterLight);
-    for (let x = 3; x < 28; x += 4) P.px(x, 26 + (x % 8 === 3 ? 1 : 0), C.goldLight);
-    // The pillar.
-    P.rect(13, 15, 5, 14, C.stone);
-    P.rect(13, 15, 1, 14, '#fffaf2');
-    P.rect(17, 15, 1, 14, C.stoneDark);
-    P.rect(12, 26, 7, 2, C.stoneDark);
-    P.rect(12, 18, 7, 1, C.gold);
-    // The golden bowl and its water falling into the basin.
-    P.ellipse(15, 14, 7, 2, C.goldDark);
-    P.ellipse(15, 13, 7, 2, C.gold);
-    P.ellipse(15, 13, 5, 1, C.water);
-    P.px(12, 13, C.waterLight);
-    for (let i = 0; i < 12; i++) {
-      const col = i % 3 === 0 ? '#ffffff' : C.waterLight;
-      P.px(7 - Math.floor(i / 3), 15 + i, col);
-      P.px(23 + Math.floor(i / 3), 15 + i, col);
+  return sprite(32, 41, (P) => {
+    // Basin wall: panels between little pilasters, a gold band under the rim.
+    P.rect(1, 33, 31, 8, C.stone);
+    P.rect(1, 40, 31, 1, C.stoneDark);
+    P.rect(1, 39, 31, 1, '#dcd2c2');
+    for (const x of [1, 7, 13, 19, 25]) {
+      P.rect(x + 1, 36, 4, 3, '#f3ede2');
+      P.rect(x + 1, 38, 4, 1, '#ddd3c3');
     }
-    // A golden bird on top.
-    P.ellipse(15, 9, 3, 2, C.gold);
-    P.ellipse(14, 8, 1, 1, C.goldLight);
-    P.disc(18, 6, 1, C.gold);
-    P.px(18, 5, C.goldLight);
-    P.px(20, 6, C.orange);
-    P.px(18, 6, OUTLINE);
-    P.rect(11, 8, 2, 1, C.goldDark);
-    P.px(10, 7, C.goldDark);
-    P.rect(14, 11, 2, 1, C.goldDark);
-    // Sparkles all around: this is the jackpot.
-    twinkle(P, 3, 6);
-    twinkle(P, 26, 3);
-    twinkle(P, 25, 19);
-    twinkle(P, 5, 21);
-    P.px(9, 2, SPARKLE);
-    P.px(22, 11, SPARKLE);
+    for (const x of [6, 12, 18, 24]) P.rect(x, 35, 2, 5, C.stoneDark);
+    P.rect(1, 34, 31, 1, C.gold);
+    P.rect(1, 35, 31, 1, C.goldDark);
+    // Rim and water.
+    P.ellipse(16, 33, 15, 6, C.stoneDark);
+    P.ellipse(16, 32, 15, 6, C.stone);
+    P.ellipse(16, 31, 15, 5, '#f6f1e8');
+    P.ellipse(16, 32, 13, 4, C.gold);
+    P.ellipse(16, 32, 12, 4, C.waterDark);
+    P.ellipse(16, 31, 11, 3, C.water);
+    for (const [x, y, w] of [[6, 31, 3], [20, 33, 4], [12, 34, 3], [24, 30, 2]]) P.rect(x, y, w, 1, C.waterLight);
+    P.px(9, 33, C.gold);
+    P.px(22, 31, C.goldLight);
+    P.px(18, 34, C.gold);
+    // Lily pads.
+    P.ellipse(7, 33, 2, 1, C.leaf);
+    P.px(8, 32, '#ff8fb8');
+    P.ellipse(25, 33, 2, 1, C.leafDark);
+    P.px(26, 33, C.leaf);
+    // The column with its gold ring.
+    P.rect(13, 19, 6, 13, C.stone);
+    P.rect(13, 19, 1, 13, '#ffffff');
+    P.rect(17, 19, 2, 13, C.stoneDark);
+    P.rect(13, 25, 6, 1, C.gold);
+    P.rect(12, 29, 8, 3, C.stoneDark);
+    P.rect(12, 29, 8, 1, C.stone);
+    // The upper bowl.
+    P.ellipse(16, 20, 8, 3, C.stoneDark);
+    P.ellipse(16, 19, 8, 3, C.stone);
+    P.ellipse(16, 19, 7, 2, C.gold);
+    P.ellipse(16, 19, 6, 1, C.water);
+    P.rect(13, 19, 3, 1, C.waterLight);
+    // A golden swan on a little plinth, a jet from its beak.
+    P.rect(13, 15, 6, 3, C.goldDark);
+    P.rect(13, 15, 6, 1, C.goldLight);
+    P.ellipse(15, 12, 4, 2, C.gold);
+    P.ellipse(14, 11, 2, 1, C.goldLight);
+    P.rect(11, 11, 2, 1, C.goldDark);
+    // The neck in an S, the head bowed, the beak to the right.
+    P.rect(17, 9, 2, 3, C.gold);
+    P.rect(18, 6, 2, 3, C.gold);
+    P.rect(17, 4, 2, 2, C.gold);
+    P.rect(18, 3, 3, 2, C.gold);
+    P.px(18, 6, C.goldLight);
+    P.px(17, 9, C.goldLight);
+    P.px(21, 4, C.orange);
+    P.px(19, 3, OUTLINE);
+    twinkle(P, 4, 9);
+    twinkle(P, 28, 21);
+    twinkle(P, 3, 23);
+    P.px(9, 3, SPARKLE);
+    P.px(29, 1, SPARKLE);
+  }, true, 1, (P) => {
+    // The water, light and never outlined: the jet from the beak, then the two falls from the bowl.
+    const drops: [number, number][] = [
+      [22, 3], [23, 2], [24, 2], [25, 3], [26, 5], [26, 7], [26, 9], [25, 12], [24, 15],
+      ...Array.from({ length: 9 }, (_, i): [number, number] => [7 - Math.floor(i / 4), 21 + i]),
+      ...Array.from({ length: 9 }, (_, i): [number, number] => [24 + Math.floor(i / 4), 21 + i]),
+    ];
+    drops.forEach(([x, y], i) => {
+      P.rect(x - 1, y, 2, 2, WATER_MIST);
+      P.px(x, y, i % 3 === 1 ? '#ffffff' : C.waterLight);
+    });
   });
 }
+
+/** The halo around falling water. */
+const WATER_MIST = '#d6eefc';
 
 // -----------------------------------------------
 // GASTON'S MAILBOX
@@ -1896,12 +2325,12 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'cowshed': return cowshed(v);
       case 'fence': return fenceSprite('fenceRanch', ACROSS, false);
       case 'fenceGate': return fenceSprite('fenceRanch', ACROSS, true);
-      case 'hedge': return hedge(v);
+      case 'hedge': return hedgeSprite(ACROSS);
       case 'flowersPink':
       case 'flowersYellow':
       case 'flowersWhite': return flowerBed(id);
-      case 'pathStone': return path(true);
-      case 'pathDirt': return path(false);
+      case 'pathStone': return pathSprite(true, 0);
+      case 'pathDirt': return pathSprite(false, 0);
       case 'bench': return bench(v);
       case 'well': return well(v);
       case 'scarecrow': return scarecrow();
@@ -1933,7 +2362,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
 
 /** Seen the same from every side: one drawing for both views. */
 const SYMMETRIC = new Set<ObjectId>([
-  'fence', 'fenceGate', 'flowerPot', 'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
+  'fence', 'fenceGate', 'hedge', 'flowerPot', 'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
   'bush', 'stump', 'rock', 'bigRock', 'teaTable', 'fountain',
 ]);
 

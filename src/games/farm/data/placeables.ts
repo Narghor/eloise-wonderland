@@ -22,7 +22,7 @@ export interface Placeable {
   flat?: boolean;
   /** Found only in Gaston's parcels: never in the shop. */
   treasure?: boolean;
-  /** Joins its neighbours of this family wearing the same skin (farmJoins.ts): one tile, never turned. */
+  /** Joins its neighbours of this family (wearing the same skin, when the family has skins; farmJoins.ts): one tile, never turned. */
   joins?: JoinFamily;
   /** A small decoration may sit on it (farmMap.ts, docs/ferme.md 16): one at a time. */
   carries?: boolean;
@@ -49,10 +49,10 @@ export const PLACEABLES: readonly Placeable[] = [
   // Decorations (docs/ferme.md 7.6): purely decorative in lot 1.
   { ...deco('fence', 'Barrière en bois', [1, 1], 5, 1), joins: 'fence', carries: true },
   { ...deco('fenceGate', 'Portillon', [1, 1], 15, 1), joins: 'fence' },
-  deco('pathDirt', 'Chemin de terre', [1, 1], 2, 1, true),
-  deco('hedge', 'Haie', [1, 1], 8, 2),
+  { ...deco('pathDirt', 'Chemin de terre', [1, 1], 2, 1, true), joins: 'pathDirt' },
+  { ...deco('hedge', 'Haie', [1, 1], 8, 2), joins: 'hedge' },
   deco('flowersPink', 'Parterre de roses', [1, 1], 12, 2),
-  deco('pathStone', 'Chemin pavé', [1, 1], 4, 2, true),
+  { ...deco('pathStone', 'Chemin pavé', [1, 1], 4, 2, true), joins: 'pathStone' },
   deco('flowersYellow', 'Parterre de boutons-d’or', [1, 1], 12, 3),
   { ...deco('flowerPot', 'Pot de fleurs', [1, 1], 15, 3), perches: true },
   deco('scarecrow', 'Épouvantail', [1, 1], 30, 3),

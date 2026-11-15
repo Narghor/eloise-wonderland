@@ -243,6 +243,25 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
 }
 
 // -----------------------------------------------
+// HEDGES AND PATHS JOIN THEIR OWN KIND (docs/ferme.md 16)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.nuts = 1000;
+  farm.level = 5;
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 3, 2)!;
+  buyAndPlace(farm, 'hedge', x, y, 0, now);
+  buyAndPlace(farm, 'hedge', x + 1, y, 0, now);
+  buyAndPlace(farm, 'fence', x + 2, y, 0, now);
+  buyAndPlace(farm, 'pathDirt', x, y + 1, 0, now);
+  const stone = buyAndPlace(farm, 'pathStone', x + 1, y + 1, 0, now)!;
+  const index = joinIndex(farm.objects);
+  check('a hedge joins a hedge, not a fence', joinMask(index, x + 1, y, 'hedge') === JOIN_WEST);
+  check('a dirt path and a stone path do not join', joinMask(index, x, y + 1, 'pathDirt') === 0 && joinMask(index, x + 1, y + 1, 'pathStone') === 0);
+  check('hedges and paths have no style and are never turned', stone.skin === undefined && stone.rot === 0 && skinOf(stone) === null);
+}
+
+// -----------------------------------------------
 // DECORATIONS SITTING ON OTHERS (docs/ferme.md 16)
 // -----------------------------------------------
 {

@@ -712,8 +712,13 @@ portillon a ses deux poteaux et se raccorde à l'est et à l'ouest.
   courts. La pièce juste au sud d'un portillon fait monter sa lisse seulement jusqu'à son pied (`JOIN_NORTH_GATE`),
   sinon elle le cachait.
 - Vérifié : `farm-check` (7 vérifications de plus, 27 au total), captures de la carte, de la planche et du mode achat.
-- **Reste de l'étape 1** : le raccord de la haie et des chemins (même mécanique, une famille de plus chacun).
 - Publié le 15/11 au soir (commit 033e2e7, sans entrée Nouveautés, choix de Flo).
+- **Fin de l'étape 1 (15/11 au soir, non joué)** : la haie et les deux chemins se raccordent aussi, chacun avec son
+  espèce (familles `hedge`, `pathDirt`, `pathStone`, sans skins : `joinKey` = le skin, ou la famille quand elle n'en a
+  pas). Haie : le dessus feuillu continue chez les voisines, la face avant seulement là où la haie s'arrête au sud,
+  bouts arrondis. Chemins : bord usé et coins arrondis là où aucun chemin de la même espèce ne continue ; un chemin
+  (objet plat) est posé pile sur sa case, sans le pixel de décalage des objets debout. Pas de bouton Tourner ni Style
+  pour eux. farm-check : 37.
 
 **Étape 2 : les décos posées sur d'autres, modèle validé par Flo et codé (15/11 au soir, non joué sur téléphone).**
 - **Qui se pose dessus** (`perches`) : la Lanterne et le Nichoir (par terre, ils gardent leur pied ; posés, seule la
@@ -737,3 +742,21 @@ portillon a ses deux poteaux et se raccorde à l'est et à l'ouest.
   qui porte quelque chose, l'appui long sur le dessin de l'objet posé prend l'objet posé. Le bouton **Fini**
   d'Aménager quitte le bandeau du haut pour le bas de l'écran, au-dessus des onglets ; le bandeau ne garde que la
   consigne, et les boutons d'un objet choisi s'arrêtent au-dessus de Fini.
+
+**Étape 3 : l'overhaul graphique, validé par Flo et fait (15/11 au soir, non joué sur téléphone).** Retour d'Éloïse et
+de Flo : « la fontaine ultra légendaire est un peu moche », puis « à appliquer sur TOUT ».
+- **La fontaine** : la « royale » choisie sur planche (A, contre B en cœur) : grand bassin rond à panneaux bordé d'or,
+  vasque haute, cygne doré dont le jet retombe dans la vasque, deux cascades, nénuphars et pièces.
+- **L'eau ne prend plus de contour** : `sprite(..., glaze)` peint une couche après le contour (jets, cascades, reflets
+  de la mare) ; sinon un filet d'eau d'un pixel devenait une chaîne de perles.
+- **La recette commune** (« boîte à outils » en tête des bâtiments dans `farmArt.ts`) : une seule lumière en haut à
+  gauche, 3 ou 4 tons par matière (`Tones`), toits en tuiles écailles (`tiledRoof`) avec un avant-toit épais et son
+  ombre (`eave`), pignons à bordures claire / sombre (`tiledGable`), pierres chaudes taillées (`stones`), fenêtres en
+  creux avec reflet et jardinière (`framedWindow`), portes en planches au haut arrondi (`plankDoor`).
+- **Refaits** : les six bâtiments, face et profil (fournil à colombages, moulin à galerie, laiterie à clins blancs,
+  filature, poulailler en planches, étable à foin dans le grenier et lanterne), la clôture des enclos au style ranch,
+  le banc (fer forgé), le puits (toit en tuiles, seau cerclé, mousse), l'épouvantail (rapiécé, un corbeau), la brouette
+  fleurie, le tas de bûches, la mare (pierres, grenouille, massettes), les parterres (bordure de cailloux), le nichoir,
+  la haie (touffes, fleurs blanches), les obstacles sauvages (volume, mousse, champignon).
+- **Gardés** : les trésors (dessinés avec soin dans une passe précédente), les arbres, la boîte aux lettres.
+- Planches de choix : fontaines, puis fournil et moulin avant / après (validés à l'œil par Flo).
