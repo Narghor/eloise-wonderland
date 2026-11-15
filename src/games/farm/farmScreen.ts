@@ -53,6 +53,7 @@ import {
   type FarmUi,
 } from './farmPanels';
 import { FarmScene, type Ghost } from './farmScene';
+import { swipeToClose } from './farmSwipe';
 import { loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
 import { MINUTE_MS } from './farmTime';
 
@@ -351,8 +352,9 @@ class FarmScreen implements FarmUi {
       }),
     );
     const body = el('div', { class: 'farm-sheet-body' }, ...content.body);
-    const sheet = el('section', { class: 'farm-sheet', role: 'dialog', 'aria-label': content.title }, el('header', {}, el('h2', { text: content.title }), close), tabs, body);
+    const sheet = el('section', { class: 'farm-sheet', role: 'dialog', 'aria-label': content.title }, el('span', { class: 'farm-grip', 'aria-hidden': 'true' }), el('header', {}, el('h2', { text: content.title }), close), tabs, body);
     sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
+    swipeToClose(sheet, body, () => this.closeSheet());
     if (old.isConnected) old.replaceWith(sheet);
     else this.overlay.append(sheet);
     this.sheet.el = sheet;
@@ -522,6 +524,7 @@ class FarmScreen implements FarmUi {
     if (!this.seeds) {
       this.seeds = { el: el('div', { class: 'farm-seedbar farm-box' }), chosen };
       this.seeds.el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      swipeToClose(this.seeds.el, null, () => this.closeSeeds());
       this.overlay.append(this.seeds.el);
       this.root.classList.add('has-seeds');
     }

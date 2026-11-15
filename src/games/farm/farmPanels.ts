@@ -163,6 +163,7 @@ export function seedRow(ui: FarmUi, chosen: PlacedObject | null, close: () => vo
   const shut = el('button', { class: 'farm-close', type: 'button', 'aria-label': 'Fermer les graines', text: '×' });
   shut.addEventListener('click', close);
   return [
+    el('span', { class: 'farm-grip', 'aria-hidden': 'true' }),
     el('div', { class: 'farm-seedbar-head' }, el('p', { text: chosen ? 'Touche une graine pour ce champ, ou fais-la glisser sur les champs vides.' : 'Fais glisser une graine sur les champs vides.' }), shut),
     el('div', { class: 'farm-seedbar-row' }, ...seeds),
   ];

@@ -626,7 +626,7 @@
   bottom: calc(var(--bar-h) + 6px);
   max-width: 720px;
   margin: 0 auto;
-  padding: 6px 8px 8px;
+  padding: 12px 8px 8px;
   border-radius: 10px;
   display: grid;
   gap: 6px;
@@ -718,6 +718,24 @@
 
 @keyframes farm-up {
   from { translate: 0 30px; opacity: 0.4; }
+}
+
+/* The little handle that says a panel can be pulled down */
+.farm-grip {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: 99px;
+  background: rgb(255 244 224 / 0.75);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.farm-seedbar .farm-grip {
+  background: var(--card-border);
 }
 
 .farm-sheet header {
