@@ -398,3 +398,54 @@ export function playGambleLose(): void {
 export function playLose(): void {
   tone(200, 0, 0.18, 'triangle', 0.08, 150);
 }
+
+// -----------------------------------------------
+// FARM VOICES
+// -----------------------------------------------
+
+/** A crop pulled from the soil: a soft rustle and a little pluck. `step` climbs along a swipe. */
+export function playPluck(step = 0): void {
+  noise(0, 0.06, 0.06, 2600);
+  tone(C_MAJOR[step % 8] * 2 ** Math.floor(step / 8), 0.01, 0.09, 'triangle', 0.09);
+}
+
+/** A seed dropped in a furrow: a tiny dry tick. */
+export function playSeed(step = 0): void {
+  tone(900 + (step % 6) * 60, 0, 0.04, 'sine', 0.07, 600);
+  noise(0, 0.03, 0.04, 1800);
+}
+
+/** Something picked up (eggs, a tray, nuts): a round pop. */
+export function playPop(): void {
+  tone(420, 0, 0.1, 'sine', 0.16, 900);
+  tone(C_MAJOR[4] * 2, 0.06, 0.12, 'sine', 0.06);
+}
+
+/** Something set down on the farm: a wooden thunk. */
+export function playThunk(): void {
+  tone(150, 0, 0.14, 'triangle', 0.3, 70);
+  noise(0, 0.05, 0.12, 700);
+}
+
+/** A hen pleased with her feed. */
+export function playCluck(): void {
+  [0, 0.09, 0.16].forEach((at, i) => tone(700 - i * 40, at, 0.06, 'square', 0.04, 520));
+}
+
+/** A cow, low and kind. */
+export function playMoo(): void {
+  tone(150, 0, 0.7, 'sawtooth', 0.06, 115);
+  tone(300, 0, 0.7, 'triangle', 0.04, 230);
+}
+
+/** A machine starting a recipe: a small mechanical click-clack. */
+export function playClack(): void {
+  noise(0, 0.03, 0.12, 1400);
+  noise(0.07, 0.03, 0.1, 1100);
+}
+
+/** A level reached or a quest handed in: a bright, gentle fanfare. */
+export function playFanfare(): void {
+  [0, 2, 4, 7].forEach((n, i) => tone(C_MAJOR[n], i * 0.1, 0.22, 'triangle', 0.12));
+  [4, 7].forEach((n) => tone(C_MAJOR[n] * 2, 0.42, 0.6, 'sine', 0.1));
+}

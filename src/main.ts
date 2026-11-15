@@ -30,6 +30,7 @@ import { renderOrigami } from './games/origami/origamiScreen';
 import { renderPixelArt } from './games/pixel/pixelScreen';
 import { renderColoringBook } from './games/coloringBook/bookScreen';
 import { renderCatNap } from './games/catNap/napScreen';
+import { renderFarm } from './games/farm/farmScreen';
 import { requestPersistentStorage } from './save';
 import { watchForUpdates } from './update';
 
@@ -67,6 +68,7 @@ const routes: Record<string, Screen> = {
   pixel: renderPixelArt,
   coloriage: renderColoringBook,
   elomew: renderCatNap,
+  ferme: renderFarm,
 };
 
 const root = document.querySelector<HTMLElement>('#app')!;

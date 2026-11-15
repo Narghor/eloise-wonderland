@@ -19,6 +19,9 @@ import { loadLeaves } from './games/leaves/leavesSave';
 import { loadAquarium } from './games/aquarium/aquariumSave';
 import { loadOrigami } from './games/origami/origamiSave';
 import { grantCasinoGifts } from './games/casino/casinoScreen';
+import { loadFarm } from './games/farm/farmSave';
+import { readyCount } from './games/farm/farmProduction';
+import { spriteImage, uiIcon } from './games/farm/farmArt';
 import { challengeGameOn, loadDaily, streak, todayKey, type ChallengeGame } from './daily/daily';
 
 // -----------------------------------------------
@@ -107,6 +110,7 @@ export function renderHome(root: HTMLElement): () => void {
       { class: 'home' },
       companionCard(),
       houseBlock(),
+      ...(FARM_ON_HOME ? [farmCard()] : []),
       casinoCard(),
       dailyCard(),
       ...resumeRow(),
@@ -309,6 +313,26 @@ function houseBlock(): HTMLElement {
       annex('#/feuilles', '🍂', 'Les feuilles', cleanedZones === 0 ? 'Le parc à nettoyer' : `${cleanedZones}/${ZONES.length} lieux propres`),
       annex('#/aquarium', '🐠', 'L’aquarium', residents === 0 ? (caught === 0 ? 'Pêche d’abord un poisson' : 'Tes poissons t’attendent') : `${residents} espèce${residents > 1 ? 's' : ''} à l’abri`),
     ),
+  );
+}
+
+/** False while the farm is tested on the published site: reachable only by its address, #/ferme. */
+const FARM_ON_HOME = false;
+
+/** The farm: a big tile of its own, like the house. */
+function farmCard(): HTMLElement {
+  const farm = loadFarm();
+  const ready = farm ? readyCount(farm, Date.now()) : 0;
+  const hint = !farm
+    ? 'Une ferme rien qu’à toi t’attend !'
+    : ready > 0
+      ? `Niveau ${farm.level} · ${ready} chose${ready > 1 ? 's' : ''} à ramasser`
+      : `Niveau ${farm.level} · tout pousse tranquillement`;
+  return el(
+    'a',
+    { class: 'home-companion home-farm', href: '#/ferme' },
+    el('span', { class: 'home-farm-icon', 'aria-hidden': 'true' }, spriteImage(uiIcon('barn'), 3)),
+    el('span', { class: 'home-companion-text' }, el('strong', { text: 'La ferme' }), el('span', { text: hint })),
   );
 }
 

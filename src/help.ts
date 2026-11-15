@@ -29,7 +29,7 @@ export function openHelpOnFirstVisit(help: Help): void {
   openHelp(help);
 }
 
-function openHelp(help: Help): void {
+export function openHelp(help: Help): void {
   openReading(help.title, [el('ol', { class: 'help-steps' }, ...help.steps.map((parts) => el('li', {}, ...parts)))], "C'est parti !");
 }
 

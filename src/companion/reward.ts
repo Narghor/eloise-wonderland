@@ -2,6 +2,8 @@ import { el } from '../dom';
 import type { Difficulty } from '../difficulty';
 import { UNGRADED_CHALLENGE_STARS, completeChallenge } from '../daily/daily';
 import { rollCasinoTicket } from '../games/casino/ticket';
+import { booster } from '../games/farm/data/boosters';
+import { rollGameBooster } from '../games/farm/farmBoosters';
 import { companionCanvas } from './companionArt';
 import { UNGRADED_STARS, addCoins, earnCoins, loadCompanion } from './companionSave';
 
@@ -12,7 +14,12 @@ import { UNGRADED_STARS, addCoins, earnCoins, loadCompanion } from './companionS
 export function levelReward(stars: number | null, difficulty: Difficulty, challenge?: string): HTMLElement {
   const banner = companionReward(stars, difficulty, challenge);
   const ticket = rollCasinoTicket(difficulty);
-  return ticket ? el('div', { class: 'reward-stack' }, banner, ticket) : banner;
+  const farm = rollGameBooster();
+  const extras = [
+    ...(ticket ? [ticket] : []),
+    ...(farm ? [el('a', { class: 'farm-drop', href: '#/ferme' }, `🧺 Pour ta ferme : 1 ${booster(farm).name} !`)] : []),
+  ];
+  return extras.length > 0 ? el('div', { class: 'reward-stack' }, banner, ...extras) : banner;
 }
 
 function companionReward(stars: number | null, difficulty: Difficulty, challenge?: string): HTMLElement {

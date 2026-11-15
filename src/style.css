@@ -1001,6 +1001,38 @@ a {
   font-size: 1.9rem;
 }
 
+.home-farm {
+  background: linear-gradient(100deg, #fbf2de, #e3f2d3);
+  box-shadow: var(--shadow), 0 0 0 2px #c9a878;
+}
+
+.home-farm-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(#cfe9f5 0 60%, #8ccb68 60%);
+  flex: none;
+}
+
+.home-farm-icon img {
+  image-rendering: pixelated;
+}
+
+/* A booster for the farm, won at the end of another game */
+.farm-drop {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #fbf2de;
+  border: 2px solid #c9a878;
+  color: #4a2f22;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
 .home-companion-text {
   display: grid;
   gap: 4px;
