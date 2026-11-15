@@ -1,6 +1,6 @@
 import './farm.css';
 import { el } from '../../dom';
-import { openHelp, openHelpOnFirstVisit } from '../../help';
+import { markHelpSeen } from '../../help';
 import { armSoundUnlock, playBigWin, playBonusTrigger, playClack, playCluck, playCoinLand, playFanfare, playMoo, playPluck, playPop, playRustle, playSeed, playThunk } from '../casino/fx/sound';
 import { prefersReducedMotion } from '../casino/fx/effects';
 import { CASINO_TEST_BUTTONS } from '../casino/fx/testMode'; // TEST-BUTTONS
@@ -86,9 +86,10 @@ export function renderFarm(root: HTMLElement): () => void {
   const orders = refillOrders(save, now);
   const newDay = !!saved?.daily && saved.daily.day !== todayKey(new Date(now));
   const screen = new FarmScreen(root, save);
+  // The first time, the help comes first, in the farm's own look; Marthe's first quest follows it.
+  if (markHelpSeen(FARM_HELP)) screen.showHelp();
   if (news) screen.welcomeBack(news, parcels, orders, newDay);
   screen.commit();
-  openHelpOnFirstVisit(FARM_HELP);
   return () => screen.dispose();
 }
 
@@ -155,7 +156,7 @@ class FarmScreen implements FarmUi {
         this.scene.toggleZoom();
         this.hud.setZoom(this.scene.isFar);
       },
-      help: () => openHelp(FARM_HELP),
+      help: () => this.showHelp(),
       seeds: () => (this.seeds ? this.closeSeeds() : this.openSeeds(null)),
       musicVolume: () => musicVolume(),
       setMusicVolume: (v) => this.music.setVolume(v),
@@ -878,6 +879,19 @@ class FarmScreen implements FarmUi {
     // The very first parcel: Gaston introduces himself before it is opened.
     if (this.save.mail.opened === 0) this.queueDialog(() => this.speech('gaston', 'Le facteur', GASTON_HELLO, 'Ouvrir le colis !'));
     this.queueDialog(() => this.parcelDialog());
+  }
+
+  /** How to play, in the farm's wood and paper rather than the site's pink. */
+  showHelp(): void {
+    this.queueDialog(() =>
+      el(
+        'div',
+        { class: 'farm-dialog-box farm-box farm-help' },
+        el('h2', { text: FARM_HELP.title }),
+        el('ol', {}, ...FARM_HELP.steps.map((parts) => el('li', {}, ...parts))),
+        el('button', { class: 'farm-btn is-wide', type: 'button', text: 'C’est parti !' }),
+      ),
+    );
   }
 
   /** "While you were away": what grew, what came, told as one happy card. */

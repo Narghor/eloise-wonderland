@@ -573,3 +573,14 @@ s'arrête avant d'en sortir.
   « Heure +3 h ».
 - **Album** : médaille « Collectionneuse » à 3, 6 et 9 trésors (l'or à l'album complet).
 - Non modélisé dans le simulateur : coups de cœur et Charme (ils accélèrent un peu une joueuse qui décore).
+
+### Troisième autocritique (15/11 au soir)
+
+- **La nuit suit la saison** : lever et coucher du soleil calculés au jour de l'année (environ 17 h 15 en décembre,
+  21 h 50 en juin, `sunHours` dans `farmScene.ts`) ; doré juste avant le coucher, bleu nuit 1 h 30 après ; nuit
+  plus marquée qu'avant.
+- **La boîte aux lettres est garantie** : une ferme sans case libre la reçoit à l'entrée, juste hors de ses terres.
+- **Premier lancement** : l'aide prend le style de la ferme (plus le rose du site), plus courte, puis Marthe.
+- **`node tools/farm-check.mjs`** : 17 vérifications de la logique sans écran (sauvegarde et migration des vieilles
+  fermes, boîte aux lettres d'une ferme pleine, rien ne se chevauche, champ / machine / enclos, règle de pitié,
+  raretés, races alignées, album, boîte qui ne dépasse pas 3, commandes). À lancer après chaque changement de logique.

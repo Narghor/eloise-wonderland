@@ -23,10 +23,15 @@ export function helpSlot(help: Help, right?: HTMLElement): HTMLElement {
 }
 
 export function openHelpOnFirstVisit(help: Help): void {
+  if (markHelpSeen(help)) openHelp(help);
+}
+
+/** Remembers a help as shown; true the first time, for games that show their help their own way. */
+export function markHelpSeen(help: Help): boolean {
   const seen = readSeen();
-  if (seen.includes(help.id)) return;
+  if (seen.includes(help.id)) return false;
   writeGame(SEEN_ID, [...seen, help.id]);
-  openHelp(help);
+  return true;
 }
 
 export function openHelp(help: Help): void {

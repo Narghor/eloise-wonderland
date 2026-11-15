@@ -322,8 +322,23 @@ const MAILBOX_AT: [number, number] = [9, 9];
 /** Farms from before the parcels get their mailbox near the middle, on the first free tile. */
 export function ensureMailbox(save: FarmSave): void {
   if (save.objects.some((o) => o.type === 'mailbox')) return;
-  const spot = freeSpotNear(save, MAILBOX_AT[0] + 0.5, MAILBOX_AT[1] + 0.5, 1, 1);
+  const spot = freeSpotNear(save, MAILBOX_AT[0] + 0.5, MAILBOX_AT[1] + 0.5, 1, 1) ?? gateSpot(save);
   if (spot) newObject(save, 'mailbox', spot[0], spot[1], 0, 0);
+}
+
+/**
+ * A farm with no free tile left still gets its mailbox: at the gate, on the first free dry tile just outside its
+ * land, so the parcels can always be opened. It can be moved in once there is room.
+ */
+function gateSpot(save: FarmSave): [number, number] | null {
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      if (isOwned(save, x, y) || isWater(x, y) || objectAt(save, x, y)) continue;
+      const nextToFarm = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isOwned(save, x + dx, y + dy));
+      if (nextToFarm) return [x, y];
+    }
+  }
+  return null;
 }
 
 /** Room left in a pen. */

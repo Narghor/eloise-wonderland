@@ -92,21 +92,42 @@ interface Particle {
   sprite?: Sprite;
 }
 
+/** The colours of the light, laid over the map by multiplying: [red, green, blue, strength]. */
+const NIGHT_LIGHT = [60, 80, 160, 0.55] as const;
+const DUSK_LIGHT = [130, 105, 185, 0.42] as const;
+const GOLDEN_LIGHT = [255, 175, 100, 0.34] as const;
+const DAWN_LIGHT = [255, 175, 170, 0.22] as const;
+const DAY_LIGHT = [255, 240, 220, 0] as const;
+
 /**
- * The light of the hour, laid over the map by multiplying: [hour, red, green, blue, strength]. Golden at the end of
- * the afternoon, blue at night, pink at dawn; nothing in the day. The interface stays as it is.
+ * Sunrise and sunset (local hours) over the year, for France: about 17 h 15 in December, 21 h 50 in June. A plain
+ * sine is close enough for a light; summer time is in the numbers already.
  */
-const DAYLIGHT: readonly [number, number, number, number, number][] = [
-  [0, 70, 90, 165, 0.42],
-  [5, 70, 90, 165, 0.42],
-  [6.5, 255, 175, 170, 0.18],
-  [8, 255, 240, 220, 0],
-  [17, 255, 240, 220, 0],
-  [18.5, 255, 180, 105, 0.32],
-  [20, 125, 110, 185, 0.32],
-  [21.5, 70, 90, 165, 0.42],
-  [24, 70, 90, 165, 0.42],
-];
+function sunHours(date: Date): { rise: number; set: number } {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const day = (date.getTime() - start.getTime()) / 86_400_000;
+  const season = Math.sin((2 * Math.PI * (day - 80)) / 365);
+  return { rise: 7.0 - 1.6 * season, set: 19.5 + 2.3 * season };
+}
+
+/**
+ * The light of the hour, following the season: golden before sunset, dusk, then blue at night, pink at dawn;
+ * nothing in the day. Keys are [hour, light]; the interface stays as it is.
+ */
+function daylightKeys(date: Date): [number, readonly [number, number, number, number]][] {
+  const { rise, set } = sunHours(date);
+  return [
+    [0, NIGHT_LIGHT],
+    [rise - 1, NIGHT_LIGHT],
+    [rise, DAWN_LIGHT],
+    [rise + 1.2, DAY_LIGHT],
+    [set - 1.5, DAY_LIGHT],
+    [set - 0.2, GOLDEN_LIGHT],
+    [set + 0.6, DUSK_LIGHT],
+    [set + 1.4, NIGHT_LIGHT],
+    [24, NIGHT_LIGHT],
+  ];
+}
 
 /** The grains that fly off each crop when it is picked. */
 const CROP_COLOURS: Record<CropId, string[]> = {
@@ -612,13 +633,16 @@ export class FarmScene {
   private daylight(): { r: number; g: number; b: number; alpha: number; night: number } {
     const d = new Date();
     const hour = (d.getHours() + d.getMinutes() / 60 + this.hourOffset + 24) % 24;
+    const keys = daylightKeys(d);
     let i = 0;
-    while (i < DAYLIGHT.length - 2 && hour >= DAYLIGHT[i + 1][0]) i++;
-    const [h0, r0, g0, b0, a0] = DAYLIGHT[i];
-    const [h1, r1, g1, b1, a1] = DAYLIGHT[i + 1];
+    while (i < keys.length - 2 && hour >= keys[i + 1][0]) i++;
+    const [h0, [r0, g0, b0, a0]] = keys[i];
+    const [h1, [r1, g1, b1, a1]] = keys[i + 1];
     const k = Math.min(1, Math.max(0, (hour - h0) / (h1 - h0)));
     const mix = (x: number, y: number) => x + (y - x) * k;
-    const night = hour >= 19.5 || hour < 6 ? Math.min(1, hour >= 19.5 ? (hour - 19.5) / 1.5 : (6 - hour) / 1) : 0;
+    // How deep in the night: lanterns and fireflies follow it.
+    const { rise, set } = sunHours(d);
+    const night = hour >= set ? Math.min(1, (hour - set) / 1.4) : hour < rise ? Math.min(1, (rise - hour) / 1) : 0;
     return { r: mix(r0, r1), g: mix(g0, g1), b: mix(b0, b1), alpha: mix(a0, a1), night };
   }
 
