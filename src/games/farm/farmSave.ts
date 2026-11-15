@@ -8,7 +8,8 @@ import { PROJECTS } from './data/projects';
 import { QUESTS } from './data/quests';
 import { MAP_SIZE } from './data/land';
 import { BREED_IDS, PARCEL_EVERY_MINUTES, TREASURES, type TreasureId } from './data/parcels';
-import type { BoosterId, BreedId, CropId, DecorId, ItemId, PersonId, PlaceableId, ProjectId, QuestId } from './data/types';
+import { SKINS, SKIN_IDS, skin } from './data/skins';
+import type { BoosterId, BreedId, CropId, DecorId, ItemId, JoinFamily, PersonId, PlaceableId, ProjectId, QuestId, SkinId } from './data/types';
 
 // -----------------------------------------------
 // THE 'farm' BLOCK OF THE SITE SAVE
@@ -33,6 +34,8 @@ export interface PlacedObject {
   x: number;
   y: number;
   rot: Rotation;
+  /** A piece that joins (fence, gate): its look; none = the family's first skin. */
+  skin?: SkinId;
   /** Field: what grows. */
   crop?: CropId;
   /** Field and tree: when it is ready. */
@@ -111,6 +114,8 @@ export interface FarmSave {
   album: TreasureId[];
   /** Rare animals won while their pen was full or not built yet: placed from the shop later. */
   waitingBreeds: BreedId[];
+  /** The skin last chosen per family: what the next piece bought wears. */
+  lastSkins: Partial<Record<JoinFamily, SkinId>>;
 }
 
 export interface Mail {
@@ -174,6 +179,9 @@ export function loadFarm(): FarmSave | null {
     mail: readMail(data.mail),
     album: asArray(data.album).filter((id): id is TreasureId => TREASURES.some((t) => t.id === id)),
     waitingBreeds: asArray(data.waitingBreeds).filter((id): id is BreedId => isOneOf(id, BREED_IDS)),
+    lastSkins: Object.fromEntries(
+      Object.entries(asRecord(data.lastSkins)).filter(([family, id]) => SKINS.some((s) => s.id === id && s.family === family)),
+    ) as FarmSave['lastSkins'],
   };
   // Two objects must never share a uid: the newest uid is always above every one in use.
   save.nextUid = Math.max(save.nextUid, ...save.objects.map((o) => o.uid + 1));
@@ -188,8 +196,10 @@ export function saveFarm(save: FarmSave): void {
 function readObject(value: unknown): PlacedObject[] {
   const o = asRecord(value);
   if (!isCount(o.uid) || !isOneOf(o.type, PLACEABLE_IDS) || !isCount(o.x) || !isCount(o.y) || o.x >= MAP_SIZE || o.y >= MAP_SIZE) return [];
-  const rot = isCount(o.rot) && o.rot <= 3 ? (o.rot as Rotation) : 0;
+  // A joined piece is never turned: its shape comes from its neighbours (old fences were turned by hand).
+  const rot = isCount(o.rot) && o.rot <= 3 && !placeable(o.type).joins ? (o.rot as Rotation) : 0;
   const object: PlacedObject = { uid: o.uid, type: o.type, x: o.x, y: o.y, rot };
+  if (isOneOf(o.skin, SKIN_IDS) && skin(o.skin).family === placeable(o.type).joins) object.skin = o.skin;
   if (isOneOf(o.crop, CROP_IDS) && typeof o.readyAt === 'number') {
     object.crop = o.crop;
     object.readyAt = o.readyAt;

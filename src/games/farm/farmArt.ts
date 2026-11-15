@@ -1,4 +1,5 @@
-import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity } from './data/types';
+import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity, SkinId } from './data/types';
+import { JOIN_EAST, JOIN_NORTH, JOIN_NORTH_GATE, JOIN_SOUTH, JOIN_WEST, SKINS } from './data/skins';
 import { BRIDGE_TILES, MAP_SIZE, ROAD_COLUMN, isWater } from './data/land';
 import { mulberry32 } from '../../random';
 
@@ -17,7 +18,7 @@ export type View = 'face' | 'profile';
 export type FieldStage = 'empty' | 'sprout' | 'growing' | 'ripe';
 export type UiIcon =
   | 'nut' | 'star' | 'chest' | 'barn' | 'orders' | 'quests' | 'shop' | 'build' | 'sack' | 'lock' | 'sickle' | 'medal'
-  | 'parcel' | 'bridge' | 'zoomIn' | 'zoomOut' | 'back' | 'rotate' | 'store' | 'check' | 'cross' | 'seed';
+  | 'parcel' | 'gift' | 'bridge' | 'zoomIn' | 'zoomOut' | 'back' | 'rotate' | 'store' | 'check' | 'cross' | 'seed' | 'brush';
 
 type ObjectId = Exclude<PlaceableId, 'field' | 'hazel'>;
 
@@ -883,26 +884,219 @@ export function wildTreeSprite(seed: number): Sprite {
 // DECORATIONS
 // -----------------------------------------------
 
-function fence(view: View): Sprite {
-  if (view === 'face') {
-    return sprite(TILE, 15, (P) => {
-      P.rect(0, 4, 16, 2, C.wood);
-      P.rect(0, 5, 16, 1, C.woodDark);
-      P.rect(0, 8, 16, 2, C.wood);
-      P.rect(0, 9, 16, 1, C.woodDark);
-      P.rect(7, 1, 2, 13, C.woodLight);
-      P.rect(8, 2, 1, 12, C.wood);
-      P.px(7, 1, C.wood);
-    }, true, 0);
-  }
-  return sprite(10, 25, (P) => {
-    P.rect(4, 0, 1, 20, C.woodLight);
-    P.rect(5, 0, 1, 20, C.wood);
-    P.rect(3, 11, 4, 12, C.woodLight);
-    P.rect(6, 12, 1, 11, C.wood);
-    P.rect(3, 11, 4, 1, C.wood);
-  }, true, 0);
+// -----------------------------------------------
+// FENCES: three skins, each piece drawn from the sides it joins (farmJoins.ts)
+// -----------------------------------------------
+// A piece is one tile wide and 8 px taller than its tile, without margin: rails reach the tile's edges to meet the
+// neighbour's, and a northern neighbour gets a rail climbing to its post. A post stands where the run turns or
+// ends (and on every tile for the ranch).
+
+const FENCE_H = TILE + 8;
+const ACROSS = JOIN_EAST | JOIN_WEST;
+const ALONG = JOIN_NORTH | JOIN_SOUTH;
+
+/** Where a rail climbing to the northern neighbour starts: its post, or the foot of a gate, which comes lower. */
+const CLIMB_TO_POST = 0;
+const CLIMB_TO_GATE = 7;
+
+/** One piece of fence: `mask` holds the sides it joins (data/skins.ts), `gate` draws the gate instead. */
+export function fenceSprite(skin: SkinId, mask: number, gate: boolean): Sprite {
+  const sides = mask & (ACROSS | ALONG);
+  const climb = (mask & JOIN_NORTH) === 0 ? null : (mask & JOIN_NORTH_GATE) !== 0 ? CLIMB_TO_GATE : CLIMB_TO_POST;
+  return cached(`fence-${skin}-${mask}-${gate ? 'gate' : 'piece'}`, () => sprite(TILE, FENCE_H, (P) => FENCE_ART[skin](P, sides, gate, climb), true, 0));
 }
+
+/** A gate in a north-south run is seen edge on. */
+function runsAlong(mask: number): boolean {
+  return (mask & ALONG) !== 0 && (mask & ACROSS) === 0;
+}
+
+/**
+ * That edge-on gate, wider than the run so it reads as a way through: a slatted panel with its latch, between the
+ * skin's far post (its foot at the tile's top) and a near one on the tile's foot, both short to leave the panel seen.
+ */
+function sideGate(P: Painter, panel: [string, string, string], post: (P: Painter, top: number, height: number) => void): void {
+  post(P, 1, 7);
+  P.rect(5, 6, 6, 14, panel[1]);
+  P.rect(5, 6, 6, 1, panel[0]);
+  for (let y = 9; y < 20; y += 3) P.rect(5, y, 6, 1, panel[2]);
+  P.px(9, 12, C.gold);
+  P.px(9, 13, C.goldDark);
+  post(P, 17, 6);
+}
+
+function ranchPost(P: Painter, top: number, height: number): void {
+  P.rect(6, top, 4, height, C.woodLight);
+  P.rect(8, top + 1, 2, height - 1, C.wood);
+  P.rect(9, top + 1, 1, height - 1, C.woodDark);
+  P.rect(6, top, 4, 1, C.strawLight);
+}
+
+function picketPost(P: Painter, top: number, height: number): void {
+  P.rect(5, top + 1, 6, height - 1, PICKET);
+  P.rect(9, top + 2, 2, height - 2, PICKET_SHADE);
+  P.rect(6, top, 4, 1, PICKET);
+  P.rect(7, top - 1, 2, 1, PICKET);
+}
+
+function logPost(P: Painter, top: number, height: number): void {
+  P.rect(5, top + 1, 6, height - 1, C.bark);
+  P.rect(9, top + 2, 2, height - 2, C.barkDark);
+  P.ellipse(7, top + 1, 2, 1, '#e6b884');
+}
+
+function ranchFence(P: Painter, mask: number, gate: boolean, climb: number | null): void {
+  if (climb !== null) {
+    P.rect(7, climb, 2, 13 - climb, C.woodLight);
+    P.rect(8, climb, 1, 13 - climb, C.wood);
+  }
+  if (gate && runsAlong(mask)) return sideGate(P, [C.woodLight, C.wood, C.woodDark], ranchPost);
+  if (gate) {
+    for (const x of [0, 13]) {
+      P.rect(x, 8, 3, 15, C.woodLight);
+      P.rect(x + 2, 9, 1, 14, C.wood);
+      P.rect(x, 8, 3, 1, C.strawLight);
+    }
+    P.rect(3, 10, 10, 11, C.woodDark);
+    for (let x = 3; x < 13; x += 2) {
+      P.rect(x, 10, 2, 11, C.woodLight);
+      P.px(x + 1, 10, C.wood);
+    }
+    P.rect(3, 12, 10, 1, C.wood);
+    P.rect(3, 18, 10, 1, C.wood);
+    P.line(4, 18, 11, 12, C.woodDark);
+    P.px(11, 15, C.gold);
+    return;
+  }
+  const rails = (x: number, w: number) => {
+    for (const y of [11, 16]) {
+      P.rect(x, y, w, 2, C.wood);
+      P.rect(x, y, w, 1, C.woodLight);
+      P.rect(x, y + 1, w, 1, C.woodDark);
+    }
+  };
+  if (mask & JOIN_WEST) rails(0, 7);
+  if (mask & JOIN_EAST) rails(9, 7);
+  P.rect(6, 9, 4, 14, C.woodLight);
+  P.rect(8, 10, 2, 13, C.wood);
+  P.rect(9, 10, 1, 13, C.woodDark);
+  P.rect(6, 9, 4, 1, C.strawLight);
+}
+
+const PICKET = '#fbf3e4';
+const PICKET_SHADE = '#e6d6be';
+const PICKET_DARK = '#c9b59a';
+
+function picketFence(P: Painter, mask: number, gate: boolean, climb: number | null): void {
+  // A north-south run seen from above: picket tips one behind the other.
+  const column = (y0: number, y1: number) => {
+    for (let y = y0; y < y1; y += 4) {
+      P.rect(6, y + 1, 4, 3, PICKET);
+      P.rect(7, y, 2, 1, PICKET);
+      P.rect(9, y + 1, 1, 3, PICKET_SHADE);
+      P.rect(6, y + 3, 4, 1, PICKET_DARK);
+    }
+  };
+  if (climb !== null) column(climb, 12);
+  if (gate && runsAlong(mask)) return sideGate(P, [PICKET, PICKET_SHADE, PICKET_DARK], picketPost);
+  if (gate) {
+    for (const x of [0, 13]) {
+      P.rect(x, 9, 3, 14, PICKET);
+      P.rect(x + 2, 10, 1, 13, PICKET_SHADE);
+      P.rect(x, 6, 3, 3, PICKET);
+      P.px(x + 1, 5, PICKET);
+      P.rect(x, 9, 3, 1, PICKET_SHADE);
+    }
+    P.rect(3, 11, 10, 11, PICKET_SHADE);
+    for (let x = 3; x < 13; x += 3) {
+      P.rect(x, 11, 2, 11, PICKET);
+      P.px(x, 10, PICKET);
+    }
+    P.rect(3, 13, 10, 1, PICKET_DARK);
+    P.rect(3, 19, 10, 1, PICKET_DARK);
+    P.line(4, 19, 11, 13, PICKET_DARK);
+    P.px(11, 16, C.goldDark);
+    return;
+  }
+  const pickets = (x0: number, x1: number) => {
+    P.rect(x0, 14, x1 - x0, 2, PICKET_DARK);
+    P.rect(x0, 19, x1 - x0, 2, PICKET_DARK);
+    for (let x = x0; x < x1; x += 4) {
+      P.rect(x + 1, 10, 2, 12, PICKET);
+      P.px(x + 2, 10, PICKET_SHADE);
+      P.rect(x + 2, 11, 1, 11, PICKET_SHADE);
+      P.px(x + 1, 9, PICKET);
+    }
+  };
+  if (mask & JOIN_WEST) pickets(0, 8);
+  if (mask & JOIN_EAST) pickets(8, 16);
+  if (mask === ACROSS) return;
+  if (mask === ALONG) return column(12, 24);
+  // A post with a knob where the run turns or ends.
+  P.rect(5, 9, 6, 14, PICKET);
+  P.rect(9, 10, 2, 13, PICKET_SHADE);
+  P.rect(5, 9, 6, 1, PICKET_SHADE);
+  P.rect(6, 6, 4, 3, PICKET);
+  P.rect(7, 5, 2, 1, PICKET);
+  P.px(9, 7, PICKET_SHADE);
+}
+
+const WATTLE = '#a8774a';
+const WATTLE_LIGHT = '#c99a66';
+const WATTLE_DARK = '#7f5634';
+
+function wattleFence(P: Painter, mask: number, gate: boolean, climb: number | null): void {
+  // A north-south run seen from above: the woven strands, and the stakes poking out on both sides.
+  const weaveAlong = (y0: number, y1: number) => {
+    P.rect(6, y0, 4, y1 - y0, WATTLE);
+    for (let y = y0; y < y1; y += 2) P.rect(y % 4 === 0 ? 6 : 8, y, 2, 1, WATTLE_LIGHT);
+    for (let y = y0 + 1; y < y1; y += 4) {
+      P.px(5, y, WATTLE_DARK);
+      P.px(10, y, WATTLE_DARK);
+    }
+  };
+  if (climb !== null) weaveAlong(climb, 14);
+  if (gate && runsAlong(mask)) return sideGate(P, ['#e6c391', '#d9b07a', '#c4955f'], logPost);
+  if (gate) {
+    for (const x of [1, 12]) {
+      P.rect(x, 6, 3, 17, C.bark);
+      P.rect(x + 2, 8, 1, 15, C.barkDark);
+      P.ellipse(x + 1, 6, 1, 1, '#e6b884');
+    }
+    P.rect(4, 11, 8, 10, '#d9b07a');
+    for (let x = 4; x < 12; x += 2) P.rect(x, 11, 1, 10, '#c4955f');
+    P.rect(4, 13, 8, 1, WATTLE_DARK);
+    P.rect(4, 18, 8, 1, WATTLE_DARK);
+    return;
+  }
+  const weaveAcross = (x0: number, x1: number) => {
+    P.rect(x0, 11, x1 - x0, 10, WATTLE);
+    for (let y = 11; y < 21; y += 2) {
+      for (let x = x0; x < x1; x++) P.px(x, y, (x + (y >> 1) * 3) % 6 < 3 ? WATTLE_LIGHT : WATTLE);
+    }
+    for (let x = x0; x < x1; x++) P.px(x, 20, WATTLE_DARK);
+    // The stakes the branches are woven around, their tips above the weave.
+    for (let x = x0 + 2; x < x1; x += 4) {
+      P.rect(x, 9, 1, 12, WATTLE_DARK);
+      P.px(x, 8, WATTLE_LIGHT);
+    }
+  };
+  if (mask & JOIN_WEST) weaveAcross(0, 8);
+  if (mask & JOIN_EAST) weaveAcross(8, 16);
+  if (mask === ACROSS) return;
+  if (mask === ALONG) return weaveAlong(11, 21);
+  // A round log where the run turns or ends.
+  P.rect(5, 8, 6, 15, C.bark);
+  P.rect(9, 9, 2, 14, C.barkDark);
+  P.ellipse(7, 8, 2, 1, '#e6b884');
+  P.px(7, 8, C.wood);
+}
+
+const FENCE_ART: Record<SkinId, (P: Painter, sides: number, gate: boolean, climb: number | null) => void> = {
+  fenceRanch: ranchFence,
+  fencePicket: picketFence,
+  fenceWattle: wattleFence,
+};
 
 function hedge(view: View): Sprite {
   if (view === 'face') {
@@ -1633,7 +1827,8 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'spinning': return spinning(v);
       case 'coop': return coop(v);
       case 'cowshed': return cowshed(v);
-      case 'fence': return fence(v);
+      case 'fence': return fenceSprite('fenceRanch', ACROSS, false);
+      case 'fenceGate': return fenceSprite('fenceRanch', ACROSS, true);
       case 'hedge': return hedge(v);
       case 'flowersPink':
       case 'flowersYellow':
@@ -1670,7 +1865,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
 
 /** Seen the same from every side: one drawing for both views. */
 const SYMMETRIC = new Set<ObjectId>([
-  'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
+  'fence', 'fenceGate', 'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
   'bush', 'stump', 'rock', 'bigRock', 'teaTable', 'fountain',
 ]);
 
@@ -1804,11 +1999,13 @@ const UI_MAPS: Record<UiIcon, PixelMap> = {
   sickle: { rows: ['..aaaa...', '.abb..a..', 'ab.....a.', 'a.......a', 'a........', '.a.......', '..aa.....', '....c....', '.....c...', '......c..', '.......c.'], pal: { a: '#cfd6dc', b: '#ffffff', c: '#9a6639' } },
   medal: { rows: ['ab...ba', 'ab...ba', '.ab.ba.', '..ccc..', '.cdddc.', 'cddeddc', 'cdeeedc', 'cddeddc', '.cdddc.', '..ccc..'], pal: { a: '#e0475b', b: '#6a9fd8', c: '#d9a339', d: '#f2c94c', e: '#fbe38a' } },
   parcel: { rows: ['....a.....', '....ab....', '....abb...', '....a.....', '....a.....', '.cccacccc.', 'ccdcccccdc', 'cccccdcccc', '.cccccccc.'], pal: { a: '#9a6639', b: '#e0475b', c: '#7cc456', d: '#5aa54a' } },
+  gift: { rows: ['.aa...aa.', '..aabaa..', 'ccccacccc', 'ddddaddde', 'aaaaaaaaa', 'ddddaddde', 'ddddaddde', 'eeeeaeeee'], pal: { a: '#e0475b', b: '#a8303f', c: '#e8c48e', d: '#d9b27a', e: '#b88a55' } },
   bridge: { rows: ['a....a....a', 'aaaaaaaaaaa', 'bbbbbbbbbbb', 'b.b.b.b.b.b', 'ccccccccccc', 'd.........d', 'eeeeeeeeeee'], pal: { a: '#9a6639', b: '#c38a55', c: '#dcaa72', d: '#9a6639', e: '#6a9fd8' } },
   zoomIn: { rows: MAGNIFIER, pal: { a: '#9c958d', b: '#cfe6f2', c: '#9a6639', d: '#4a3135' } },
   zoomOut: { rows: MAGNIFIER.map((r, i) => (i === 2 || i === 4 ? r.replace('d', 'b') : r)), pal: { a: '#9c958d', b: '#cfe6f2', c: '#9a6639', d: '#4a3135' } },
   back: { rows: ['...a....', '..aa....', '.aaaaaaa', 'aaaaaaaa', '.aaaaaaa', '..aa....', '...a....'], pal: { a: '#fffaf2' } },
   rotate: { rows: ['...aaa....', '.aa...a...', '.a.....a..', 'a......a..', 'a....aaaaa', 'a.....aaa.', '.a.....a..', '.aa.......', '...aaa....'], pal: { a: '#fffaf2' } },
+  brush: { rows: ['........aa', '.......aba', '......aba.', '.....aba..', '....cca...', '...cddc...', '..eddc....', '.eefe.....', 'eeee......', 'ee........'], pal: { a: '#8a5a3b', b: '#c38a55', c: '#9c958d', d: '#dad5ce', e: '#f06a96', f: '#ffb3cc' } },
   store: { rows: ['....a....', '....a....', '..aaaaa..', '...aaa...', '....a....', 'bbbbbbbbb', 'bcdcdcdcb', 'bdcdcdcdb', 'bbbbbbbbb'], pal: { a: '#5f8f33', b: '#9a6639', c: '#c38a55', d: '#dcaa72' } },
   check: { rows: ['........a', '.......aa', 'a.....aa.', 'aa...aa..', '.aa.aa...', '..aaa....', '...a.....'], pal: { a: '#7cc456' } },
   cross: { rows: ['aa...aa', '.aa.aa.', '..aaa..', '.aa.aa.', 'aa...aa'], pal: { a: '#e0475b' } },
@@ -2336,6 +2533,32 @@ const BOARD_BOOSTERS: BoosterId[] = ['fertilizer', 'wateringCan', 'hourglass', '
 const BOARD_PEOPLE: PersonId[] = ['marthe', 'leon', 'rosalie', 'basile', 'jules', 'capucine', 'gaston', 'pivoine'];
 const BOARD_UI = Object.keys(UI_MAPS) as UiIcon[];
 
+/** '#' a fence, 'G' a gate: every shape a piece can take, as the scene stacks them. */
+const BOARD_YARD = [
+  '............',
+  '.#######....',
+  '.#.....#..#.',
+  '.#.....####.',
+  '.#.....G..#.',
+  '.###G###....',
+  '.........#..',
+  '..###.......',
+];
+
+function fenceYard(skin: SkinId): Sprite {
+  const c = canvas(BOARD_YARD[0].length * TILE, BOARD_YARD.length * TILE);
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#86c45f';
+  g.fillRect(0, 0, c.width, c.height);
+  const at = (x: number, y: number) => (BOARD_YARD[y]?.[x] ?? '.') !== '.';
+  BOARD_YARD.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch === '.') return;
+    const mask = (at(x, y - 1) ? JOIN_NORTH | (BOARD_YARD[y - 1][x] === 'G' ? JOIN_NORTH_GATE : 0) : 0) | (at(x + 1, y) ? JOIN_EAST : 0) | (at(x, y + 1) ? JOIN_SOUTH : 0) | (at(x - 1, y) ? JOIN_WEST : 0);
+    g.drawImage(fenceSprite(skin, mask, ch === 'G'), x * TILE, (y + 1) * TILE - FENCE_H + 1);
+  }));
+  return c;
+}
+
 /** Every drawing, labelled, at 3x: to read the whole art at a glance. */
 export function artBoard(): HTMLElement {
   const board = document.createElement('div');
@@ -2374,6 +2597,7 @@ export function artBoard(): HTMLElement {
     ...([0, 1, 2] as const).flatMap((col): [Sprite, string][] => [[butterflySprite(col, 0), `papillon ${col}`], [butterflySprite(col, 1), 'ailes fermées']]),
     [signSprite(), 'panneau'],
   ], 4);
+  section('Barrières : un enclos par style (angles, T, bouts, poteau seul, portillons)', SKINS.map((s): [Sprite, string] => [fenceYard(s.id), s.name]), 3);
   section('Objets (face / profil)', BOARD_OBJECTS.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
   section('Arbres, ailes, animaux', [
     [hazelSprite(false), 'noisetier'], [hazelSprite(true), 'noisetier prêt'],

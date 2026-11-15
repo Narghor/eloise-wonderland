@@ -23,6 +23,8 @@ import { orderable, rollOrder } from '../src/games/farm/farmOrders';
 import { deliverMail, openParcel } from '../src/games/farm/farmParcels';
 import { breedsOf, buyAnimal, collectMachine, collectPen, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
 import { loadFarm, saveFarm, type FarmSave } from '../src/games/farm/farmSave';
+import { joinIndex, joinMask, nextSkin, restyleRun, skinOf } from '../src/games/farm/farmJoins';
+import { JOIN_EAST, JOIN_WEST } from '../src/games/farm/data/skins';
 import { MINUTE_MS } from '../src/games/farm/farmTime';
 
 let failures = 0;
@@ -201,6 +203,41 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   const twoGnomes = totalCharm(['gnome', 'gnome', 'fountain']);
   const paths = totalCharm(Array(10).fill('pathDirt'));
   check('a treasure counts once, ten paths make 2 charm', twoGnomes === 75 && paths === 2, `${twoGnomes}, ${paths}`);
+}
+
+// -----------------------------------------------
+// FENCES: skins, joins, and the run that changes style together (docs/ferme.md 16)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.nuts = 1000;
+  // A row of three fences, and a lone one touching the row only by a corner.
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 5, 3)!;
+  const row = [1, 2, 3].map((dx) => buyAndPlace(farm, 'fence', x + dx, y + 1, 0, now)!);
+  const lone = buyAndPlace(farm, 'fence', x, y, 0, now)!;
+  check('a new fence wears the first skin', row.every((f) => skinOf(f) === 'fenceRanch'));
+  const index = joinIndex(farm.objects);
+  check('the middle of a row joins east and west, the corner does not join', joinMask(index, x + 2, y + 1, 'fenceRanch') === (JOIN_EAST | JOIN_WEST) && joinMask(index, x, y, 'fenceRanch') === 0);
+
+  check('no other style before level 4', nextSkin(farm, 'fence', 'fenceRanch') === null);
+  farm.level = 8;
+  const order = [nextSkin(farm, 'fence', 'fenceRanch'), nextSkin(farm, 'fence', 'fencePicket'), nextSkin(farm, 'fence', 'fenceWattle')];
+  check('at level 8 the styles go round', order.join() === 'fencePicket,fenceWattle,fenceRanch', order.join());
+
+  const changed = restyleRun(farm, row[1], 'fencePicket');
+  check('a style change takes the whole run, not the piece beside it', changed === 3 && row.every((f) => f.skin === 'fencePicket') && skinOf(lone) === 'fenceRanch', `${changed} changed`);
+  const next = buyAndPlace(farm, 'fenceGate', x + 4, y + 1, 0, now)!;
+  check('the next piece bought wears the style just chosen, and joins the run', next.skin === 'fencePicket' && joinMask(joinIndex(farm.objects), x + 4, y + 1, 'fencePicket') === JOIN_WEST);
+
+  // A fence from before the skins: turned by hand, no skin.
+  saveFarm(farm);
+  const raw = JSON.parse(store.get('mini-jeux.save')!) as { games: { farm: { objects: { uid: number; rot: number; skin?: string }[] } } };
+  const old = raw.games.farm.objects.find((o) => o.uid === lone.uid)!;
+  old.rot = 1;
+  delete old.skin;
+  store.set('mini-jeux.save', JSON.stringify(raw));
+  const back = loadFarm()!.objects.find((o) => o.uid === lone.uid)!;
+  check('an old turned fence comes back unturned, as a ranch', back.rot === 0 && skinOf(back) === 'fenceRanch');
 }
 
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);

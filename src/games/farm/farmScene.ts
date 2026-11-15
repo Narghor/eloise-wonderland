@@ -1,7 +1,8 @@
 import { prefersReducedMotion } from '../casino/fx/effects';
 import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
 import { placeable } from './data/placeables';
-import type { PlaceableId } from './data/types';
+import type { PlaceableId, SkinId } from './data/types';
+import { isGate, joinIndex, joinMask, skinOf, type JoinCell } from './farmJoins';
 import {
   GROUND_MARGIN,
   OUTLINE,
@@ -11,6 +12,7 @@ import {
   butterflySprite,
   chimneyOf,
   cropSprite,
+  fenceSprite,
   fernSprite,
   fieldSprite,
   hazelSprite,
@@ -50,6 +52,8 @@ export interface Ghost {
   rot: Rotation;
   /** The object being moved, or undefined for a new one. */
   uid?: number;
+  /** A piece that joins: the skin it wears. */
+  skin?: SkinId;
 }
 
 export interface SceneEvents {
@@ -184,6 +188,8 @@ export class FarmScene {
   ghost: Ghost | null = null;
   /** The object chosen in edit mode. */
   selected: number | null = null;
+  /** Where the joined pieces stand this frame, the ghost included: each piece's shape comes from it. */
+  private joins = new Map<string, JoinCell>();
   /** Called after each frame: the HTML overlay follows the camera. */
   onFrame: (() => void) | null = null;
   /** The villagers and Gaston on the road. */
@@ -400,7 +406,17 @@ export class FarmScene {
 
   /** Glides the view until the world point (wx, wy) sits at (screenX, screenY), or as close as the edges allow. */
   glideTo(wx: number, wy: number, screenX: number, screenY: number): void {
-    this.panGoal = this.clamped({ x: wx - screenX / this.scale, y: wy - screenY / this.scale });
+    this.glideCamera({ x: wx - screenX / this.scale, y: wy - screenY / this.scale });
+  }
+
+  /** Glides the view so that what is on the screen moves by (dx, dy) pixels, or as far as the edges allow. */
+  glideBy(dx: number, dy: number): void {
+    const from = this.panGoal ?? this.cam;
+    this.glideCamera({ x: from.x - dx / this.scale, y: from.y - dy / this.scale });
+  }
+
+  private glideCamera(goal: { x: number; y: number }): void {
+    this.panGoal = this.clamped(goal);
     if (this.reduced) {
       this.cam = this.panGoal;
       this.panGoal = null;
@@ -529,6 +545,8 @@ export class FarmScene {
     }
     if (o.type === 'hazel') return hazelSprite(readyOn(o, Date.now()) !== null);
     if (o.type === 'mailbox') return mailboxSprite(this.save.mail.waiting > 0, o.rot % 2 === 1 ? 'profile' : 'face');
+    const skin = skinOf(o);
+    if (skin) return fenceSprite(skin, joinMask(this.joins, o.x, o.y, skin), isGate(o.type));
     void now;
     return objectSprite(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
   }
@@ -561,6 +579,7 @@ export class FarmScene {
     ctx.fillRect(camX - 2, camY - 2, this.width / this.scale + 4, this.height / this.scale + 4);
     if (this.ground) ctx.drawImage(this.ground, -GROUND_MARGIN * TILE, -GROUND_MARGIN * TILE);
     this.drawWater(now);
+    this.joins = joinIndex(this.save.objects, this.ghost);
 
     const clock = Date.now();
     const view = { x0: camX - 3 * TILE, y0: camY - 3 * TILE, x1: camX + this.width / this.scale + 3 * TILE, y1: camY + this.height / this.scale + 5 * TILE };
@@ -878,7 +897,11 @@ export class FarmScene {
     const ctx = this.ctx;
     const fits = this.events.ghostFits(ghost);
     const [w, h] = footprint(ghost);
-    const sprite = ghost.type === 'field' ? fieldSprite(null, 'empty') : ghost.type === 'hazel' ? hazelSprite(false) : objectSprite(ghost.type, ghost.rot % 2 === 1 ? 'profile' : 'face');
+    const skin = skinOf(ghost);
+    const sprite = ghost.type === 'field' ? fieldSprite(null, 'empty')
+      : ghost.type === 'hazel' ? hazelSprite(false)
+      : skin ? fenceSprite(skin, joinMask(this.joins, ghost.x, ghost.y, skin), isGate(ghost.type))
+      : objectSprite(ghost.type, ghost.rot % 2 === 1 ? 'profile' : 'face');
     const at = this.origin(ghost, sprite);
     ctx.globalAlpha = 0.8;
     this.stamp(sprite, at.x, at.y, ghost.rot === 3);
@@ -902,25 +925,11 @@ export class FarmScene {
       ctx.fillRect(x - 1, y, 3, 1);
       return;
     }
-    if (o.type === 'mailbox') {
-      if (this.reduced || this.save.mail.waiting === 0) return;
-      const sprite = this.spriteOf(o, now);
-      const at = this.origin(o, sprite);
-      for (let i = 0; i < 3; i++) {
-        const phase = (now / 700 + i / 3) % 1;
-        if (phase > 0.45) continue;
-        const x = at.x + ((i * 7 + 3) % sprite.width);
-        const y = at.y + 2 + ((i * 5) % 8) - Math.round(phase * 6);
-        ctx.fillStyle = i === 1 ? '#ffe07a' : '#fffbe0';
-        ctx.fillRect(x, y - 1, 1, 3);
-        ctx.fillRect(x - 1, y, 3, 1);
-      }
-      return;
-    }
     const ready = readyOn(o, clock);
     let icon: Sprite | null = null;
     let alpha = 1;
-    if (ready === 'nuts') icon = uiIcon('nut');
+    if (o.type === 'mailbox') icon = this.save.mail.waiting > 0 ? uiIcon('gift') : null;
+    else if (ready === 'nuts') icon = uiIcon('nut');
     else if (ready) icon = itemIcon(ready);
     else if (o.type === 'coop' || o.type === 'cowshed') {
       const animal = penAnimal(o);

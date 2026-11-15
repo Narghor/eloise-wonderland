@@ -21,8 +21,15 @@ export type TreeId = 'hazel';
 export type DecorId =
   | 'fence' | 'hedge' | 'flowersPink' | 'flowersYellow' | 'flowersWhite' | 'pathStone' | 'pathDirt'
   | 'bench' | 'well' | 'scarecrow' | 'lantern' | 'wheelbarrow' | 'appleTree' | 'logPile' | 'birdhouse' | 'pond'
+  | 'fenceGate'
   // Treasures: found only in Gaston's parcels, never sold.
   | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
+
+/** Pieces that join their neighbours of the same family (a fence and its gate). */
+export type JoinFamily = 'fence';
+
+/** The looks a joined piece can wear (data/skins.ts). */
+export type SkinId = 'fenceRanch' | 'fencePicket' | 'fenceWattle';
 export type ObstacleId = 'bush' | 'stump' | 'rock' | 'bigRock';
 
 /** Everything that stands on the map. The mailbox is Gaston's: one per farm, given, moved like the rest. */

@@ -10,6 +10,7 @@ import { MEDALS, medalReward } from './data/medals';
 import { totalCharm } from './data/charm';
 import { PLACEABLES, placeable } from './data/placeables';
 import { PROJECTS, project } from './data/projects';
+import { FAMILY_NAMES, SKINS } from './data/skins';
 import { MAX_OPEN_QUESTS, QUESTS, quest, type Quest } from './data/quests';
 import { MAX_LEVEL, levelReward, xpToNext } from './data/levels';
 import type { AnimalId, FarmEvent, ItemId, Objective, PlaceableId, ProjectId, QuestId, Reward, Unlock } from './data/types';
@@ -298,6 +299,7 @@ export function unlocksAt(level: number): string[] {
     ...ANIMALS.filter((a) => at(a.unlock)).map((a) => `Animal : ${a.name}`),
     ...RECIPES.filter((r) => at(r.unlock) && !PLACEABLES.some((p) => p.id === r.machine && at(p.unlock))).map((r) => `Recette : ${item(r.item).name}`),
     ...PLACEABLES.filter((p) => p.kind === 'deco' && !p.treasure && at(p.unlock)).map((p) => `Déco : ${p.name}`),
+    ...SKINS.filter((s) => at(s.unlock)).map((s) => `Style de ${FAMILY_NAMES[s.family]} : ${s.name}`),
     ...PROJECTS.filter((p) => at(p.unlock)).map((p) => `Grand projet : ${p.name}`),
   ];
 }

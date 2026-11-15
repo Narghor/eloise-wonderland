@@ -33,6 +33,7 @@ import {
   offerOf,
   parcelBubble,
   penBubble,
+  refreshTimesLeft,
   rewardLine,
   seedRow,
   sheetContent,
@@ -78,11 +79,8 @@ const WELCOME_AFTER_MS = 20 * 60 * 1000;
 
 /** Room kept between the bars and what the screen places on the map. */
 const BAND_MARGIN = 8;
-/** The bubble's distance from its object, above and below: the translate of .farm-bubble in farm.css. */
-const BUBBLE_GAP_ABOVE = 10;
-const BUBBLE_GAP_BELOW = 12;
-/** Squeezed between an object and a bar, a bubble keeps this height and scrolls inside. */
-const BUBBLE_MIN_HEIGHT = 140;
+/** The bubble's distance from its object, above or below it. */
+const BUBBLE_GAP = 10;
 
 export function renderFarm(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -255,7 +253,11 @@ class FarmScreen implements FarmUi {
       const state = fieldState(target, now);
       if (state === 'ripe') this.closeBubble();
       else if (state !== 'empty') this.bubble!.el.replaceChildren(...(this.bubbleContent(target) ?? []));
+    } else if (target && this.bubble && refreshTimesLeft(this.bubble.el, now)) {
+      // An egg laid, a loaf baked, Gaston back: the bubble shows what is ready now.
+      this.bubble.el.replaceChildren(...(this.bubbleContent(target) ?? []));
     }
+    if (this.sheet) refreshTimesLeft(this.sheet.el, now);
   }
 
   private tell(notices: Notice[]): void {
@@ -357,7 +359,9 @@ class FarmScreen implements FarmUi {
     this.overlay.append(bubble);
     this.bubble = { el: bubble, target };
     const box = this.root.getBoundingClientRect();
-    this.placeBubble(box, this.visibleBand(box));
+    const band = this.visibleBand(box);
+    this.makeRoomForBubble(band);
+    this.placeBubble(box, band);
   }
 
   private bubbleContent(target: Target): Node[] | null {
@@ -376,31 +380,46 @@ class FarmScreen implements FarmUi {
     return decoBubble(target);
   }
 
-  /** Above its object when it fits, else below when it fits, else on the roomier side, scrolling inside: never under a bar. */
-  private placeBubble(box: DOMRect, band: Band): void {
-    const { el: bubble, target } = this.bubble!;
-    let anchor: { x: number; y: number; bottom: number } | null;
+  /** The object's screen points a bubble hangs from: the top of its drawing and the bottom of its footprint. */
+  private bubbleAnchor(target: Target): { x: number; top: number; bottom: number } | null {
     if ('parcel' in target) {
       const sign = this.scene.signAnchor(target.parcel);
-      anchor = sign && { ...sign, bottom: sign.y + 20 };
-    } else {
-      const a = this.scene.anchorOf(target);
-      anchor = { x: a.x, y: a.top, bottom: a.bottom };
+      return sign && { x: sign.x, top: sign.y, bottom: sign.y + 20 };
     }
+    return this.scene.anchorOf(target);
+  }
+
+  /** A bubble opening with no room above nor below its object: the map glides just enough for it to fit. */
+  private makeRoomForBubble(band: Band): void {
+    const { el: bubble, target } = this.bubble!;
+    const anchor = this.bubbleAnchor(target);
     if (!anchor) return;
+    const h = bubble.offsetHeight;
+    const missingAbove = h - (anchor.top - BUBBLE_GAP - band.top);
+    const missingBelow = h - (band.bottom - anchor.bottom - BUBBLE_GAP);
+    if (missingAbove <= 0 || missingBelow <= 0) return;
+    // The map going down makes room above the object, going up makes room below: the shorter glide.
+    this.scene.glideBy(0, missingAbove <= missingBelow ? missingAbove : -missingBelow);
+  }
+
+  /** Always whole, never resized: above its object when it fits, else below, else held inside the seen map. */
+  private placeBubble(box: DOMRect, band: Band): void {
+    const { el: bubble, target } = this.bubble!;
+    const anchor = this.bubbleAnchor(target);
+    if (!anchor) return;
+    // Only a screen shorter than the bubble itself makes it scroll.
+    bubble.style.maxHeight = `${Math.floor(band.bottom - band.top)}px`;
     const w = bubble.offsetWidth;
-    // Its whole height, even while it scrolls: the content plus the borders.
-    const h = bubble.scrollHeight + bubble.offsetHeight - bubble.clientHeight;
-    const roomAbove = anchor.y - BUBBLE_GAP_ABOVE - band.top;
-    const roomBelow = band.bottom - anchor.bottom - BUBBLE_GAP_BELOW;
-    const below = h > roomAbove && (h <= roomBelow || roomBelow > roomAbove);
-    const room = below ? roomBelow : roomAbove;
-    bubble.style.maxHeight = h > room ? `${Math.max(BUBBLE_MIN_HEIGHT, Math.floor(room))}px` : '';
+    const h = bubble.offsetHeight;
+    const above = anchor.top - BUBBLE_GAP - h;
+    const below = anchor.bottom + BUBBLE_GAP;
+    const fits = (top: number) => top >= band.top && top + h <= band.bottom;
+    const roomier = anchor.top - band.top > band.bottom - anchor.bottom ? above : below;
+    const wanted = fits(above) ? above : fits(below) ? below : roomier;
+    const top = Math.max(band.top, Math.min(wanted, band.bottom - h));
     const x = Math.min(Math.max(anchor.x, w / 2 + 8), box.width - w / 2 - 8);
-    const y = below ? anchor.bottom : anchor.y;
-    bubble.classList.toggle('is-below', below);
     bubble.style.left = `${Math.round(x)}px`;
-    bubble.style.top = `${Math.round(y)}px`;
+    bubble.style.top = `${Math.round(top)}px`;
   }
 
   closeBubble(): void {

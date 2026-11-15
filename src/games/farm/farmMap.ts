@@ -24,6 +24,7 @@ import type { BoosterId, DecorId, ObstacleId, PlaceableId } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import { FARM_VERSION, newMail, type FarmSave, type PlacedObject, type Rotation } from './farmSave';
 import { earn, emit, gainXp, isUnlocked, noBoosters, ownCount, spend } from './farmProgress';
+import { chosenSkin } from './farmJoins';
 
 // -----------------------------------------------
 // THE GRID: parcels, footprints, placing, moving, turning, storing, clearing
@@ -126,6 +127,10 @@ export function buyAndPlace(save: FarmSave, id: PlaceableId, x: number, y: numbe
 function newObject(save: FarmSave, id: PlaceableId, x: number, y: number, rot: Rotation, now: number): PlacedObject {
   const p = placeable(id);
   const object: PlacedObject = { uid: save.nextUid++, type: id, x, y, rot };
+  if (p.joins) {
+    object.rot = 0;
+    object.skin = chosenSkin(save, p.joins);
+  }
   if (p.kind === 'pen') {
     object.animals = [];
     object.breeds = [];
@@ -303,6 +308,7 @@ export function newFarm(now: number): FarmSave {
     mail: newMail(now),
     album: [],
     waitingBreeds: [],
+    lastSkins: {},
   };
   const fieldsAt: [number, number][] = [[10, 10], [11, 10], [12, 10], [10, 11], [11, 11], [12, 11]];
   for (const [x, y] of fieldsAt) {

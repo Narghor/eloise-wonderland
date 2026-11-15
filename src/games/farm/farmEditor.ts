@@ -1,6 +1,9 @@
 import { el } from '../../dom';
 import { playThunk } from '../casino/fx/sound';
 import { placeable } from './data/placeables';
+import { skin } from './data/skins';
+import { chosenSkin, lockedSkin, nextSkin, restyleRun, skinOf } from './farmJoins';
+import { unlockText } from './farmProgress';
 import type { PlaceableId } from './data/types';
 import { spriteImage, uiIcon } from './farmArt';
 import type { FarmHud } from './farmHud';
@@ -30,6 +33,8 @@ export class FarmEditor {
   private readonly host: EditorHost;
   private editing = false;
   private placing: PlaceableId | null = null;
+  /** Bought or placed since the shop: the way out then says "Fini", not "Annuler". */
+  private placedInRow = 0;
   private banner: HTMLElement | null = null;
   private tools: HTMLElement | null = null;
 
@@ -99,10 +104,12 @@ export class FarmEditor {
     const spot = freeSpotNear(host.save, cx, cy, p.size[0], p.size[1]);
     if (!spot) return host.toast('Plus de place libre : dégage la friche ou achète un terrain.');
     this.placing = id;
-    host.scene.ghost = { type: id, x: spot[0], y: spot[1], rot: 0 };
+    host.scene.ghost = { type: id, x: spot[0], y: spot[1], rot: 0, ...(p.joins ? { skin: chosenSkin(host.save, p.joins) } : {}) };
     host.scene.editMode = true;
     host.hud.setEditing(true);
-    this.showBanner(`Fais glisser : ${p.name.toLowerCase()}, ou touche l’endroit choisi.`, 'Annuler', () => this.exit());
+    this.placedInRow = 0;
+    // The way out sits with the ghost's buttons, where the thumb already is.
+    this.showBanner(`Fais glisser : ${p.name.toLowerCase()}, ou touche l’endroit choisi.`);
     this.renderTools();
   }
 
@@ -124,20 +131,18 @@ export class FarmEditor {
     this.tools.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, 12px)`;
   }
 
-  /** The buttons under the ghost: turn, store, buy or OK. */
+  /** The buttons under the ghost: turn (or change style), store, buy or OK. */
   renderTools(): void {
     const { host } = this;
     this.tools?.remove();
     this.tools = null;
     const ghost = host.scene.ghost;
     if (!ghost) return;
-    const turn = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('rotate'), 2), 'Tourner');
-    turn.addEventListener('click', () => {
-      ghost.rot = ((ghost.rot + 1) % 4) as Ghost['rot'];
-      this.renderTools();
-    });
-    const buttons: HTMLElement[] = [turn];
+    const buttons: HTMLElement[] = [placeable(ghost.type).joins ? this.styleButton(ghost) : this.turnButton(ghost)];
     if (this.placing) {
+      const leave = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('cross'), 2), this.placedInRow > 0 ? 'Fini' : 'Annuler');
+      leave.addEventListener('click', () => this.exit());
+      buttons.unshift(leave);
       const ok = el('button', { class: 'farm-btn', type: 'button', ...(this.ghostFits(ghost) ? {} : { disabled: '' }) }, spriteImage(uiIcon('check'), 2), this.storedCount(this.placing) > 0 ? 'Poser' : 'Acheter');
       ok.addEventListener('click', () => this.place());
       buttons.push(ok);
@@ -167,11 +172,50 @@ export class FarmEditor {
     host.overlay.append(this.tools);
   }
 
-  private showBanner(text: string, done: string, onDone: () => void): void {
+  private turnButton(ghost: Ghost): HTMLElement {
+    const turn = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('rotate'), 2), 'Tourner');
+    turn.addEventListener('click', () => {
+      ghost.rot = ((ghost.rot + 1) % 4) as Ghost['rot'];
+      this.renderTools();
+    });
+    return turn;
+  }
+
+  /**
+   * A piece that joins is never turned: its button shows its style and goes to the next open one. On a piece of
+   * the map, the whole run it belongs to changes at once; on a new one, the pieces bought next wear it too.
+   */
+  private styleButton(ghost: Ghost): HTMLElement {
+    const { host } = this;
+    const family = placeable(ghost.type).joins!;
+    const current = ghost.skin ?? chosenSkin(host.save, family);
+    const button = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('brush'), 2), skin(current).name);
+    button.addEventListener('click', () => {
+      const next = nextSkin(host.save, family, current);
+      if (!next) {
+        const locked = lockedSkin(host.save, family);
+        return host.toast(locked ? `${locked.name} : ${unlockText(locked.unlock)}.` : 'Un seul style pour l’instant.');
+      }
+      ghost.skin = next;
+      const object = ghost.uid !== undefined ? host.save.objects.find((o) => o.uid === ghost.uid) : undefined;
+      if (object) restyleRun(host.save, object, next);
+      else host.save.lastSkins[family] = next;
+      host.commit();
+      this.renderTools();
+    });
+    return button;
+  }
+
+  /** The hint at the top; with a button only when nothing under the map offers the way out. */
+  private showBanner(text: string, done?: string, onDone?: () => void): void {
     this.banner?.remove();
-    const b = el('button', { class: 'farm-btn', type: 'button', text: done });
-    b.addEventListener('click', onDone);
-    this.banner = el('div', { class: 'farm-edit-banner farm-box' }, el('p', { text }), b);
+    const parts: HTMLElement[] = [el('p', { text })];
+    if (done && onDone) {
+      const b = el('button', { class: 'farm-btn', type: 'button', text: done });
+      b.addEventListener('click', onDone);
+      parts.push(b);
+    }
+    this.banner = el('div', { class: 'farm-edit-banner farm-box' }, ...parts);
     this.host.overlay.append(this.banner);
   }
 
@@ -179,7 +223,8 @@ export class FarmEditor {
     const { scene } = this.host;
     this.applySelection();
     if (!canMove(object)) return this.host.toast('Un obstacle ne se déplace pas : il se dégage (touche-le hors du mode Aménager).');
-    scene.ghost = { type: object.type, x: object.x, y: object.y, rot: object.rot, uid: object.uid };
+    const worn = skinOf(object);
+    scene.ghost = { type: object.type, x: object.x, y: object.y, rot: object.rot, uid: object.uid, ...(worn ? { skin: worn } : {}) };
     scene.selected = object.uid;
     this.renderTools();
   }
@@ -210,6 +255,7 @@ export class FarmEditor {
     const placed = buyAndPlace(host.save, id, ghost.x, ghost.y, ghost.rot, Date.now());
     if (!placed) return host.toast('Pas assez d’Éloisettes.');
     playThunk();
+    this.placedInRow++;
     host.commit();
     // Fields and decorations often come in rows: offer the next one right beside.
     const p = placeable(id);

@@ -48,7 +48,7 @@ import {
   unlockText,
 } from './farmProgress';
 import { canHurry, growingFields, shopLeft, siteCoins } from './farmBoosters';
-import { MINUTE_MS, clockAt, countdown, duration } from './farmTime';
+import { MINUTE_MS, countdown, duration } from './farmTime';
 import type { FarmSave, PlacedObject } from './farmSave';
 
 // -----------------------------------------------
@@ -108,8 +108,29 @@ function price(n: number, short = false): HTMLElement {
   return el('span', { class: `farm-price${short ? ' is-short' : ''}` }, String(n), nut(1));
 }
 
-function line(icon: Sprite | null, text: string, end: string, state: '' | 'ok' | 'missing' = ''): HTMLElement {
-  return el('div', { class: `farm-line${state ? ` is-${state}` : ''}` }, ...(icon ? [img(icon)] : []), text, el('span', { class: 'farm-end', text: end }));
+function line(icon: Sprite | null, text: string, end: string | Node, state: '' | 'ok' | 'missing' = ''): HTMLElement {
+  return el('div', { class: `farm-line${state ? ` is-${state}` : ''}` }, ...(icon ? [img(icon)] : []), text, el('span', { class: 'farm-end' }, end));
+}
+
+/** "dans 4 min 05": every timer says how long is left, never an hour of the day to work out. */
+function timeLeftText(time: number, now: number): string {
+  return `dans ${countdown(time, now)}`;
+}
+
+/** A time left that runs by itself: the screen ticks every [data-until] each second (refreshTimesLeft). */
+function timeLeft(time: number, now: number): HTMLElement {
+  return el('span', { class: 'farm-time-left', 'data-until': String(time), text: timeLeftText(time, now) });
+}
+
+/** Ticks every time left under `root`; true when one has run out: what it waited for is ready to show. */
+export function refreshTimesLeft(root: HTMLElement, now: number): boolean {
+  let ended = false;
+  for (const node of root.querySelectorAll<HTMLElement>('[data-until]')) {
+    const until = Number(node.dataset.until);
+    if (until <= now) ended = true;
+    node.textContent = timeLeftText(until, now);
+  }
+  return ended;
 }
 
 /** A reward, as icons and numbers. */
@@ -149,15 +170,23 @@ function growth(readyAt: number, total: number, now: number): HTMLElement[] {
 
 /** The seed row docked above the bottom bar: a seed is dragged onto the empty fields, or tapped for the chosen one. */
 export function seedRow(ui: FarmUi, chosen: PlacedObject | null, close: () => void): Node[] {
-  const seeds = CROPS.map((c) => {
-    const open = isUnlocked(ui.save, c.unlock);
+  // The seeds already open and only the next one to unlock: the later ones are nothing to act on yet.
+  const next = CROPS.find((c) => !isUnlocked(ui.save, c.unlock));
+  const seeds = CROPS.filter((c) => c === next || isUnlocked(ui.save, c.unlock)).map((c) => {
+    const open = c !== next;
     const affordable = ui.save.nuts >= c.seed;
     const b = el(
       'button',
       { class: `farm-seed${c.id === ui.save.lastSeed ? ' is-last' : ''}`, type: 'button', ...(open && affordable ? {} : { disabled: '' }) },
       open ? img(itemIcon(c.id), 2) : img(uiIcon('lock'), 2),
       item(c.id).name,
-      el('small', { text: open ? `${duration(c.minutes)} · ${c.seed}` : unlockText(c.unlock) }),
+      ...(open
+        ? [
+            el('small', { text: duration(c.minutes) }),
+            el('small', { class: 'farm-seed-money' }, `Achat ${c.seed}`, nut(1)),
+            el('small', { class: 'farm-seed-money', title: `La récolte (${itemCount(c.id, c.yield)}) vendue au marchand` }, `Vente ${sellPrice(c.id, c.yield)}`, nut(1)),
+          ]
+        : [el('small', { text: unlockText(c.unlock) })]),
     );
     b.addEventListener('pointerdown', (e) => {
       if (!open || !affordable) return;
@@ -206,7 +235,7 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
   if (count === 0) lines.push(el('p', { text: `Pas encore de ${a.plural.toLowerCase()} ici : adoptes-en une !` }));
   if (ready > 0) lines.push(line(itemIcon(a.product), `${itemCount(a.product, ready)} à ramasser`, '', 'ok'));
   if (hungry > 0) lines.push(line(itemIcon(a.feed), `${hungry} ${hungry > 1 ? 'ont' : 'a'} faim`, `${feed} en grange`, feed > 0 ? 'ok' : 'missing'));
-  if (next !== null) lines.push(line(itemIcon(a.product), 'Prochain', `à ${clockAt(next, now)}`));
+  if (next !== null) lines.push(line(itemIcon(a.product), item(a.product).name, timeLeft(next, now)));
   const room = capacity - count;
   const animalPrice = nextAnimalPrice(ui.save, pen);
   const actions = el('div', { class: 'farm-row' });
@@ -252,7 +281,7 @@ export function machineBubble(ui: FarmUi, machine: PlacedObject): Node[] {
   if (canHurry(machine, now)) actions.append(button([img(boosterIcon('hourglass')), `Sablier (${ui.save.boosters.hourglass})`], () => ui.useBooster('hourglass', machine), { ghost: true, disabled: ui.save.boosters.hourglass === 0 }));
   return [
     el('h3', { text: `${placeable(machine.type).name} · file ${pending} / ${slots}` }),
-    ...(queue.length > 0 ? [el('div', { class: 'farm-lines' }, ...queue.map((j) => line(itemIcon(j.item), item(j.item).name, `prêt à ${clockAt(j.readyAt, now)}`)))] : [el('p', { text: 'La file est vide : choisis une recette.' })]),
+    ...(queue.length > 0 ? [el('div', { class: 'farm-lines' }, ...queue.map((j) => line(itemIcon(j.item), item(j.item).name, j.readyAt <= now ? 'prêt' : timeLeft(j.readyAt, now))))] : [el('p', { text: 'La file est vide : choisis une recette.' })]),
     ...(tray > 0 ? [el('p', { text: `${tray} fabrication${tray > 1 ? 's' : ''} terminée${tray > 1 ? 's' : ''}, sur le plateau.` })] : []),
     ...recipes,
     actions,
@@ -260,7 +289,7 @@ export function machineBubble(ui: FarmUi, machine: PlacedObject): Node[] {
 }
 
 export function treeBubble(ui: FarmUi, tree: PlacedObject): Node[] {
-  return [el('h3', { text: 'Noisetier' }), el('p', { text: `Il donne 5 à 10 Éloisettes toutes les 4 heures, tout seul. Prochaine cueillette à ${clockAt(tree.readyAt ?? 0, ui.now())}.` })];
+  return [el('h3', { text: 'Noisetier' }), el('p', {}, 'Il donne 5 à 10 Éloisettes toutes les 4 heures, tout seul. Prochaine cueillette ', timeLeft(tree.readyAt ?? 0, ui.now()), '.')];
 }
 
 export function obstacleBubble(ui: FarmUi, object: PlacedObject): Node[] {
@@ -278,7 +307,7 @@ export function mailboxBubble(ui: FarmUi): Node[] {
   const mail = ui.save.mail;
   return [
     el('h3', {}, img(parcelSprite(null), 2), 'La boîte aux lettres'),
-    el('p', { text: `Gaston repasse à ${clockAt(mail.nextAt, ui.now())} avec un colis. Les niveaux et le coffre du jour en donnent aussi.` }),
+    el('p', {}, 'Gaston repasse ', timeLeft(mail.nextAt, ui.now()), ' avec un colis. Les niveaux et le coffre du jour en donnent aussi.'),
     el('p', { text: `${mail.opened} colis ouvert${mail.opened > 1 ? 's' : ''} · ${ui.save.album.length} / ${TREASURES.length} trésors dans l’album.` }),
     button(['Voir l’album'], () => ui.openSheet('quests', 'album'), { ghost: true, wide: true }),
   ];
@@ -412,7 +441,7 @@ function ordersSheet(ui: FarmUi): Node[] {
     );
   });
   for (const at of [...save.orderWaits].sort((a, b) => a - b)) {
-    cards.push(el('div', { class: 'farm-card farm-waiting' }, el('span', { text: 'Nouvelle commande' }), el('b', { text: at <= now ? 'tout de suite' : `à ${clockAt(at, now)}` })));
+    cards.push(el('div', { class: 'farm-card farm-waiting' }, el('span', { text: 'Nouvelle commande' }), el('b', {}, at <= now ? 'tout de suite' : timeLeft(at, now))));
   }
   return [el('p', { class: 'farm-note', text: 'Les commandes n’expirent jamais. Une commande servie est remplacée une minute après.' }), el('div', { class: 'farm-orders' }, ...cards)];
 }

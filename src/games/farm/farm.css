@@ -460,20 +460,16 @@
 
 .farm-bubble {
   position: absolute;
-  transform: translate(-50%, calc(-100% - 10px));
+  transform: translateX(-50%);
   padding: 10px;
   border-radius: 10px;
   display: grid;
   gap: 8px;
   width: min(300px, calc(100vw - 20px));
-  /* Its max-height comes from the room left between its object and the bars (farmScreen.placeBubble). */
+  /* Placed whole by farmScreen.placeBubble; it scrolls only on a screen shorter than itself. */
   overflow-y: auto;
   z-index: 5;
   touch-action: pan-y;
-}
-
-.farm-bubble.is-below {
-  transform: translate(-50%, 12px);
 }
 
 .farm-bubble h3 {
@@ -520,6 +516,12 @@
 .farm-seed small {
   color: var(--ui-muted);
   font-size: 10.5px;
+}
+
+.farm-seed-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .farm-seed.is-last {
@@ -718,8 +720,9 @@
   width: 72px;
 }
 
+/* Sowing: the options step aside rather than ride up next to the seed row's close button. */
 .farm.has-seeds .farm-side {
-  bottom: calc(env(safe-area-inset-bottom) + 208px);
+  display: none;
 }
 
 /* The seed riding above the finger during a swipe */

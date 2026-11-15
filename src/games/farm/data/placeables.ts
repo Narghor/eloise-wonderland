@@ -1,4 +1,4 @@
-import { atLevel, type DecorId, type MachineId, type ObstacleId, type PenId, type PlaceableId, type TreeId, type Unlock } from './types';
+import { atLevel, type DecorId, type JoinFamily, type MachineId, type ObstacleId, type PenId, type PlaceableId, type TreeId, type Unlock } from './types';
 
 // -----------------------------------------------
 // EVERYTHING THAT STANDS ON THE MAP (docs/ferme.md 4.2)
@@ -22,6 +22,8 @@ export interface Placeable {
   flat?: boolean;
   /** Found only in Gaston's parcels: never in the shop. */
   treasure?: boolean;
+  /** Joins its neighbours of this family wearing the same skin (farmJoins.ts): one tile, never turned. */
+  joins?: JoinFamily;
 }
 
 const machine = (id: MachineId, name: string, level: number, price: number): Placeable => ({ id, name, kind: 'machine', size: [2, 2], price, unlock: atLevel(level), maxCount: 1 });
@@ -41,7 +43,8 @@ export const PLACEABLES: readonly Placeable[] = [
   pen('cowshed', 'Étable', 6, 250),
   tree('hazel', 'Noisetier', 5, 150, 3),
   // Decorations (docs/ferme.md 7.6): purely decorative in lot 1.
-  deco('fence', 'Barrière en bois', [1, 1], 5, 1),
+  { ...deco('fence', 'Barrière en bois', [1, 1], 5, 1), joins: 'fence' },
+  { ...deco('fenceGate', 'Portillon', [1, 1], 15, 1), joins: 'fence' },
   deco('pathDirt', 'Chemin de terre', [1, 1], 2, 1, true),
   deco('hedge', 'Haie', [1, 1], 8, 2),
   deco('flowersPink', 'Parterre de roses', [1, 1], 12, 2),

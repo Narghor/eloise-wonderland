@@ -40,8 +40,9 @@ On ne reprend ni les noms, ni les dessins, ni les textes des jeux du commerce : 
 6. **L'absence rapporte** : au retour, tout est prêt à ramasser, les noisetiers ont donné, de nouvelles commandes
    sont arrivées.
 7. **Chaque minuteur se lit** : jamais une barre seule. Un champ qui pousse montre une barre **et le temps restant**
-   (« Encore 1 min 58 », choix de Flo du 15/11 au premier test) ; les files des machines et les enclos disent
-   l'heure de fin (« prêt à 18 h 40 »).
+   (« Encore 1 min 58 », choix de Flo du 15/11 au premier test). **Jamais une heure de la journée** : machines,
+   enclos, noisetier, Gaston et nouvelles commandes disent le temps restant (« dans 4 min 05 »), qui défile tout
+   seul (`timeLeft` / `refreshTimesLeft`, farmPanels) ; le joueur ne calcule pas une heure (Flo, 15/11, redemandé).
 8. **Accélérer se gagne en jouant** (boosters), et ne devient jamais nécessaire pour avancer.
 
 ---
@@ -232,7 +233,7 @@ L'écran est la ferme en plein écran, avec un bandeau en haut et une barre en b
 - **En haut** : le niveau et sa barre d'XP, les Éloisettes, les boosters.
 - **En bas** : Grange · Commandes · Quêtes · Boutique · Aménager.
 - **La carte** : on la fait glisser au doigt ; deux niveaux de zoom (pincer, ou un bouton sur PC).
-- **Toucher un objet** ouvre une petite bulle à côté : les graines à semer, la file de la machine, l'heure de fin.
+- **Toucher un objet** ouvre une petite bulle à côté : les graines à semer, la file de la machine, le temps restant.
 - **Glisser le doigt** depuis une graine (ou la faucille) sur les champs : semer / récolter en un geste.
 - **Ce qui est prêt se voit** : une petite icône qui sautille au-dessus (sans animer d'ombres ni de filtres :
   sur téléphone, seulement des déplacements et de la transparence).
@@ -462,6 +463,7 @@ src/games/farm/
   farmOrders.ts    le tableau de commandes
   farmProgress.ts  XP, niveaux, isUnlocked, événements -> quêtes, projets, tâches, médailles
   farmBoosters.ts  boosters : stock, achat, effets
+  farmJoins.ts     les pièces qui se raccordent (barrière, portillon) : skins, voisins, tronçon (section 16)
   farmScene.ts     le canvas : caméra, dessin, toucher et glisser
   farmVillage.ts   les villageois et Gaston sur la route (section 15), dessinés par la scène
   farmArt.ts       les dessins (et son moteur de sprites, exporté)
@@ -545,6 +547,9 @@ la terre), le pincement à deux doigts, la place des bulles sur un petit écran,
   à dégager, ombre sous tout objet posé, champs voisins raccordés en une parcelle labourée, papillons, ombre
   d'oiseau, blé mûr qui ondule, fumée des cheminées qui travaillent, reflets du ruisseau (tout se coupe avec
   « réduire les animations »), boutons latéraux plus petits, noisette peinte sur les panneaux.
+- **Sortir de l'achat d'une déco** (retour de Flo) : le bouton n'est plus dans le bandeau du haut, loin du pouce et
+  vert comme « Acheter », mais dans la rangée sous l'objet, à gauche : « Annuler », puis « Fini » dès qu'un objet
+  est posé (on pose souvent en rangée). Le bandeau ne garde que la consigne.
 
 ---
 
@@ -664,3 +669,47 @@ s'arrête avant d'en sortir.
 - **Les bulles des objets** (moulin, enclos, champ) se posent dans la carte vraiment visible, entre le bandeau du haut
   (et la quête) et la barre du bas (`visibleBand` dans `farmScreen.ts`) : au-dessus de l'objet si elles y tiennent, sinon en dessous, sinon
   du côté le plus grand, en défilant à l'intérieur. Avant, une bulle haute pouvait passer sous le bandeau.
+
+---
+
+## 16. Les décos qui vont ensemble (VALIDÉ par Flo le 15/11, à faire dans une conversation dédiée)
+
+Retour de Flo : « les barrières sont moches et ne se clipsent pas ensemble » ; il veut des décos qui interagissent bien,
+par exemple une torche posée SUR une barrière. MESURE du 15/11 : chaque déco est un dessin seul qui ignore ses voisines ;
+la barrière n'a que deux dessins (face, profil, `fence()` dans `farmArt.ts`) qui ne se raccordent pas ; une case ne porte
+qu'un objet, rien ne se pose sur un autre.
+
+Plan validé, dans cet ordre :
+1. **Raccord automatique** de la barrière, de la haie et des chemins : chaque case regarde ses 4 voisines de la même
+   famille et choisit sa forme (bout, ligne, angle, T, croisement : 16 cas par masque de voisins, dessinés par code,
+   poteaux aux angles et aux bouts), plus un **portillon**. La rotation manuelle n'a plus de sens pour ces familles.
+2. **Décos posées sur d'autres** : un emplacement « dessus » pour de petites décos (lanterne ou torche sur un poteau
+   de barrière, pot de fleurs sur un banc ou le puits, nichoir sur un poteau). Touche la donnée (une déco dit ce qu'elle
+   porte et où elle se pose), la sauvegarde (un objet porté par un autre) et Aménager (déplacer le support emporte ce
+   qu'il porte). Le plus gros morceau.
+3. **Une passe de style commune** : mêmes bois, mêmes contours, même échelle pour barrière, banc, nichoir, brouette.
+
+Méthode : rendu de goût, donc d'abord une planche de 2 ou 3 styles de clôtures assemblées, que Flo choisit à l'œil
+(`artBoard()` de `farmArt.ts`), puis le code.
+
+**Planche du 15/11 au soir, choix de Flo : LES TROIS, en skins.** A barrière de ranch (un poteau par case, deux
+lisses), B piquets blancs « cottage » (poteau à boule aux angles et aux bouts seulement), C plessis tressé (rondins
+aux angles et aux bouts). Raccord par masque de voisins (N 1, E 2, S 4, O 8) ; chaque case est un dessin de 16 x 24
+sans marge, dont le bas est celui de la case ; une voisine au nord donne une lisse qui monte vers son poteau ; le
+portillon a ses deux poteaux et se raccorde à l'est et à l'ouest.
+
+**Les skins, modèle validé par Flo et codé (15/11 au soir, non joué sur téléphone).**
+- Une seule « Barrière en bois » en boutique, plus un **Portillon** (15 Éloisettes, niveau 1) de la même famille.
+  Chaque pièce posée garde son skin (`PlacedObject.skin`) ; sans skin = le premier de la famille (Ranch) : les
+  vieilles barrières deviennent des ranchs, et leur rotation est remise à zéro au chargement.
+- Les skins (`data/skins.ts`) : Ranch au niveau 1, **Piquets blancs au niveau 4, Plessis tressé au niveau 8** (choix
+  de Flo : par niveau, pas par les colis). L'annonce de niveau dit « Style de barrière : … ».
+- **Ne se raccordent qu'entre même skin** (`farmJoins.ts` : `joinIndex`, `joinMask`).
+- **Le bouton Style** remplace « Tourner » sous une barrière : il passe au style ouvert suivant. Sur une barrière
+  posée (Aménager), tout le tronçon raccordé change d'un coup (`restyleRun`) ; à l'achat, les suivantes le prennent
+  (`FarmSave.lastSkins`). Un seul style ouvert : le bouton dit lequel vient et à quel niveau.
+- Le portillon dans une rangée nord-sud se voit de profil : un panneau plus large que la rangée, entre deux poteaux
+  courts. La pièce juste au sud d'un portillon fait monter sa lisse seulement jusqu'à son pied (`JOIN_NORTH_GATE`),
+  sinon elle le cachait.
+- Vérifié : `farm-check` (7 vérifications de plus, 27 au total), captures de la carte, de la planche et du mode achat.
+- **Reste de l'étape 1** : le raccord de la haie et des chemins (même mécanique, une famille de plus chacun).
