@@ -15,9 +15,10 @@ const store = new Map<string, string>();
 
 import { mulberry32 } from '../src/random';
 import { MAP_SIZE } from '../src/games/farm/data/land';
+import { totalCharm } from '../src/games/farm/data/charm';
 import { PITY } from '../src/games/farm/data/parcels';
 import { ITEMS } from '../src/games/farm/data/items';
-import { buyAndPlace, canStand, ensureMailbox, footprint, freeSpotNear, isOwned, newFarm } from '../src/games/farm/farmMap';
+import { buyAndPlace, canStand, ensureMailbox, footprint, freeSpotNear, gateTile, isOwned, isRoad, newFarm } from '../src/games/farm/farmMap';
 import { orderable, rollOrder } from '../src/games/farm/farmOrders';
 import { deliverMail, openParcel } from '../src/games/farm/farmParcels';
 import { breedsOf, buyAnimal, collectMachine, collectPen, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
@@ -173,6 +174,33 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
     }
   }
   check('orders ask for makeable goods, 1 to 12 each, and pay', bad === '', bad);
+}
+
+// -----------------------------------------------
+// THE VILLAGE: the road meets the farm wherever its south edge is; one order per villager on the board
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  const start = gateTile(farm);
+  farm.parcels.push(14);
+  const after = gateTile(farm);
+  const outside = !isOwned(farm, after[0], after[1]) && isOwned(farm, after[0], after[1] - 1);
+  check('the gate is just south of the farm, and moves down with a parcel', start.join() === '12,18' && after.join() === '12,24' && outside && isRoad(farm, 12, 30), `${start} -> ${after}`);
+  const board = newFarm(now);
+  board.level = 8;
+  board.orders = [];
+  const random = mulberry32(9);
+  for (let i = 0; i < 6; i++) board.orders.push(rollOrder(board, random));
+  check('each villager has one order at a time', new Set(board.orders.map((o) => o.who)).size === board.orders.length, board.orders.map((o) => o.who).join(','));
+}
+
+// -----------------------------------------------
+// CHARM: it rewards decorating; a treasure counts once, a cheap tile little
+// -----------------------------------------------
+{
+  const twoGnomes = totalCharm(['gnome', 'gnome', 'fountain']);
+  const paths = totalCharm(Array(10).fill('pathDirt'));
+  check('a treasure counts once, ten paths make 2 charm', twoGnomes === 75 && paths === 2, `${twoGnomes}, ${paths}`);
 }
 
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);

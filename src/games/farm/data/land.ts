@@ -37,6 +37,13 @@ export function isWater(x: number, y: number): boolean {
 
 export const BRIDGE_TILES: readonly [number, number][] = [[18, 11], [18, 12]];
 
+/**
+ * The village road comes up out of the forest from the south along this column and stops at the farm's edge,
+ * wherever that edge is (farmMap.gateTile). South, because a phone held upright always shows the farm's south edge.
+ * Villagers walk it to fetch their orders, Gaston rides it with the parcels.
+ */
+export const ROAD_COLUMN = 12;
+
 // -----------------------------------------------
 // THE WILD
 // -----------------------------------------------

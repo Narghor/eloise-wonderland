@@ -397,13 +397,48 @@ graines 1 à 4, avec le contenu codé (le coffre du jour rapporte aussi 10 × ni
 (posée), j28-29 (régulière), j14-16 (accro), j14-15 (accro + plafond), j7 (sans plafond). Ce qui n'est pas modélisé : les achats de
 déco (ils ralentiront les joueuses qui décorent beaucoup), les quêtes de l'histoire (petites récompenses).
 
+### La joueuse qui décore (MESURE du 15/11 au soir : niveaux sur les graines 1 à 4, paliers de Charme sur 1 et 2)
+
+Le simulateur compte maintenant les **coups de cœur** (1 commande sur 8 dès le niveau 2 : Éloisettes doublées et un
+colis), le **Charme** (commandes mieux payées, Gaston plus souvent), les **trésors** des colis posés dès qu'ils
+arrivent (ils sont gratuits), et des profils qui mettent une part de ce qu'ils gagnent dans la déco : « mélange »
+achète chaque déco à tour de rôle (on décore pour le joli), « chemins » achète le plus de charme par Éloisette.
+Les décos ne prennent jamais plus de 40 % des terres.
+
+| profil | niveau 15 | Charme 300 (« Ferme de rêve ») atteint |
+|---|---|---|
+| Posée | j41-44 | j9-11, **sans rien acheter** |
+| Posée, 30 % en déco | j44-45 | j11 |
+| Régulière | j29 | j9-12, **sans rien acheter** |
+| Régulière, 15 % en déco | j27-30 | j5-7 |
+| Régulière, 30 % en déco | j28-29 | j4-8 |
+| Régulière, 50 % en déco | j31-32 | j9-10 |
+| Accro | j14-15 | j7 |
+
+Ce que ça dit :
+- **Décorer ne coûte presque rien en durée** : jusqu'à 30 % des gains dans la déco, aucune différence mesurable ;
+  à 50 %, 2 à 3 jours de plus sur un mois. Le Charme ne fait presque pas avancer non plus : il paie des Éloisettes,
+  et c'est l'XP (le rythme des commandes) qui freine. Les coups de cœur, idem.
+- **PROBLÈME (corrigé, voir plus bas) : le Charme ne récompensait pas la déco.** Toutes les joueuses finissaient « Ferme de rêve » en une à deux
+  semaines sans acheter une seule déco (charme 700 à 1 900 en fin de lot, pour un dernier palier à 300) : chaque
+  trésor compte, **doublons compris** (un nain 15, une arche 30, une fontaine 60), et il en tombe un tous les 4 colis
+  environ. Second défaut : un chemin à 2 🌰 donne 1 de charme comme une barrière à 5 (plancher de 1), cinq fois plus
+  rentable qu'une mare.
+- **DÉCIDÉ par Flo le 15/11 et codé** (`totalCharm`, `data/charm.ts`) : un trésor ne compte que pour son premier
+  exemplaire, une déco achetée rapporte exactement un dixième de son prix (un chemin 0,2, une mare 15 ; le total est
+  arrondi en dessous). MESURE après, graines 1 à 4 : sans rien acheter, charme 105-165 (« Ferme charmante » au mieux,
+  les trésors seuls) ; avec 15 à 30 % en déco, « Ferme de rêve » vers j8-11 (j11-15 pour une posée) ; à 50 %, j16-22 ;
+  les chemins seuls n'y arrivent plus. Niveau 15 : j42-44 (posée), j28-30 (régulière, avec ou sans 30 % de déco),
+  j31-32 (50 % de déco), j14-16 (accro). Dans la Boutique, un trésor déjà posé affiche « +0 : déjà sur la ferme ».
+
 ---
 
 ## 9. Les outils
 
-- **Simulation de progression** (`node tools/farm-sim.mjs [jours] [graine]`, FAIT le 15/11) : 5 profils de
-  joueuse et le jour où chacune atteint chaque niveau. `FARM_DETAIL=1` détaille d'où viennent l'XP et les Éloisettes,
-  `ALL_LEVELS=1` montre tous les niveaux, `XP_TABLE="15,30,..."` essaie une autre table d'XP.
+- **Simulation de progression** (`node tools/farm-sim.mjs [jours] [graine]`, FAIT le 15/11) : 10 profils de
+  joueuse (dont 5 qui décorent) et le jour où chacune atteint chaque niveau et chaque palier de Charme.
+  `FARM_DETAIL=1` détaille d'où viennent l'XP et les Éloisettes, `ALL_LEVELS=1` montre tous les niveaux,
+  `XP_TABLE="15,30,..."` essaie une autre table d'XP. Le Charme y suit la règle du jeu (`totalCharm`).
 - **Planche des dessins** (extension de `tools/preview.mjs`) : tous les sprites de la ferme sur une image,
   pour les relire d'un coup.
 - **Mode test** : `MINUTE_MS` à 1 seconde, et des boutons de triche locaux (comme le casino), à `false` avant
@@ -428,12 +463,23 @@ src/games/farm/
   farmProgress.ts  XP, niveaux, isUnlocked, événements -> quêtes, projets, tâches, médailles
   farmBoosters.ts  boosters : stock, achat, effets
   farmScene.ts     le canvas : caméra, dessin, toucher et glisser
-  farmArt.ts       les dessins
+  farmVillage.ts   les villageois et Gaston sur la route (section 15), dessinés par la scène
+  farmArt.ts       les dessins (et son moteur de sprites, exporté)
+  farmPeopleArt.ts les villageois en pied (côté, face, dos) et le vélo de Gaston
   farmHud.ts       bandeau et barre du bas
   farmPanels.ts    grange, commandes, quêtes, boutique, bulles
-  farmScreen.ts    l'écran #/ferme
+  farmScreen.ts    l'écran #/ferme : aiguille les touchers, fiches, bulles, et chaque action du joueur
+  farmFeedback.ts  chiffres qui flottent, produits qui volent à la grange, pluie d'Éloisettes, bandeaux
+  farmDialogs.ts   les cartes au milieu de l'écran, une à la fois (niveau, quêtes, aide, absence, colis)
+  farmEditor.ts    le mode Aménager et la pose d'un objet acheté
+  farmSeedSwipe.ts semer en glissant une graine de la rangée
+  farmTestBar.ts   la barre TEST (seulement si CASINO_TEST_BUTTONS)
   farmHelp.ts      le tuto
 ```
+
+`farmScreen.ts` a été découpé le 15/11 au soir (1 176 lignes -> 670) : ce qui se montre est sorti dans les fichiers
+`farmFeedback`, `farmDialogs`, `farmEditor`, `farmSeedSwipe`, `farmTestBar` ; l'écran garde l'aiguillage et les
+actions. Restent gros : `farmArt.ts` (~2 400 lignes de dessins) et `farmScene.ts` (~1 200).
 
 La logique (`farmProduction`, `farmMap`, `farmOrders`, `farmProgress`, `farmBoosters`) ne touche jamais à l'écran :
 elle se teste et se simule seule.
@@ -563,8 +609,9 @@ s'arrête avant d'en sortir.
 - **Gaston se présente** au premier colis, avant qu'on l'ouvre.
 - **« Pendant ton absence… »** : après 20 min d'absence, une carte dit ce qui a mûri, produit, été fabriqué,
   donné, les colis déposés, les nouvelles commandes et les nouvelles tâches du jour.
-- **Le Charme** (`data/charm.ts`) : chaque déco posée ajoute du charme (environ 1 point par 10 Éloisettes de prix ;
-  trésors : rare 15, épique 30, légendaire 60 ; les décos rangées ne comptent pas). Six paliers, de « Ferme toute
+- **Le Charme** (`data/charm.ts`) : chaque déco posée ajoute du charme (un dixième de son prix depuis le 15/11 au
+  soir, voir 8bis ; trésors : rare 15, épique 30, légendaire 60, **le premier exemplaire seulement** ; les décos
+  rangées ne comptent pas). Six paliers, de « Ferme toute
   simple » à « Ferme de rêve » (0, 20, 50, 100, 180, 300) : Gaston passe toutes les 4 h puis jusqu'à 2 h 45, et les
   commandes paient jusqu'à +15 %. Affiché dans la Boutique (onglet Déco, « +N de charme » sur chaque carte) et dans
   le bandeau d'Aménager.
@@ -581,6 +628,32 @@ s'arrête avant d'en sortir.
   plus marquée qu'avant.
 - **La boîte aux lettres est garantie** : une ferme sans case libre la reçoit à l'entrée, juste hors de ses terres.
 - **Premier lancement** : l'aide prend le style de la ferme (plus le rose du site), plus courte, puis Marthe.
-- **`node tools/farm-check.mjs`** : 17 vérifications de la logique sans écran (sauvegarde et migration des vieilles
+- **`node tools/farm-check.mjs`** : 17 vérifications (19 depuis le village, section 15) de la logique sans écran (sauvegarde et migration des vieilles
   fermes, boîte aux lettres d'une ferme pleine, rien ne se chevauche, champ / machine / enclos, règle de pitié,
   raretés, races alignées, album, boîte qui ne dépasse pas 3, commandes). À lancer après chaque changement de logique.
+
+---
+
+## 15. Le village sur la carte (15/11 au soir)
+
+- **La route du village** monte de la forêt, au sud, par la colonne 12 (`ROAD_COLUMN`, `data/land.ts`) et s'arrête au
+  bord sud de la ferme, où elle s'élargit en une petite cour (`gateTile`, `farmMap.ts`). Au sud parce qu'un téléphone
+  tenu droit montre toujours le bord sud de la ferme ; à l'ouest, l'entrée tombait juste hors de l'écran. Quand on
+  achète le terrain du sud, l'entrée descend avec le bord. Rien de sauvage ne pousse sur la route ni dans la cour.
+- **Les villageois viennent chercher leur commande** (`farmVillage.ts`) : seulement quand elle **peut être livrée**
+  (on a tout dans la grange), trois au plus à la fois, une seule fois chacun (deux commandes ne viennent jamais du
+  même villageois : `rollOrder` tire parmi ceux qui n'en ont pas). Ils attendent dans la cour, face à nous, avec la
+  bulle de ce qu'ils veulent (un cœur pour un coup de cœur). Les toucher ouvre les Commandes. Livrés, ils repartent
+  par la route avec un panier ; si la commande ne peut plus être livrée (on a vendu ou utilisé ce qu'il fallait), ou
+  qu'on la change, ils repartent les mains vides. À l'ouverture de la ferme, ceux qui peuvent être servis sont déjà
+  là ; les suivants montent la route.
+- **Gaston à vélo** : quand il dépose un colis pendant qu'on joue, il monte la route jusqu'à la boîte aux lettres
+  (là où on l'a mise), s'arrête un instant tourné vers elle, et redescend.
+- **Les dessins** (`farmPeopleArt.ts`) : les 8 villageois en pied, vus de côté, de face et de dos, deux pas de marche
+  chacun, avec les mêmes cheveux, chapeaux et couleurs que leurs visages ; le vélo jaune de Gaston dans les trois vues.
+- Rien n'est sauvegardé : les marcheurs se recalculent à partir des commandes. Avec « réduire les animations », ils
+  apparaissent directement à leur place et Gaston ne passe pas. Un marcheur garde la carte à 20 images/s (pas de
+  ralenti à 8 tant que quelqu'un marche).
+- `farm-check` : 20 vérifications (+ l'entrée qui suit le bord sud, une commande par villageois, la règle du Charme).
+- Limite connue : sur PC (écran large) ou une fois le terrain du sud acheté, la cour peut être sous le bas de
+  l'écran ; on la voit en faisant glisser la carte.

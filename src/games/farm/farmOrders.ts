@@ -22,8 +22,8 @@ const REFUSED_WAIT_MINUTES = 15;
 const MAX_QUANTITY = 12;
 const MIN_CAP = 4;
 /** A "coup de cœur" order, from level 2: double Eloisettes and a parcel. */
-const SPECIAL_CHANCE = 0.12;
-const SPECIAL_LEVEL = 2;
+export const SPECIAL_CHANCE = 0.12;
+export const SPECIAL_LEVEL = 2;
 
 /** Items the farm can make right now and that people ask for (feeds stay for the animals). */
 export function orderable(save: FarmSave): ItemId[] {
@@ -52,9 +52,12 @@ export function rollOrder(save: FarmSave, random: () => number): Order {
     value += qty * v;
   }
   const special = save.level >= SPECIAL_LEVEL && random() < SPECIAL_CHANCE;
+  // Someone who has no order on the board yet: each villager comes to the gate for one order at a time.
+  const free = PERSON_IDS.filter((p) => !save.orders.some((o) => o.who === p));
+  const people = free.length > 0 ? free : PERSON_IDS;
   return {
     id: save.nextOrderId++,
-    who: PERSON_IDS[Math.floor(random() * PERSON_IDS.length)],
+    who: people[Math.floor(random() * people.length)],
     items,
     nuts: Math.round(value * ORDER_NUTS * (1 + charmStep(charm(save)).step.orderBonusPercent / 100) * (special ? 2 : 1)),
     xp: Math.max(1, Math.round(value * ORDER_XP)),

@@ -18,6 +18,14 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-15-ferme',
+    date: '15 novembre',
+    news: [
+      '🌻 Nouveau jeu : la Ferme ! Sème, récolte, élève tes animaux, fais tourner tes machines et prépare les commandes des villageois, qui viennent les chercher en personne. Agrandis ta ferme, décore-la comme tu veux, et guette le facteur Gaston : il dépose des colis surprises.',
+      '🏡 La maison : les 18 décos murales sont redessinées, plus grandes et plus détaillées.',
+    ],
+  },
+  {
     id: '2026-11-15',
     date: '15 novembre',
     news: [

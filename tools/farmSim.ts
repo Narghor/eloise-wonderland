@@ -5,6 +5,8 @@
 // Model player of docs/ferme.md 8bis on the game's real content tables (src/games/farm/data) and order prices.
 // The player is greedy but sensible: collects, serves orders, feeds, queues machines, plants for the next visit,
 // buys buildings and fields as soon as they open, then clears land. One action round per game minute of a visit.
+// "Coups de coeur" orders, charm (orders pay more, Gaston comes more often) and the treasures placed from the parcels
+// count for every profile; the decorating profiles also set aside a share of what they earn for decorations.
 
 import { mulberry32 } from '../src/random';
 import { ANIMALS as DATA_ANIMALS, PEN_CAPACITY, animalPrice as dataAnimalPrice } from '../src/games/farm/data/animals';
@@ -14,11 +16,12 @@ import { item } from '../src/games/farm/data/items';
 import { OBSTACLES as DATA_OBSTACLES, OBSTACLES_PER_PARCEL, PARCEL_STEPS, STARTING_OBSTACLES } from '../src/games/farm/data/land';
 import { XP_TABLE as DATA_XP_TABLE, levelReward as dataLevelReward, orderSlots } from '../src/games/farm/data/levels';
 import { FEEDS, RECIPES as DATA_RECIPES, queueSlotPrice } from '../src/games/farm/data/machines';
-import { HAZEL as DATA_HAZEL, PLACEABLES, placeable } from '../src/games/farm/data/placeables';
+import { DECOR, HAZEL as DATA_HAZEL, PLACEABLES, placeable, type Placeable } from '../src/games/farm/data/placeables';
+import { CHARM_STEPS, charmOf, charmStep, totalCharm } from '../src/games/farm/data/charm';
 import { project } from '../src/games/farm/data/projects';
-import type { ItemId, Unlock } from '../src/games/farm/data/types';
-import { ORDER_NUTS, ORDER_XP } from '../src/games/farm/farmOrders';
-import { MAILBOX_SIZE, PARCEL_EVERY_MINUTES, PITY, PRIZES, RARITIES } from '../src/games/farm/data/parcels';
+import type { ItemId, PlaceableId, Unlock } from '../src/games/farm/data/types';
+import { ORDER_NUTS, ORDER_XP, SPECIAL_CHANCE, SPECIAL_LEVEL } from '../src/games/farm/farmOrders';
+import { MAILBOX_SIZE, PITY, PRIZES, RARITIES } from '../src/games/farm/data/parcels';
 import { MERCHANT_SHARE as DATA_MERCHANT_SHARE } from '../src/games/farm/farmProduction';
 
 const DAYS = Number(process.argv[2] ?? 90);
@@ -103,7 +106,14 @@ interface BoosterRule {
   fromGames: number;
 }
 
-interface Profile { name: string; visits: [number, number][]; boosters: BoosterRule | null }
+/**
+ * A decorating player: `share` of every Eloisette earned goes to decorations. 'mix' buys every decoration in turn,
+ * as one who decorates for the look; 'cheap' buys the most charm per Eloisette (fences, paths), as one who aims at
+ * the charm steps.
+ */
+interface DecorRule { share: number; style: 'mix' | 'cheap' }
+
+interface Profile { name: string; visits: [number, number][]; boosters: BoosterRule | null; decor?: DecorRule }
 
 const hm = (h: number, m = 0) => h * 60 + m;
 const every = (from: number, to: number, step: number, length: number): [number, number][] => {
@@ -114,9 +124,17 @@ const every = (from: number, to: number, step: number, length: number): [number,
 const CAPPED: BoosterRule = { shop: { fertilizer: 5, wateringCan: 1, hourglass: 3 }, fromGames: 2 };
 const UNLIMITED: BoosterRule = { shop: { fertilizer: Infinity, wateringCan: Infinity, hourglass: Infinity }, fromGames: 0 };
 
+const POSEE: [number, number][] = [[hm(8), 10], [hm(20), 15]];
+const REGULIERE: [number, number][] = [[hm(7, 30), 10], [hm(12, 30), 10], [hm(18), 15], [hm(22), 10]];
+
 const PROFILES: Profile[] = [
-  { name: 'Posee (2 x 10-15 min)', visits: [[hm(8), 10], [hm(20), 15]], boosters: null },
-  { name: 'Reguliere (4 x 10-15 min)', visits: [[hm(7, 30), 10], [hm(12, 30), 10], [hm(18), 15], [hm(22), 10]], boosters: null },
+  { name: 'Posee (2 x 10-15 min)', visits: POSEE, boosters: null },
+  { name: 'Posee decoratrice 30 % (melange)', visits: POSEE, boosters: null, decor: { share: 0.3, style: 'mix' } },
+  { name: 'Reguliere (4 x 10-15 min)', visits: REGULIERE, boosters: null },
+  { name: 'Reguliere deco 15 % (melange)', visits: REGULIERE, boosters: null, decor: { share: 0.15, style: 'mix' } },
+  { name: 'Reguliere deco 30 % (melange)', visits: REGULIERE, boosters: null, decor: { share: 0.3, style: 'mix' } },
+  { name: 'Reguliere deco 50 % (melange)', visits: REGULIERE, boosters: null, decor: { share: 0.5, style: 'mix' } },
+  { name: 'Reguliere deco 15 % (chemins)', visits: REGULIERE, boosters: null, decor: { share: 0.15, style: 'cheap' } },
   { name: 'Accro (11 x 15 min)', visits: every(hm(8), hm(23), 90, 15), boosters: null },
   { name: 'Accro + boosters plafonnes', visits: every(hm(8), hm(23), 90, 15), boosters: CAPPED },
   { name: 'Accro + boosters SANS plafond', visits: every(hm(8), hm(23), 90, 15), boosters: UNLIMITED },
@@ -128,7 +146,7 @@ const PROFILES: Profile[] = [
 
 interface Field { crop: Crop | null; readyAt: number }
 interface Job { recipe: Recipe; readyAt: number }
-interface Order { items: Record<string, number>; value: number; since: number }
+interface Order { items: Record<string, number>; value: number; since: number; special: boolean }
 
 class Farm {
   coins = 50;
@@ -151,17 +169,72 @@ class Farm {
   levelAt: number[] = [0, 0];
   bridgeDoneAt = -1;
   /** Gaston's parcels: waiting in the mailbox, next round, plain ones in a row. */
-  mail = { waiting: 1, nextAt: PARCEL_EVERY_MINUTES, sinceRare: 0, opened: 0 };
+  mail = { waiting: 1, nextAt: charmStep(0).step.parcelMinutes, sinceRare: 0, opened: 0 };
+  /** Charm of the decorations on the map (bought ones and placed treasures), and the tiles they take. */
+  charm = 0;
+  decorTiles = 0;
+  /** Eloisettes set aside for decorations, and spent on them. */
+  decorBudget = 0;
+  decorSpent = 0;
+  decorBought = 0;
+  decorTurn = 0;
+  decor: DecorRule | null = null;
+
+  /** Gaston's round, shorter on a charming farm. */
+  parcelEvery(): number {
+    return charmStep(this.charm).step.parcelMinutes;
+  }
+
+  /** When each charm step was first reached (index of CHARM_STEPS). */
+  charmAt: number[] = [0];
+  /** Every decoration placed, for the game's own charm rule (a treasure counts once). */
+  placed: PlaceableId[] = [];
+
+  placeDecor(p: Placeable, now: number): void {
+    this.placed.push(p.id);
+    this.charm = totalCharm(this.placed);
+    this.decorTiles += p.size[0] * p.size[1];
+    CHARM_STEPS.forEach((step, i) => {
+      if (this.charmAt[i] === undefined && this.charm >= step.min) this.charmAt[i] = now;
+    });
+  }
+
+  /** Land owned, in tiles (the river bank left out). */
+  ownedTiles(): number {
+    return 144 + 36 * this.parcelsBought;
+  }
+
+  /** Tiles taken by decorations may not pass this share of the land: the farm itself needs room. */
+  decorRoom(): number {
+    return 0.4 * this.ownedTiles() - this.decorTiles;
+  }
+
+  /** The decorating player spends her decoration budget: every decoration in turn, or the most charm per Eloisette. */
+  buyDecor(now: number): void {
+    if (!this.decor) return;
+    const open = DECOR.filter((d) => levelOf(d.unlock) <= this.level);
+    const cheapest = [...open].sort((a, b) => charmOf(b.id) / b.price - charmOf(a.id) / a.price || a.price - b.price)[0];
+    for (;;) {
+      const pick = this.decor.style === 'cheap' ? cheapest : open[this.decorTurn % open.length];
+      const tiles = pick.size[0] * pick.size[1];
+      if (this.decorBudget < pick.price || this.decorRoom() < tiles) return;
+      this.decorBudget -= pick.price;
+      this.decorSpent += pick.price;
+      this.decorBought++;
+      this.decorTurn++;
+      this.placeDecor(pick, now);
+    }
+  }
 
   /** Collects Gaston's rounds and opens every parcel, as a player would on each visit. */
   openMail(now: number): void {
     while (now >= this.mail.nextAt) {
       if (this.mail.waiting >= MAILBOX_SIZE) {
-        this.mail.nextAt = now + PARCEL_EVERY_MINUTES;
+        this.mail.nextAt = now + this.parcelEvery();
         break;
       }
       this.mail.waiting++;
-      this.mail.nextAt += PARCEL_EVERY_MINUTES;
+      this.mail.nextAt += this.parcelEvery();
     }
     for (; this.mail.waiting > 0; this.mail.waiting--) {
       this.mail.opened++;
@@ -177,7 +250,8 @@ class Farm {
         this.boosters.wateringCan += prize.boosters.wateringCan ?? 0;
         this.boosters.hourglass += prize.boosters.hourglass ?? 0;
       }
-      // Treasures (decorations, rare animals) do not pace the game: a rare animal's extra product is left out.
+      // A treasure decoration is placed at once (it is free): its charm counts. A rare animal's extra product is left out.
+      if (prize.kind === 'decor') this.placeDecor(placeable(prize.decor), now);
     }
   }
   playMinutes = 0;
@@ -214,7 +288,9 @@ class Farm {
   }
 
   earn(coins: number, source: string): void {
-    this.coins += coins;
+    const kept = this.decor ? coins * this.decor.share : 0;
+    this.decorBudget += kept;
+    this.coins += coins - kept;
     this.note(this.coinsFrom, source, coins);
   }
 
@@ -293,7 +369,8 @@ class Farm {
       items[id] = qty;
       value += qty * v;
     }
-    return { items, value, since: now };
+    const special = this.level >= SPECIAL_LEVEL && this.random() < SPECIAL_CHANCE;
+    return { items, value, since: now, special };
   }
 
   refillOrders(now: number): void {
@@ -318,6 +395,7 @@ class Farm {
     this.plant(now, visitEnd, nextVisit);
     if (rule) this.useBoosters(now);
     this.sellSurplus();
+    this.buyDecor(now);
   }
 
   collect(now: number): void {
@@ -360,7 +438,9 @@ class Farm {
     for (const order of ready) {
       if (!this.canPay(order.items)) continue;
       this.pay(order.items);
-      this.earn(Math.round(order.value * ORDER_COINS), 'commandes');
+      const bonus = 1 + charmStep(this.charm).step.orderBonusPercent / 100;
+      this.earn(Math.round(order.value * ORDER_COINS * bonus * (order.special ? 2 : 1)), order.special ? 'coups de coeur' : 'commandes');
+      if (order.special) this.mail.waiting++;
       this.gainXp(Math.round(order.value * ORDER_XP), now, 'commandes');
       this.orders.splice(this.orders.indexOf(order), 1);
       this.nextOrderAt.push(now + 1);
@@ -563,6 +643,7 @@ class Farm {
 
 function play(profile: Profile, seed: number): Farm {
   const farm = new Farm(seed);
+  farm.decor = profile.decor ?? null;
   const visits = [...profile.visits].sort((a, b) => a[0] - b[0]);
   for (let day = 0; day < DAYS; day++) {
     const rule = profile.boosters;
@@ -603,6 +684,9 @@ for (const profile of PROFILES) {
   console.log(
     `${profile.name.padEnd(32)}${shown.map((l) => when(farm.levelAt[l]).padStart(8)).join('')}  ${when(farm.bridgeDoneAt >= 0 ? farm.bridgeDoneAt : undefined)}   ${String(minutesPerDay).padStart(4)} min  ${farm.used.fertilizer}/${farm.used.wateringCan}/${farm.used.hourglass}`,
   );
+  const steps = CHARM_STEPS.slice(1).map((s, i) => `${s.min} ${when(farm.charmAt[i + 1]).trim()}`).join(' · ');
+  const deco = farm.decor ? `, deco : ${farm.decorBought} achats, ${Math.round(farm.decorSpent)} Eloisettes` : '';
+  console.log(`    charme ${Math.round(farm.charm)} a la fin ; paliers : ${steps}${deco}`);
   if (process.env.FARM_DETAIL) console.log(`    XP : ${shares(farm.xpFrom)}\n    Eloisettes : ${shares(farm.coinsFrom)}`);
 }
 

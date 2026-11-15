@@ -110,7 +110,7 @@ export function renderHome(root: HTMLElement): () => void {
       { class: 'home' },
       companionCard(),
       houseBlock(),
-      ...(FARM_ON_HOME ? [farmCard()] : []),
+      farmCard(),
       casinoCard(),
       dailyCard(),
       ...resumeRow(),
@@ -315,9 +315,6 @@ function houseBlock(): HTMLElement {
     ),
   );
 }
-
-/** False while the farm is tested on the published site: reachable only by its address, #/ferme. */
-const FARM_ON_HOME = false;
 
 /** The farm: a big tile of its own, like the house. */
 function farmCard(): HTMLElement {

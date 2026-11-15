@@ -1,5 +1,5 @@
 import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity } from './data/types';
-import { BRIDGE_TILES, MAP_SIZE, isWater } from './data/land';
+import { BRIDGE_TILES, MAP_SIZE, ROAD_COLUMN, isWater } from './data/land';
 import { mulberry32 } from '../../random';
 
 // -----------------------------------------------
@@ -25,7 +25,7 @@ type ObjectId = Exclude<PlaceableId, 'field' | 'hazel'>;
 // SPRITE ENGINE
 // -----------------------------------------------
 
-interface Painter {
+export interface Painter {
   px(x: number, y: number, col: string): void;
   rect(x: number, y: number, w: number, h: number, col: string): void;
   ellipse(cx: number, cy: number, rx: number, ry: number, col: string): void;
@@ -44,7 +44,7 @@ function canvas(w: number, h: number): HTMLCanvasElement {
 }
 
 /** A drawing of w x h pixels; `margin` pixels are added around it for the outline. */
-function sprite(w: number, h: number, paint: (P: Painter) => void, outline = true, margin = 1): Sprite {
+export function sprite(w: number, h: number, paint: (P: Painter) => void, outline = true, margin = 1): Sprite {
   const c = canvas(w + 2 * margin, h + 2 * margin);
   const g = c.getContext('2d', { willReadFrequently: true })!;
   const fill = (x: number, y: number, ww: number, hh: number, col: string) => {
@@ -107,7 +107,7 @@ function addOutline(c: HTMLCanvasElement): void {
 }
 
 const cache = new Map<string, Sprite>();
-function cached(key: string, make: () => Sprite): Sprite {
+export function cached(key: string, make: () => Sprite): Sprite {
   let s = cache.get(key);
   if (!s) {
     s = make();
@@ -126,7 +126,7 @@ function mapSprite(rows: readonly string[], pal: Record<string, string>): Sprite
 // PALETTE
 // -----------------------------------------------
 
-const C = {
+export const C = {
   soil: '#b07a52', soilDark: '#8f5e3e', soilLight: '#c99466',
   wood: '#c38a55', woodDark: '#9a6639', woodLight: '#dcaa72',
   roof: '#d9606a', roofDark: '#b4474f', roofLight: '#ee8b90',
@@ -1823,7 +1823,7 @@ export function uiIcon(name: UiIcon): Sprite {
 // FACES
 // -----------------------------------------------
 
-const SKIN = '#f5cfae';
+export const SKIN = '#f5cfae';
 
 export function faceSprite(id: PersonId): Sprite {
   return cached(`face-${id}`, () =>
@@ -2041,9 +2041,9 @@ function noise(x: number, y: number, scale: number, seed: number): number {
 /**
  * The whole ground with GROUND_MARGIN tiles of forest floor around the map; map tile (0, 0) is at pixel
  * (GROUND_MARGIN * TILE, GROUND_MARGIN * TILE). Mown grass on the farm, meadow outside, the farm's edge wobbling
- * like real grass, the stream with its banks, the old bridge.
+ * like real grass, the stream with its banks, the old bridge, the village road up to the gate.
  */
-export function paintGround(owned: (x: number, y: number) => boolean, bridgeDone: boolean): HTMLCanvasElement {
+export function paintGround(owned: (x: number, y: number) => boolean, bridgeDone: boolean, gate: readonly [number, number]): HTMLCanvasElement {
   const M = GROUND_MARGIN * TILE;
   const size = MAP_SIZE * TILE + 2 * M;
   const c = canvas(size, size);
@@ -2204,8 +2204,54 @@ export function paintGround(owned: (x: number, y: number) => boolean, bridgeDone
     }
   }
 
+  paintRoad(g, gate);
   paintBridge(dot, bridgeDone);
   return c;
+}
+
+const ROAD = { base: [0xc9, 0xa0, 0x6c], light: [0xd8, 0xb4, 0x80], dark: [0xb6, 0x8c, 0x5c], rim: [0xa2, 0x7b, 0x52] } as const;
+
+/**
+ * The village road: a dirt track with wobbling edges and two wheel ruts, coming up from the south edge of the forest
+ * to the farm's gate, where it widens into a small yard for the villagers who wait. Painted over the grass details
+ * so no tuft grows in it.
+ */
+function paintRoad(g: CanvasRenderingContext2D, gate: readonly [number, number]): void {
+  const M = GROUND_MARGIN * TILE;
+  const centre = gate[0] * TILE + 8;
+  const yard = { y: gate[1] * TILE + 9, rx: 27, ry: 7.5 };
+  const top = gate[1] * TILE - 3;
+  const left = centre - yard.rx - 3;
+  const width = 2 * (yard.rx + 3);
+  const height = (MAP_SIZE + GROUND_MARGIN) * TILE - top;
+  const image = g.getImageData(left + M, top + M, width, height);
+  const data = image.data;
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < width; px++) {
+      const wx = left + px;
+      const wy = top + py;
+      const wobble = noise(0, wy, 9, 31) * 2.2;
+      // How far inside the dirt, in pixels: the track, or the yard's wobbling oval.
+      const track = 5 + wobble - Math.abs(wx + 0.5 - centre);
+      const oval = 1 - Math.hypot((wx + 0.5 - centre) / (yard.rx + noise(wx, 0, 6, 34) * 4), (wy + 0.5 - yard.y) / yard.ry);
+      const inside = Math.max(wy >= yard.y ? track : -1, oval * yard.ry);
+      if (inside < 0) continue;
+      const h = hash2(wx, wy, 35);
+      const rut = wy > yard.y + yard.ry && Math.abs(Math.abs(wx + 0.5 - centre) - 2.5) < 0.8 && h < 0.75;
+      const col = inside < 1.2 ? ROAD.rim : rut ? ROAD.dark : h < 0.07 ? ROAD.light : h > 0.95 ? ROAD.dark : ROAD.base;
+      const i = (py * width + px) * 4;
+      data[i] = col[0];
+      data[i + 1] = col[1];
+      data[i + 2] = col[2];
+    }
+  }
+  g.putImageData(image, left + M, top + M);
+  // A few pebbles in the dust.
+  const r = mulberry32(41);
+  for (let y = yard.y + 8; y < top + height - 4; y += 6 + Math.floor(r() * 10)) {
+    g.fillStyle = r() < 0.5 ? '#e6d6b8' : '#9c8a70';
+    g.fillRect(centre - 3 + Math.floor(r() * 7) + M, y + M, 1, r() < 0.3 ? 2 : 1);
+  }
 }
 
 /** The bridge across the stream, west to east, over BRIDGE_TILES. */
@@ -2350,6 +2396,7 @@ export function artBoard(): HTMLElement {
   section('Visages', BOARD_PEOPLE.map((id): [Sprite, string] => [faceSprite(id), id]), 4);
   // The starting farm plus one parcel bought to the west, to see an L-shaped edge.
   const own = (x: number, y: number) => (x >= 6 && x < 18 && y >= 6 && y < 18) || (x >= 0 && x < 6 && y >= 6 && y < 12);
-  section('Sol', [[paintGround(own, false), 'pont cassé'], [paintGround(own, true), 'pont réparé']], 1);
+  const gate: [number, number] = [ROAD_COLUMN, 18];
+  section('Sol', [[paintGround(own, false, gate), 'pont cassé'], [paintGround(own, true, gate), 'pont réparé']], 1);
   return board;
 }

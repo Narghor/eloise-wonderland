@@ -13,6 +13,7 @@ import {
   RIVER_PARCELS,
   RIVER_PARCEL_PRICE,
   RIVER_PROJECT,
+  ROAD_COLUMN,
   STARTING_OBSTACLES,
   STARTING_PARCELS,
   isWater,
@@ -316,6 +317,22 @@ export function newFarm(now: number): FarmSave {
   return save;
 }
 
+/** The tile where the village road meets the farm: on ROAD_COLUMN, just south of the farm, outside it. */
+export function gateTile(save: FarmSave): [number, number] {
+  let y = STARTING_SOUTH_ROW;
+  while (isOwned(save, ROAD_COLUMN, y + 1)) y++;
+  return [ROAD_COLUMN, y + 1];
+}
+
+/** The road's tiles: its column from the gate down into the forest, and the gate's two neighbours, where villagers wait. */
+export function isRoad(save: FarmSave, x: number, y: number): boolean {
+  const [gx, gy] = gateTile(save);
+  return (x === gx && y >= gy) || (y === gy && Math.abs(x - gx) <= 1);
+}
+
+/** The south row of the starting parcels, always owned. */
+const STARTING_SOUTH_ROW = 3 * PARCEL - 1;
+
 /** Where a new farm's mailbox stands, by the fields. */
 const MAILBOX_AT: [number, number] = [9, 9];
 
@@ -333,7 +350,7 @@ export function ensureMailbox(save: FarmSave): void {
 function gateSpot(save: FarmSave): [number, number] | null {
   for (let y = 0; y < MAP_SIZE; y++) {
     for (let x = 0; x < MAP_SIZE; x++) {
-      if (isOwned(save, x, y) || isWater(x, y) || objectAt(save, x, y)) continue;
+      if (isOwned(save, x, y) || isWater(x, y) || isRoad(save, x, y) || objectAt(save, x, y)) continue;
       const nextToFarm = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isOwned(save, x + dx, y + dy));
       if (nextToFarm) return [x, y];
     }

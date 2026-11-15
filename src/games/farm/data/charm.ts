@@ -7,10 +7,13 @@ import type { PlaceableId, Rarity } from './types';
 // -----------------------------------------------
 // Every decoration on the map adds charm (stored ones do not). Each step of charm makes Gaston come a little more
 // often and the orders pay a little more: decorating is a choice with a return, never needed to progress.
+// Charm must reward decorating (MESURE of 15/11, docs/ferme.md 8bis): a bought decoration brings a tenth of its
+// price, no more for the cheap ones; a treasure counts for its first copy only, or the parcels alone would fill
+// every step.
 
 const TREASURE_CHARM: Record<Exclude<Rarity, 'common'>, number> = { rare: 15, epic: 30, legendary: 60 };
 
-/** Charm a decoration brings: about one point per 10 Eloisettes it costs, much more for a treasure. */
+/** Charm one decoration brings: a tenth of its price (a path 0.2, a pond 15), a fixed amount for a treasure. */
 export function charmOf(id: PlaceableId): number {
   const p: Placeable = placeable(id);
   if (p.kind !== 'deco') return 0;
@@ -18,7 +21,21 @@ export function charmOf(id: PlaceableId): number {
     const rarity = (['rare', 'epic', 'legendary'] as const).find((r) => PRIZES[r].some((prize) => prize.kind === 'decor' && prize.decor === id));
     return rarity ? TREASURE_CHARM[rarity] : 10;
   }
-  return Math.max(1, Math.round(p.price / 10));
+  return p.price / 10;
+}
+
+/** Charm of everything standing on a farm, rounded down: each treasure counts once, however many copies stand. */
+export function totalCharm(placed: readonly PlaceableId[]): number {
+  const seen = new Set<PlaceableId>();
+  let total = 0;
+  for (const id of placed) {
+    if (placeable(id).treasure) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    total += charmOf(id);
+  }
+  return Math.floor(total + 1e-9);
 }
 
 export interface CharmStep {

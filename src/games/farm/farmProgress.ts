@@ -7,7 +7,7 @@ import { DAILY_TASKS, DAILY_TEMPLATES, dailyChestReward, dailyTaskReward } from 
 import { item } from './data/items';
 import { RECIPES } from './data/machines';
 import { MEDALS, medalReward } from './data/medals';
-import { charmOf } from './data/charm';
+import { totalCharm } from './data/charm';
 import { PLACEABLES, placeable } from './data/placeables';
 import { PROJECTS, project } from './data/projects';
 import { MAX_OPEN_QUESTS, QUESTS, quest, type Quest } from './data/quests';
@@ -116,7 +116,7 @@ export function ownCount(save: FarmSave, id: PlaceableId | AnimalId): number {
 
 /** The farm's charm: what its decorations on the map add up to. */
 export function charm(save: FarmSave): number {
-  return save.objects.reduce((sum, o) => sum + charmOf(o.type), 0);
+  return totalCharm(save.objects.map((o) => o.type));
 }
 
 export function obstaclesLeft(save: FarmSave): number {

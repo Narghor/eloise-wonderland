@@ -28,7 +28,8 @@ import {
   wildTreeSprite,
   type Sprite,
 } from './farmArt';
-import { footprint, isOwned, type ParcelOffer } from './farmMap';
+import { footprint, gateTile, isOwned, isRoad, type ParcelOffer } from './farmMap';
+import { FarmVillage } from './farmVillage';
 import { breedsOf, fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
 import type { CropId } from './data/types';
 import { have } from './farmProgress';
@@ -60,6 +61,8 @@ export interface SceneEvents {
   ghostMoved(ghost: Ghost): void;
   /** Whether the ghost fits where it is. */
   ghostFits(ghost: Ghost): boolean;
+  /** A tap on a villager waiting at the gate for their order. */
+  visitor(orderId: number): void;
 }
 
 interface Actor {
@@ -183,6 +186,8 @@ export class FarmScene {
   selected: number | null = null;
   /** Called after each frame: the HTML overlay follows the camera. */
   onFrame: (() => void) | null = null;
+  /** The villagers and Gaston on the road. */
+  readonly village: FarmVillage;
 
   private readonly ctx: CanvasRenderingContext2D;
   private readonly host: HTMLElement;
@@ -225,6 +230,7 @@ export class FarmScene {
     this.host = host;
     this.save = save;
     this.events = events;
+    this.village = new FarmVillage(save, this.reduced);
     this.canvas.className = 'farm-canvas';
     this.canvas.setAttribute('aria-label', 'La ferme, vue de dessus');
     this.ctx = this.canvas.getContext('2d')!;
@@ -248,7 +254,7 @@ export class FarmScene {
   // -----------------------------------------------
 
   refreshLand(offers: ParcelOffer[]): void {
-    this.ground = paintGround((x, y) => isOwned(this.save, x, y), this.save.projectsDone.includes('bridge'));
+    this.ground = paintGround((x, y) => isOwned(this.save, x, y), this.save.projectsDone.includes('bridge'), gateTile(this.save));
     this.signs = offers.map((o) => {
       const px = (o.parcel % PARCELS_PER_SIDE) * PARCEL;
       const py = Math.floor(o.parcel / PARCELS_PER_SIDE) * PARCEL;
@@ -262,6 +268,8 @@ export class FarmScene {
     const inMap = (x: number, y: number) => x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE;
     const free = (x: number, y: number) =>
       !isWater(x, y) && (inMap(x, y) ? !isOwned(this.save, x, y) && !this.signs.some((s) => Math.abs(s.x - x) <= 1 && Math.abs(s.y - y) <= 1) : Math.abs(x - MAP_SIZE / 2) <= MAP_SIZE / 2 + GROUND_MARGIN);
+    // The road and the gate stay clear, and no tree stands just below a waiting place (its crown would hide it).
+    const onRoad = (x: number, y: number, below: number) => isRoad(this.save, x, y) || (below > 0 && isRoad(this.save, x, y - 1));
     const taken = new Set<string>();
     const span = (visit: (x: number, y: number) => void) => {
       for (let y = -GROUND_MARGIN; y < MAP_SIZE + GROUND_MARGIN; y++) for (let x = -GROUND_MARGIN; x < MAP_SIZE + GROUND_MARGIN; x++) visit(x, y);
@@ -275,14 +283,14 @@ export class FarmScene {
       const onGrid = forest ? mod(x + (mod(y, 4) === 1 ? 1 : 0), 2) === 0 && mod(y, 2) === 1 : mod(x, 2) === 0 && mod(y, 2) === 1;
       if (!onGrid || roll >= (forest ? 0.85 : 0.14)) return;
       const tiles = [[0, 0], [1, 0], [0, -1], [1, -1]].map(([dx, dy]) => [x + dx, y + dy]);
-      if (!tiles.every(([tx, ty]) => free(tx, ty) && !taken.has(`${tx},${ty}`))) return;
+      if (!tiles.every(([tx, ty]) => free(tx, ty) && !onRoad(tx, ty, 1) && !taken.has(`${tx},${ty}`))) return;
       for (const [tx, ty] of tiles) taken.add(`${tx},${ty}`);
       this.wild.push(this.placeWild(wildTreeSprite(Math.floor(random() * 3)), x, y - 1, 2, 2, true));
     });
     // Then a light undergrowth and a few stones: enough to feel wild, not a grid of weeds.
     span((x, y) => {
       const roll = random();
-      if (!free(x, y) || taken.has(`${x},${y}`)) return;
+      if (!free(x, y) || onRoad(x, y, 0) || taken.has(`${x},${y}`)) return;
       const forest = !inMap(x, y);
       if (roll < (forest ? 0.3 : 0.07)) this.wild.push(this.placeWild(fernSprite(Math.floor(random() * 3)), x, y, 1, 1, false));
       else if (!forest && roll < 0.1) this.wild.push(this.placeWild(objectSprite('rock', 'face'), x, y, 1, 1, true));
@@ -431,6 +439,7 @@ export class FarmScene {
     this.last = now;
     if (this.width > 0) {
       this.walk(dt);
+      this.village.update(dt);
       this.glideZoom(dt);
       this.flutter(dt);
       this.updateParticles(dt);
@@ -447,7 +456,9 @@ export class FarmScene {
       this.frameId = requestAnimationFrame((t) => this.frame(t));
       return;
     }
-    const delay = document.hidden ? HIDDEN_FRAME_MS : now - this.lastInput > ASLEEP_AFTER_MS ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
+    // Someone walking the road keeps the calm rate, so they never stutter.
+    const asleep = now - this.lastInput > ASLEEP_AFTER_MS && !this.village.isMoving;
+    const delay = document.hidden ? HIDDEN_FRAME_MS : asleep ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
     this.sleeping = true;
     this.sleepTimer = window.setTimeout(() => {
       this.sleeping = false;
@@ -579,6 +590,7 @@ export class FarmScene {
       else list.push({ base: at.y + sprite.height, draw: paint });
       if (kind === 'pen') this.queueAnimals(o, list, at.y + sprite.height);
     }
+    this.village.queue(list, { stamp: (s, x, y, mirrored) => this.stamp(s, x, y, mirrored), shadow: (x, y, w) => this.shadow(x, y, w) });
     if (this.ghost) list.push({ base: Infinity, draw: () => this.drawGhost(this.ghost!) });
     for (const paint of flat) paint();
     list.sort((a, b) => a.base - b.base);
@@ -591,6 +603,7 @@ export class FarmScene {
     // On top of everything: what is ready, and the ripe fields' sparkles.
     if (!this.editMode) {
       for (const o of this.save.objects) this.drawReady(o, clock, now);
+      this.village.drawBubbles(ctx, now);
     }
   }
 
@@ -1054,6 +1067,13 @@ export class FarmScene {
     return null;
   }
 
+  /** The order of a villager waiting under a screen point; none while arranging the farm. */
+  private visitorAtClient(clientX: number, clientY: number): number | null {
+    if (this.editMode || this.ghost) return null;
+    const w = this.toWorld(clientX, clientY);
+    return this.village.hit(w.x, w.y);
+  }
+
   fieldAtClient(clientX: number, clientY: number): PlacedObject | null {
     const target = this.targetAtClient(clientX, clientY);
     return target && 'uid' in target && target.type === 'field' ? target : null;
@@ -1098,7 +1118,7 @@ export class FarmScene {
       this.gesture = { mode: onGhost ? 'ghost' : 'pending', x: e.clientX, y: e.clientY, last: { x: e.clientX, y: e.clientY }, camX: this.cam.x, camY: this.cam.y, target, grab };
     });
     c.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'mouse' && e.buttons === 0) c.classList.toggle('is-pointing', this.targetAtClient(e.clientX, e.clientY) !== null);
+      if (e.pointerType === 'mouse' && e.buttons === 0) c.classList.toggle('is-pointing', this.targetAtClient(e.clientX, e.clientY) !== null || this.visitorAtClient(e.clientX, e.clientY) !== null);
       if (!this.pointers.has(e.pointerId)) return;
       this.wake();
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1154,8 +1174,10 @@ export class FarmScene {
       this.wake();
       if (g?.mode === 'pinch') this.settleZoom();
       if (g && g.mode === 'pending' && e.type === 'pointerup') {
+        const visitor = this.visitorAtClient(g.x, g.y);
         const w = this.toWorld(g.x, g.y);
-        this.events.tap(g.target, [Math.floor(w.x / TILE), Math.floor(w.y / TILE)]);
+        if (visitor !== null) this.events.visitor(visitor);
+        else this.events.tap(g.target, [Math.floor(w.x / TILE), Math.floor(w.y / TILE)]);
       }
     };
     c.addEventListener('pointerup', end);

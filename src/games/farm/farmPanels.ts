@@ -627,13 +627,19 @@ export function charmLine(save: FarmSave): string {
   return next ? `${now}. À ${next.min} : Gaston toutes les ${duration(next.parcelMinutes)}, commandes +${next.orderBonusPercent} %.` : `${now}. Le plus haut palier !`;
 }
 
+/** What placing one more of a decoration adds: "+1,5 de charme", nothing for a second copy of a treasure. */
+function charmAdded(save: FarmSave, id: PlaceableId): string {
+  if (placeable(id).treasure && save.objects.some((o) => o.type === id)) return '+0 : déjà sur la ferme';
+  return `+${charmOf(id).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} de charme`;
+}
+
 function decorShop(ui: FarmUi): Node[] {
   // Treasures show only while one is stored, ready to be placed again.
   const list = PLACEABLES.filter((p) => p.kind === 'deco' && (!p.treasure || (ui.save.decorStore[p.id as DecorId] ?? 0) > 0));
   return [
     el('p', { class: 'farm-charm', text: charmLine(ui.save) }),
-    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), `+${charmOf(p.id)} de charme`))),
-    el('p', { class: 'farm-note', text: 'Chaque déco posée ajoute du charme : Gaston passe plus souvent et les commandes paient un peu mieux. Les décos se tournent et se rangent dans « Aménager ».' }),
+    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), charmAdded(ui.save, p.id)))),
+    el('p', { class: 'farm-note', text: 'Chaque déco posée ajoute du charme (un trésor, une seule fois) : Gaston passe plus souvent et les commandes paient un peu mieux. Les décos se tournent et se rangent dans « Aménager ».' }),
   ];
 }
 
