@@ -18,6 +18,7 @@ import { buyBooster, fertilize, hurry, water } from './farmBoosters';
 import { FarmDialogs } from './farmDialogs';
 import { FarmEditor } from './farmEditor';
 import { FarmFeedback } from './farmFeedback';
+import { FarmGateCall, type Band } from './farmGateCall';
 import { FARM_HELP } from './farmHelp';
 import { FarmHud, type SheetId } from './farmHud';
 import { buyParcel, clearObstacle, ensureMailbox, newFarm, parcelOffers } from './farmMap';
@@ -70,10 +71,18 @@ import { testBar } from './farmTestBar';
 // -----------------------------------------------
 // This file routes: touches on the map, the bottom bar, the sheets and bubbles, and every player action
 // (act, then commit). What the screen shows lives beside it: farmFeedback (floating numbers, toasts),
-// farmDialogs (cards in the middle), farmEditor (Amenager), farmSeedSwipe, farmTestBar.
+// farmDialogs (cards in the middle), farmEditor (Amenager), farmGateCall, farmSeedSwipe, farmTestBar.
 
 /** Away longer than this, the farm tells what happened while the player was gone. */
 const WELCOME_AFTER_MS = 20 * 60 * 1000;
+
+/** Room kept between the bars and what the screen places on the map. */
+const BAND_MARGIN = 8;
+/** The bubble's distance from its object, above and below: the translate of .farm-bubble in farm.css. */
+const BUBBLE_GAP_ABOVE = 10;
+const BUBBLE_GAP_BELOW = 12;
+/** Squeezed between an object and a bar, a bubble keeps this height and scrolls inside. */
+const BUBBLE_MIN_HEIGHT = 140;
 
 export function renderFarm(root: HTMLElement): () => void {
   armSoundUnlock();
@@ -106,6 +115,7 @@ class FarmScreen implements FarmUi {
   readonly feedback: FarmFeedback;
   readonly dialogs: FarmDialogs;
   private readonly editor: FarmEditor;
+  private readonly gateCall = new FarmGateCall(() => this.showGate());
   private bubble: { el: HTMLElement; target: Target } | null = null;
   private sheet: { el: HTMLElement; id: SheetId; tab: string } | null = null;
   /** The seed row, and the empty field touched to open it (a tapped seed sows that one). */
@@ -161,7 +171,7 @@ class FarmScreen implements FarmUi {
     this.feedback = new FarmFeedback(this.root, this.overlay, this.scene, this.hud);
     this.dialogs = new FarmDialogs(this.overlay, save, () => this.commit());
     this.editor = new FarmEditor(this);
-    this.overlay.append(this.hud.top, this.hud.quest, this.hud.side, this.feedback.toasts, this.hud.bar);
+    this.overlay.append(this.hud.top, this.hud.quest, this.hud.side, this.feedback.toasts, this.gateCall.el, this.hud.bar);
     if (CASINO_TEST_BUTTONS) this.overlay.append(testBar(this)); // TEST-BUTTONS
     this.root.append(this.overlay);
     this.scene.onFrame = () => this.follow();
@@ -285,8 +295,25 @@ class FarmScreen implements FarmUi {
   /** Every frame: the HTML that sits on the map follows the camera. */
   private follow(): void {
     const box = this.root.getBoundingClientRect();
-    if (this.bubble) this.placeBubble(box);
+    const band = this.visibleBand(box);
+    if (this.bubble) this.placeBubble(box, band);
+    const gate = this.scene.village.gatePoint();
+    this.gateCall.follow(this.scene.village.waiting, this.scene.toScreen(gate.x, gate.y), band, box.width, !this.sheet && !this.seeds && !this.editor.isActive);
     this.editor.follow(box);
+  }
+
+  /** The map really seen: below the top bar and the quest, above the bottom bar. */
+  private visibleBand(box: DOMRect): Band {
+    const top = Math.max(this.hud.top.getBoundingClientRect().bottom, this.hud.quest.getBoundingClientRect().bottom);
+    return { top: top - box.top + BAND_MARGIN, bottom: this.hud.bar.getBoundingClientRect().top - box.top - BAND_MARGIN };
+  }
+
+  /** Glides to the gate, two thirds down the seen map: the waiting villagers and the farm above them. */
+  private showGate(): void {
+    const box = this.root.getBoundingClientRect();
+    const band = this.visibleBand(box);
+    const gate = this.scene.village.gatePoint();
+    this.scene.glideTo(gate.x, gate.y, box.width / 2, band.top + ((band.bottom - band.top) * 2) / 3);
   }
 
   private tap(target: Target | null, tile: [number, number]): void {
@@ -329,7 +356,8 @@ class FarmScreen implements FarmUi {
     bubble.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.overlay.append(bubble);
     this.bubble = { el: bubble, target };
-    this.placeBubble(this.root.getBoundingClientRect());
+    const box = this.root.getBoundingClientRect();
+    this.placeBubble(box, this.visibleBand(box));
   }
 
   private bubbleContent(target: Target): Node[] | null {
@@ -348,7 +376,8 @@ class FarmScreen implements FarmUi {
     return decoBubble(target);
   }
 
-  private placeBubble(box: DOMRect): void {
+  /** Above its object when it fits, else below when it fits, else on the roomier side, scrolling inside: never under a bar. */
+  private placeBubble(box: DOMRect, band: Band): void {
     const { el: bubble, target } = this.bubble!;
     let anchor: { x: number; y: number; bottom: number } | null;
     if ('parcel' in target) {
@@ -360,8 +389,13 @@ class FarmScreen implements FarmUi {
     }
     if (!anchor) return;
     const w = bubble.offsetWidth;
-    const h = bubble.offsetHeight;
-    const below = anchor.y - h - 14 < 70;
+    // Its whole height, even while it scrolls: the content plus the borders.
+    const h = bubble.scrollHeight + bubble.offsetHeight - bubble.clientHeight;
+    const roomAbove = anchor.y - BUBBLE_GAP_ABOVE - band.top;
+    const roomBelow = band.bottom - anchor.bottom - BUBBLE_GAP_BELOW;
+    const below = h > roomAbove && (h <= roomBelow || roomBelow > roomAbove);
+    const room = below ? roomBelow : roomAbove;
+    bubble.style.maxHeight = h > room ? `${Math.max(BUBBLE_MIN_HEIGHT, Math.floor(room))}px` : '';
     const x = Math.min(Math.max(anchor.x, w / 2 + 8), box.width - w / 2 - 8);
     const y = below ? anchor.bottom : anchor.y;
     bubble.classList.toggle('is-below', below);

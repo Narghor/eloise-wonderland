@@ -68,6 +68,11 @@ export class FarmVillage {
     this.reduced = reduced;
   }
 
+  /** The villagers standing at the gate for their order, first arrived first. */
+  get waiting(): PersonId[] {
+    return this.walkers.filter((w) => w.order !== null && w.state === 'waiting').map((w) => w.who);
+  }
+
   /** Someone is on the move: the scene keeps a steady frame rate meanwhile. */
   get isMoving(): boolean {
     return this.walkers.some((w) => w.route.length > 0 || w.state === 'dropping');
@@ -241,8 +246,8 @@ export class FarmVillage {
     }
   }
 
-  /** The middle of the gate's yard, where the road ends. */
-  private gatePoint(): Point {
+  /** The middle of the gate's yard, where the road ends, in world pixels. */
+  gatePoint(): Point {
     const [gx, gy] = gateTile(this.save);
     return { x: (gx + 0.5) * TILE, y: gy * TILE + 12 };
   }

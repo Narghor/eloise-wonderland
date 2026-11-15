@@ -207,6 +207,8 @@ export class FarmScene {
   private viewTiles = ZOOM_TILES.near;
   /** Where the zoom button glides to, a few frames at a time. */
   private zoomGoal: number | null = null;
+  /** Where the camera glides to (its top-left corner, in world pixels), a few frames at a time. */
+  private panGoal: { x: number; y: number } | null = null;
   private dpr = 1;
   private scale = 2;
   private pixel = 2;
@@ -396,13 +398,44 @@ export class FarmScene {
     this.clampCamera();
   }
 
+  /** Glides the view until the world point (wx, wy) sits at (screenX, screenY), or as close as the edges allow. */
+  glideTo(wx: number, wy: number, screenX: number, screenY: number): void {
+    this.panGoal = this.clamped({ x: wx - screenX / this.scale, y: wy - screenY / this.scale });
+    if (this.reduced) {
+      this.cam = this.panGoal;
+      this.panGoal = null;
+    }
+    this.wake();
+  }
+
+  private glidePan(dt: number): void {
+    if (this.panGoal === null) return;
+    const dx = this.panGoal.x - this.cam.x;
+    const dy = this.panGoal.y - this.cam.y;
+    if (Math.hypot(dx, dy) < 0.5) {
+      this.cam = this.panGoal;
+      this.panGoal = null;
+      return;
+    }
+    const share = Math.min(1, dt / 120);
+    this.cam.x += dx * share;
+    this.cam.y += dy * share;
+  }
+
   private clampCamera(): void {
+    this.cam = this.clamped(this.cam);
+  }
+
+  /** A camera corner kept near the map: a few tiles of forest at most around it. */
+  private clamped(cam: { x: number; y: number }): { x: number; y: number } {
     const margin = 4 * TILE;
     const vw = this.width / this.scale;
     const vh = this.height / this.scale;
     const size = MAP_SIZE * TILE;
-    this.cam.x = vw >= size + 2 * margin ? (size - vw) / 2 : Math.min(Math.max(this.cam.x, -margin), size + margin - vw);
-    this.cam.y = vh >= size + 2 * margin ? (size - vh) / 2 : Math.min(Math.max(this.cam.y, -margin - 2 * TILE), size + margin - vh);
+    return {
+      x: vw >= size + 2 * margin ? (size - vw) / 2 : Math.min(Math.max(cam.x, -margin), size + margin - vw),
+      y: vh >= size + 2 * margin ? (size - vh) / 2 : Math.min(Math.max(cam.y, -margin - 2 * TILE), size + margin - vh),
+    };
   }
 
   /** A world pixel on the screen, in CSS pixels from the host's corner. */
@@ -441,6 +474,7 @@ export class FarmScene {
       this.walk(dt);
       this.village.update(dt);
       this.glideZoom(dt);
+      this.glidePan(dt);
       this.flutter(dt);
       this.updateParticles(dt);
       this.draw(now);
@@ -451,7 +485,7 @@ export class FarmScene {
 
   /** The next image: at once while busy, later when calm, the slower the longer nobody touches the farm. */
   private schedule(now: number): void {
-    const busy = this.gesture !== null || this.zoomGoal !== null || this.particles.length > 0 || now - this.lastInput < BUSY_AFTER_INPUT_MS;
+    const busy = this.gesture !== null || this.zoomGoal !== null || this.panGoal !== null || this.particles.length > 0 || now - this.lastInput < BUSY_AFTER_INPUT_MS;
     if (busy && !document.hidden) {
       this.frameId = requestAnimationFrame((t) => this.frame(t));
       return;
@@ -1101,6 +1135,8 @@ export class FarmScene {
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
       this.wake();
+      // A finger takes the view back from a glide.
+      this.panGoal = null;
       c.setPointerCapture(e.pointerId);
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 2) {

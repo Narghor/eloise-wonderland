@@ -473,6 +473,7 @@ src/games/farm/
   farmDialogs.ts   les cartes au milieu de l'écran, une à la fois (niveau, quêtes, aide, absence, colis)
   farmEditor.ts    le mode Aménager et la pose d'un objet acheté
   farmSeedSwipe.ts semer en glissant une graine de la rangée
+  farmGateCall.ts  la pastille « X t'attend à l'entrée » quand la cour est hors de l'écran
   farmTestBar.ts   la barre TEST (seulement si CASINO_TEST_BUTTONS)
   farmHelp.ts      le tuto
 ```
@@ -655,5 +656,11 @@ s'arrête avant d'en sortir.
   apparaissent directement à leur place et Gaston ne passe pas. Un marcheur garde la carte à 20 images/s (pas de
   ralenti à 8 tant que quelqu'un marche).
 - `farm-check` : 20 vérifications (+ l'entrée qui suit le bord sud, une commande par villageois, la règle du Charme).
-- Limite connue : sur PC (écran large) ou une fois le terrain du sud acheté, la cour peut être sous le bas de
-  l'écran ; on la voit en faisant glisser la carte.
+- **La cour hors de l'écran** (sur PC, ou une fois le terrain du sud acheté) : tant que des villageois y attendent, une
+  pastille au bord de la carte le dit (« Marthe t'attend à l'entrée ▼ », `farmGateCall.ts`) ; la toucher fait glisser
+  la carte jusqu'à la cour (`FarmScene.glideTo`). Un doigt sur la carte reprend la main. Pour ne pas cacher la ferme
+  tant qu'ils attendent, elle ne dit sa phrase que 4 s à l'arrivée d'un villageois, puis se réduit au visage, au
+  nombre et à la flèche (environ 70 px) ; cachée aussi pendant une fiche, la rangée de graines et Aménager.
+- **Les bulles des objets** (moulin, enclos, champ) se posent dans la carte vraiment visible, entre le bandeau du haut
+  (et la quête) et la barre du bas (`visibleBand` dans `farmScreen.ts`) : au-dessus de l'objet si elles y tiennent, sinon en dessous, sinon
+  du côté le plus grand, en défilant à l'intérieur. Avant, une bulle haute pouvait passer sous le bandeau.
