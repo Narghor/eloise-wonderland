@@ -20,6 +20,8 @@ export const JOIN_SOUTH = 4;
 export const JOIN_WEST = 8;
 /** With JOIN_NORTH: the northern neighbour is a gate, whose own post comes down to this tile; no rail climbs to it. */
 export const JOIN_NORTH_GATE = 16;
+/** Something sits on this piece: a post stands there to carry it, whatever the run. */
+export const JOIN_CARRIES = 32;
 
 export const SKINS: readonly Skin[] = [
   { id: 'fenceRanch', family: 'fence', name: 'Ranch', unlock: atLevel(1) },

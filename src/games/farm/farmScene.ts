@@ -3,6 +3,7 @@ import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
 import { placeable } from './data/placeables';
 import type { PlaceableId, SkinId } from './data/types';
 import { isGate, joinIndex, joinMask, skinOf, type JoinCell } from './farmJoins';
+import { JOIN_CARRIES } from './data/skins';
 import {
   GROUND_MARGIN,
   OUTLINE,
@@ -22,6 +23,9 @@ import {
   millHub,
   millSails,
   objectSprite,
+  perchedSprite,
+  seatOf,
+  type PercherId,
   paintGround,
   readyBubble,
   signSprite,
@@ -54,6 +58,8 @@ export interface Ghost {
   uid?: number;
   /** A piece that joins: the skin it wears. */
   skin?: SkinId;
+  /** A decoration sitting on a support: the support's uid (the support, not the ghost's tile, says where it is). */
+  on?: number;
 }
 
 export interface SceneEvents {
@@ -63,6 +69,8 @@ export interface SceneEvents {
   harvest(field: PlacedObject): void;
   /** The ghost was dragged to a new tile. */
   ghostMoved(ghost: Ghost): void;
+  /** A finger held still on an object: true when it was taken to be moved (it is then the ghost, under the finger). */
+  longPress(target: PlacedObject): boolean;
   /** Whether the ghost fits where it is. */
   ghostFits(ghost: Ghost): boolean;
   /** A tap on a villager waiting at the gate for their order. */
@@ -158,6 +166,8 @@ interface Butterfly {
 }
 
 const DRAG_START_PX = 7;
+/** Holding a finger this long on an object takes it to be moved (the arrange mode). */
+const LONG_PRESS_MS = 450;
 /** World pixels shown along the short side of the screen, close and far. */
 /** Tiles shown along the short side of the screen: the close and far views of the button, and the pinch limits. */
 const ZOOM_TILES = { near: 12, far: 22, closest: 7, farthest: 26 };
@@ -190,6 +200,8 @@ export class FarmScene {
   selected: number | null = null;
   /** Where the joined pieces stand this frame, the ghost included: each piece's shape comes from it. */
   private joins = new Map<string, JoinCell>();
+  /** What sits on each support this frame (carriedNow). */
+  private carried = new Map<number, PlacedObject>();
   /** Called after each frame: the HTML overlay follows the camera. */
   onFrame: (() => void) | null = null;
   /** The villagers and Gaston on the road. */
@@ -228,6 +240,7 @@ export class FarmScene {
   private last = performance.now();
   private readonly resizer: ResizeObserver;
   private pointers = new Map<number, { x: number; y: number }>();
+  private holdTimer: number | null = null;
   private gesture:
     | { mode: 'pending' | 'pan' | 'harvest' | 'ghost'; x: number; y: number; last: { x: number; y: number }; camX: number; camY: number; target: PlacedObject | { parcel: number } | null; grab: [number, number] }
     | { mode: 'pinch'; distance: number; tiles: number; anchor: { x: number; y: number } }
@@ -546,9 +559,52 @@ export class FarmScene {
     if (o.type === 'hazel') return hazelSprite(readyOn(o, Date.now()) !== null);
     if (o.type === 'mailbox') return mailboxSprite(this.save.mail.waiting > 0, o.rot % 2 === 1 ? 'profile' : 'face');
     const skin = skinOf(o);
-    if (skin) return fenceSprite(skin, joinMask(this.joins, o.x, o.y, skin), isGate(o.type));
+    if (skin) {
+      const carries = this.carried.has(o.uid) || this.ghost?.on === o.uid;
+      return fenceSprite(skin, joinMask(this.joins, o.x, o.y, skin) | (carries ? JOIN_CARRIES : 0), isGate(o.type));
+    }
     void now;
     return objectSprite(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
+  }
+
+  /** What sits on each support this frame, by the support's uid; the one being moved is the ghost's to draw. */
+  private carriedNow(): Map<number, PlacedObject> {
+    const carried = new Map<number, PlacedObject>();
+    for (const o of this.save.objects) if (o.on !== undefined && o.uid !== this.ghost?.uid) carried.set(o.on, o);
+    return carried;
+  }
+
+  /** The decoration sitting on `support`, drawn right after it. */
+  private drawCarried(support: PlacedObject): void {
+    const top = this.carried.get(support.uid);
+    if (!top) return;
+    const place = this.perchedPlace(top.type, top.rot, support);
+    this.stamp(place.sprite, place.x, place.y, top.rot === 3);
+  }
+
+  /** A decoration sitting on `support` (an object, or the ghost moving it): its drawing and top-left world pixel. */
+  private perchedPlace(type: PlaceableId, rot: Rotation, support: PlacedObject): { sprite: Sprite; x: number; y: number } {
+    const base = this.spriteOf(support, 0);
+    const at = this.origin(support, base);
+    const seat = seatOf(support.type, support.rot % 2 === 1 ? 'profile' : 'face', skinOf(support));
+    const seatX = support.rot === 3 ? base.width - 1 - seat.x : seat.x;
+    const sprite = perchedSprite(type as PercherId, rot % 2 === 1 ? 'profile' : 'face');
+    return { sprite, x: at.x + seatX - Math.floor(sprite.width / 2), y: at.y + seat.y - sprite.height + 1 };
+  }
+
+  /** An object's drawing and top-left world pixel, on the ground or sitting on its support. */
+  private drawnPlace(o: PlacedObject): { sprite: Sprite; x: number; y: number } {
+    const support = this.supportOf(o);
+    if (support) return this.perchedPlace(o.type, o.rot, support);
+    const sprite = this.spriteOf(o, 0);
+    return { sprite, ...this.origin(o, sprite) };
+  }
+
+  /** The support a decoration sits on, where it is drawn this frame: the ghost when it is being moved. */
+  private supportOf(o: { on?: number }): PlacedObject | undefined {
+    if (o.on === undefined) return undefined;
+    if (this.ghost?.uid === o.on) return this.ghost as PlacedObject;
+    return this.save.objects.find((s) => s.uid === o.on);
   }
 
   /** Top-left world pixel of an object's drawing: centred on its footprint, standing on its bottom edge. */
@@ -580,6 +636,7 @@ export class FarmScene {
     if (this.ground) ctx.drawImage(this.ground, -GROUND_MARGIN * TILE, -GROUND_MARGIN * TILE);
     this.drawWater(now);
     this.joins = joinIndex(this.save.objects, this.ghost);
+    this.carried = this.carriedNow();
 
     const clock = Date.now();
     const view = { x0: camX - 3 * TILE, y0: camY - 3 * TILE, x1: camX + this.width / this.scale + 3 * TILE, y1: camY + this.height / this.scale + 5 * TILE };
@@ -615,7 +672,8 @@ export class FarmScene {
       list.push({ base: y + sign.height, draw: () => (this.shadow(x + 3, y + sign.height - 2, sign.width - 6), ctx.drawImage(sign, x, y)) });
     }
     for (const o of this.save.objects) {
-      if (this.ghost?.uid === o.uid) continue;
+      // A decoration sitting on another is drawn by its support, right after it.
+      if (this.ghost?.uid === o.uid || o.on !== undefined) continue;
       const kind = placeable(o.type).kind;
       if (kind === 'field') {
         const state = fieldState(o, clock);
@@ -638,6 +696,7 @@ export class FarmScene {
         ctx.globalAlpha = 1;
         if (chosen) this.outline(o, '#fff6c8');
         this.drawSmoke(o, sprite, at, now);
+        this.drawCarried(o);
       };
       if (placeable(o.type).flat) flat.push(paint);
       else list.push({ base: at.y + sprite.height, draw: paint });
@@ -723,9 +782,8 @@ export class FarmScene {
       // Lanterns glow once the evening comes.
       ctx.globalCompositeOperation = 'lighter';
       for (const o of this.save.objects) {
-        if (o.type !== 'lantern') continue;
-        const sprite = this.spriteOf(o, 0);
-        const at = this.origin(o, sprite);
+        if (o.type !== 'lantern' || o.uid === this.ghost?.uid) continue;
+        const { sprite, ...at } = this.drawnPlace(o);
         const x = at.x + sprite.width / 2;
         const y = at.y + 5;
         const glow = ctx.createRadialGradient(x, y, 1, x, y, 26);
@@ -896,6 +954,19 @@ export class FarmScene {
   private drawGhost(ghost: Ghost): void {
     const ctx = this.ctx;
     const fits = this.events.ghostFits(ghost);
+    const support = this.supportOf(ghost);
+    if (support) {
+      // Sitting on a support: drawn on it, the support's footprint tinted.
+      const place = this.perchedPlace(ghost.type, ghost.rot, support);
+      ctx.globalAlpha = 0.85;
+      this.stamp(place.sprite, place.x, place.y, ghost.rot === 3);
+      ctx.globalAlpha = 1;
+      const [sw, sh] = footprint(support);
+      ctx.fillStyle = fits ? 'rgba(120, 220, 110, 0.35)' : 'rgba(235, 70, 70, 0.5)';
+      ctx.fillRect(support.x * TILE, support.y * TILE, sw * TILE, sh * TILE);
+      this.outline(support, fits ? '#e9ffd9' : '#ffd6d6');
+      return;
+    }
     const [w, h] = footprint(ghost);
     const skin = skinOf(ghost);
     const sprite = ghost.type === 'field' ? fieldSprite(null, 'empty')
@@ -905,6 +976,8 @@ export class FarmScene {
     const at = this.origin(ghost, sprite);
     ctx.globalAlpha = 0.8;
     this.stamp(sprite, at.x, at.y, ghost.rot === 3);
+    // A support being moved takes what sits on it along.
+    if (ghost.uid !== undefined) this.drawCarried(ghost as PlacedObject);
     ctx.globalAlpha = 1;
     // The tint goes over the drawing, so a red footprint shows even under a tall building.
     ctx.fillStyle = fits ? 'rgba(120, 220, 110, 0.35)' : 'rgba(235, 70, 70, 0.5)';
@@ -1095,7 +1168,13 @@ export class FarmScene {
     const ty = Math.floor(w.y / TILE);
     const sign = this.signs.find((s) => s.x === tx && (s.y === ty || s.y - 1 === ty));
     if (sign) return { parcel: sign.parcel };
-    const byDepth = [...this.save.objects].sort((a, b) => footprintBottom(b) - footprintBottom(a));
+    // A decoration sitting on another is on top: touching its drawing picks it, not its support.
+    for (const o of this.save.objects) {
+      if (o.on === undefined) continue;
+      const { sprite, x, y } = this.drawnPlace(o);
+      if (w.x >= x && w.x < x + sprite.width && w.y >= y && w.y < y + sprite.height) return o;
+    }
+    const byDepth = this.save.objects.filter((o) => o.on === undefined).sort((a, b) => footprintBottom(b) - footprintBottom(a));
     for (const o of byDepth) {
       const [fw, fh] = footprint(o);
       if (tx >= o.x && tx < o.x + fw && ty >= o.y && ty < o.y + fh) return o;
@@ -1140,10 +1219,28 @@ export class FarmScene {
     return w.x >= this.ghost.x * TILE - 4 && w.x < (this.ghost.x + gw) * TILE + 4 && w.y >= this.ghost.y * TILE - 20 && w.y < (this.ghost.y + gh) * TILE + 4;
   }
 
+  /** A finger still held on the object it touched: it becomes the ghost, and the same finger drags it on. */
+  private hold(gesture: NonNullable<FarmScene['gesture']>, target: PlacedObject): void {
+    this.holdTimer = null;
+    if (this.gesture !== gesture || gesture.mode !== 'pending' || this.pointers.size !== 1) return;
+    if (!this.events.longPress(target) || !this.ghost) return;
+    navigator.vibrate?.(12);
+    const w = this.toWorld(gesture.x, gesture.y);
+    gesture.mode = 'ghost';
+    gesture.grab = [Math.floor(w.x / TILE) - this.ghost.x, Math.floor(w.y / TILE) - this.ghost.y];
+    this.wake();
+  }
+
+  private cancelHold(): void {
+    if (this.holdTimer !== null) window.clearTimeout(this.holdTimer);
+    this.holdTimer = null;
+  }
+
   private listen(): void {
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
       this.wake();
+      this.cancelHold();
       // A finger takes the view back from a glide.
       this.panGoal = null;
       c.setPointerCapture(e.pointerId);
@@ -1160,7 +1257,9 @@ export class FarmScene {
       const onGhost = this.isOnGhost(e.clientX, e.clientY);
       const w = this.toWorld(e.clientX, e.clientY);
       const grab: [number, number] = this.ghost ? [Math.floor(w.x / TILE) - this.ghost.x, Math.floor(w.y / TILE) - this.ghost.y] : [0, 0];
-      this.gesture = { mode: onGhost ? 'ghost' : 'pending', x: e.clientX, y: e.clientY, last: { x: e.clientX, y: e.clientY }, camX: this.cam.x, camY: this.cam.y, target, grab };
+      const gesture = { mode: onGhost ? 'ghost' as const : 'pending' as const, x: e.clientX, y: e.clientY, last: { x: e.clientX, y: e.clientY }, camX: this.cam.x, camY: this.cam.y, target, grab };
+      this.gesture = gesture;
+      if (!this.editMode && !this.ghost && target && 'uid' in target) this.holdTimer = window.setTimeout(() => this.hold(gesture, target), LONG_PRESS_MS);
     });
     c.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'mouse' && e.buttons === 0) c.classList.toggle('is-pointing', this.targetAtClient(e.clientX, e.clientY) !== null || this.visitorAtClient(e.clientX, e.clientY) !== null);
@@ -1184,6 +1283,7 @@ export class FarmScene {
       const dy = e.clientY - g.y;
       if (g.mode === 'pending') {
         if (Math.hypot(dx, dy) < DRAG_START_PX) return;
+        this.cancelHold();
         const ripe = g.target && 'uid' in g.target && g.target.type === 'field' && fieldState(g.target, Date.now()) === 'ripe';
         g.mode = ripe && !this.editMode && !this.ghost ? 'harvest' : 'pan';
         if (g.mode === 'harvest') this.events.harvest(g.target as PlacedObject);
@@ -1212,6 +1312,7 @@ export class FarmScene {
     });
     const end = (e: PointerEvent) => {
       if (!this.pointers.delete(e.pointerId)) return;
+      this.cancelHold();
       const g = this.gesture;
       if (this.pointers.size > 0) return;
       this.gesture = null;

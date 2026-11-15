@@ -1,5 +1,5 @@
 import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity, SkinId } from './data/types';
-import { JOIN_EAST, JOIN_NORTH, JOIN_NORTH_GATE, JOIN_SOUTH, JOIN_WEST, SKINS } from './data/skins';
+import { JOIN_CARRIES, JOIN_EAST, JOIN_NORTH, JOIN_NORTH_GATE, JOIN_SOUTH, JOIN_WEST, SKINS } from './data/skins';
 import { BRIDGE_TILES, MAP_SIZE, ROAD_COLUMN, isWater } from './data/land';
 import { mulberry32 } from '../../random';
 
@@ -901,7 +901,8 @@ const CLIMB_TO_GATE = 7;
 
 /** One piece of fence: `mask` holds the sides it joins (data/skins.ts), `gate` draws the gate instead. */
 export function fenceSprite(skin: SkinId, mask: number, gate: boolean): Sprite {
-  const sides = mask & (ACROSS | ALONG);
+  // A piece that carries something is never a plain straight run: it falls through to the shape with a post.
+  const sides = mask & (ACROSS | ALONG | JOIN_CARRIES);
   const climb = (mask & JOIN_NORTH) === 0 ? null : (mask & JOIN_NORTH_GATE) !== 0 ? CLIMB_TO_GATE : CLIMB_TO_POST;
   return cached(`fence-${skin}-${mask}-${gate ? 'gate' : 'piece'}`, () => sprite(TILE, FENCE_H, (P) => FENCE_ART[skin](P, sides, gate, climb), true, 0));
 }
@@ -1244,12 +1245,73 @@ function lantern(): Sprite {
   return sprite(10, 26, (P) => {
     P.rect(4, 8, 2, 16, '#5b4a48');
     P.rect(2, 23, 6, 3, '#5b4a48');
-    P.rect(1, 1, 8, 8, '#5b4a48');
-    P.rect(2, 2, 6, 6, C.glow);
-    P.rect(3, 3, 2, 2, '#fff3c4');
-    P.rect(0, 0, 10, 1, '#3f3331');
-    P.rect(2, 9, 6, 1, '#3f3331');
+    lanternLamp(P);
   });
+}
+
+/** The lamp at the top of the lantern; it glows at night (farmScene). */
+function lanternLamp(P: Painter): void {
+  P.rect(1, 1, 8, 8, '#5b4a48');
+  P.rect(2, 2, 6, 6, C.glow);
+  P.rect(3, 3, 2, 2, '#fff3c4');
+  P.rect(0, 0, 10, 1, '#3f3331');
+  P.rect(2, 9, 6, 1, '#3f3331');
+}
+
+function flowerPot(): Sprite {
+  return sprite(10, 11, (P) => {
+    P.rect(2, 3, 6, 2, C.leaf);
+    P.px(3, 3, C.leafLight);
+    P.px(6, 4, C.leafDark);
+    for (const [x, y, col] of [[2, 2, '#ff8fb8'], [5, 1, '#ffd84a'], [7, 2, '#ff8fb8']] as const) {
+      P.rect(x - 1, y, 3, 1, col);
+      P.px(x, y - 1, col);
+      P.px(x, y + 1, col);
+      P.px(x, y, '#fff6c8');
+    }
+    P.rect(0, 5, 10, 2, C.brick);
+    P.rect(0, 5, 10, 1, '#e08a6a');
+    P.rect(1, 7, 8, 4, '#d4764f');
+    P.rect(6, 7, 2, 4, C.brickDark);
+  });
+}
+
+// -----------------------------------------------
+// DECORATIONS SITTING ON OTHERS (docs/ferme.md 16)
+// -----------------------------------------------
+
+export type PercherId = 'lantern' | 'birdhouse' | 'flowerPot';
+
+/** A decoration as it looks sitting on a support: without the pole it has on the ground. */
+export function perchedSprite(id: PercherId, view: View): Sprite {
+  const v: View = id === 'birdhouse' ? view : 'face';
+  return cached(`perched-${id}-${v}`, () => {
+    if (id === 'lantern') {
+      return sprite(10, 11, (P) => {
+        lanternLamp(P);
+        P.rect(3, 10, 4, 1, '#5b4a48');
+      });
+    }
+    if (id === 'birdhouse') return sprite(14, 12, (P) => {
+      birdhouseBox(P, v);
+      P.rect(4, 11, 6, 1, C.woodDark);
+    });
+    return flowerPot();
+  });
+}
+
+/**
+ * Where a decoration sits on a support: the point of the support's drawing (as drawn, not mirrored) that the
+ * bottom row of the perched drawing lands on, centred.
+ */
+export function seatOf(id: PlaceableId, view: View, skin: SkinId | null): { x: number; y: number } {
+  switch (id) {
+    case 'fence': return { x: 8, y: skin === 'fencePicket' ? 6 : skin === 'fenceWattle' ? 8 : 9 };
+    case 'bench': return view === 'face' ? { x: 14, y: 8 } : { x: 5, y: 17 };
+    case 'well': return { x: 8, y: 24 };
+    case 'logPile': return view === 'face' ? { x: 16, y: 2 } : { x: 6, y: 3 };
+    default: return { x: 8, y: 2 };
+  }
 }
 
 function wheelbarrow(view: View): Sprite {
@@ -1309,20 +1371,25 @@ function birdhouse(view: View): Sprite {
   return sprite(14, 24, (P) => {
     P.rect(6, 10, 2, 14, C.woodDark);
     P.rect(5, 22, 4, 2, C.woodDark);
-    if (view === 'face') {
-      P.rect(2, 4, 10, 7, '#6a9fd8');
-      P.rect(2, 10, 10, 1, '#4d7fb0');
-      for (let i = 0; i < 5; i++) P.rect(6 - i - 1, i, 2 * i + 4, 1, i < 2 ? C.roofLight : C.roof);
-      P.disc(7, 7, 1, OUTLINE);
-      P.rect(6, 10, 3, 1, C.woodLight);
-    } else {
-      P.rect(4, 4, 6, 7, '#5c8fc8');
-      P.rect(4, 10, 6, 1, '#4d7fb0');
-      for (let i = 0; i < 5; i++) P.rect(2 + i * 0, i, 10, 1, i < 2 ? C.roofLight : C.roof);
-      P.rect(2, 4, 10, 1, C.roofDark);
-      P.px(6, 7, '#86b6e6');
-    }
+    birdhouseBox(P, view);
   });
+}
+
+/** The little house itself, on its pole or sitting on a support. */
+function birdhouseBox(P: Painter, view: View): void {
+  if (view === 'face') {
+    P.rect(2, 4, 10, 7, '#6a9fd8');
+    P.rect(2, 10, 10, 1, '#4d7fb0');
+    for (let i = 0; i < 5; i++) P.rect(6 - i - 1, i, 2 * i + 4, 1, i < 2 ? C.roofLight : C.roof);
+    P.disc(7, 7, 1, OUTLINE);
+    P.rect(6, 10, 3, 1, C.woodLight);
+  } else {
+    P.rect(4, 4, 6, 7, '#5c8fc8');
+    P.rect(4, 10, 6, 1, '#4d7fb0');
+    for (let i = 0; i < 5; i++) P.rect(2 + i * 0, i, 10, 1, i < 2 ? C.roofLight : C.roof);
+    P.rect(2, 4, 10, 1, C.roofDark);
+    P.px(6, 7, '#86b6e6');
+  }
 }
 
 function appleTree(): Sprite {
@@ -1843,6 +1910,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'appleTree': return appleTree();
       case 'logPile': return logPile(v);
       case 'birdhouse': return birdhouse(v);
+      case 'flowerPot': return flowerPot();
       case 'pond': return pond();
       case 'bush': return bush();
       case 'stump': return stump();
@@ -1865,7 +1933,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
 
 /** Seen the same from every side: one drawing for both views. */
 const SYMMETRIC = new Set<ObjectId>([
-  'fence', 'fenceGate', 'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
+  'fence', 'fenceGate', 'flowerPot', 'flowersPink', 'flowersYellow', 'flowersWhite', 'pathStone', 'pathDirt', 'scarecrow', 'lantern', 'appleTree', 'pond',
   'bush', 'stump', 'rock', 'bigRock', 'teaTable', 'fountain',
 ]);
 

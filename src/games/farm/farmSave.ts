@@ -36,6 +36,8 @@ export interface PlacedObject {
   rot: Rotation;
   /** A piece that joins (fence, gate): its look; none = the family's first skin. */
   skin?: SkinId;
+  /** A small decoration sitting on another: the uid of its support, whose tile it keeps (it takes none itself). */
+  on?: number;
   /** Field: what grows. */
   crop?: CropId;
   /** Field and tree: when it is ready. */
@@ -183,6 +185,7 @@ export function loadFarm(): FarmSave | null {
       Object.entries(asRecord(data.lastSkins)).filter(([family, id]) => SKINS.some((s) => s.id === id && s.family === family)),
     ) as FarmSave['lastSkins'],
   };
+  settlePerches(save);
   // Two objects must never share a uid: the newest uid is always above every one in use.
   save.nextUid = Math.max(save.nextUid, ...save.objects.map((o) => o.uid + 1));
   save.nextOrderId = Math.max(save.nextOrderId, ...save.orders.map((o) => o.id + 1));
@@ -200,6 +203,7 @@ function readObject(value: unknown): PlacedObject[] {
   const rot = isCount(o.rot) && o.rot <= 3 && !placeable(o.type).joins ? (o.rot as Rotation) : 0;
   const object: PlacedObject = { uid: o.uid, type: o.type, x: o.x, y: o.y, rot };
   if (isOneOf(o.skin, SKIN_IDS) && skin(o.skin).family === placeable(o.type).joins) object.skin = o.skin;
+  if (isCount(o.on) && placeable(o.type).perches) object.on = o.on;
   if (isOneOf(o.crop, CROP_IDS) && typeof o.readyAt === 'number') {
     object.crop = o.crop;
     object.readyAt = o.readyAt;
@@ -217,6 +221,27 @@ function readObject(value: unknown): PlacedObject[] {
   }
   if (isCount(o.slots)) object.slots = o.slots;
   return [object];
+}
+
+/**
+ * A perched decoration keeps its support's tile; one whose support is gone, cannot carry, or already carries
+ * another goes back to the store.
+ */
+function settlePerches(save: FarmSave): void {
+  const taken = new Set<number>();
+  save.objects = save.objects.filter((o) => {
+    if (o.on === undefined) return true;
+    const support = save.objects.find((s) => s.uid === o.on && s.on === undefined);
+    if (support && placeable(support.type).carries && !taken.has(support.uid)) {
+      taken.add(support.uid);
+      o.x = support.x;
+      o.y = support.y;
+      return true;
+    }
+    const id = o.type as DecorId;
+    save.decorStore[id] = (save.decorStore[id] ?? 0) + 1;
+    return false;
+  });
 }
 
 /** Saves from before the parcels get a mailbox with a welcome parcel. */

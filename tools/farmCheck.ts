@@ -18,7 +18,9 @@ import { MAP_SIZE } from '../src/games/farm/data/land';
 import { totalCharm } from '../src/games/farm/data/charm';
 import { PITY } from '../src/games/farm/data/parcels';
 import { ITEMS } from '../src/games/farm/data/items';
-import { buyAndPlace, canStand, ensureMailbox, footprint, freeSpotNear, gateTile, isOwned, isRoad, newFarm } from '../src/games/farm/farmMap';
+import {
+  buyAndPlace, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
+} from '../src/games/farm/farmMap';
 import { orderable, rollOrder } from '../src/games/farm/farmOrders';
 import { deliverMail, openParcel } from '../src/games/farm/farmParcels';
 import { breedsOf, buyAnimal, collectMachine, collectPen, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
@@ -238,6 +240,42 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   store.set('mini-jeux.save', JSON.stringify(raw));
   const back = loadFarm()!.objects.find((o) => o.uid === lone.uid)!;
   check('an old turned fence comes back unturned, as a ranch', back.rot === 0 && skinOf(back) === 'fenceRanch');
+}
+
+// -----------------------------------------------
+// DECORATIONS SITTING ON OTHERS (docs/ferme.md 16)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.nuts = 5000;
+  farm.level = 10;
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 4, 1)!;
+  const fences = [0, 1, 2].map((dx) => buyAndPlace(farm, 'fence', x + dx, y, 0, now)!);
+  const gate = buyAndPlace(farm, 'fenceGate', x + 3, y, 0, now)!;
+  const lamp = buyAndPlace(farm, 'lantern', 0, 0, 0, now, fences[0]);
+  check('a lantern sits on a fence and takes no tile', !!lamp && lamp.on === fences[0].uid && lamp.x === x && objectAt(farm, x, y) === fences[0]);
+  check('one decoration per support, none on a gate, nothing on a decoration that sits',
+    !canPerch(farm, 'flowerPot', fences[0]) && !canPerch(farm, 'flowerPot', gate) && !canPerch(farm, 'flowerPot', lamp!) && canPerch(farm, 'flowerPot', fences[1]));
+  check('the next free post is found beside', freePerchNear(farm, 'flowerPot', x, y, 4) === fences[1]);
+
+  const [gx, gy] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2 + 4, 1, 1)!;
+  check('a moved fence takes its lantern along', moveObject(farm, fences[0], gx, gy, 0) && lamp!.x === gx && lamp!.y === gy);
+  check('the lantern moves to another post, then down to the ground',
+    moveObject(farm, lamp!, 0, 0, 0, fences[2]) && lamp!.on === fences[2].uid
+    && moveObject(farm, lamp!, x + 1, y + 1, 0) && lamp!.on === undefined && objectAt(farm, x + 1, y + 1) === lamp);
+
+  const pot = buyAndPlace(farm, 'flowerPot', 0, 0, 0, now, fences[1])!;
+  storeObject(farm, fences[1]);
+  check('storing a support stores what sits on it', !farm.objects.includes(pot) && farm.decorStore.flowerPot === 1 && farm.decorStore.fence === 1);
+
+  // A save where a pot sits on a support that is gone.
+  const bird = buyAndPlace(farm, 'birdhouse', 0, 0, 0, now, fences[2])!;
+  saveFarm(farm);
+  const raw = JSON.parse(store.get('mini-jeux.save')!) as { games: { farm: { objects: { uid: number }[] } } };
+  raw.games.farm.objects = raw.games.farm.objects.filter((o) => o.uid !== fences[2].uid);
+  store.set('mini-jeux.save', JSON.stringify(raw));
+  const back = loadFarm()!;
+  check('a decoration whose support is gone goes back to the store', !back.objects.some((o) => o.uid === bird.uid) && back.decorStore.birdhouse === 1);
 }
 
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);

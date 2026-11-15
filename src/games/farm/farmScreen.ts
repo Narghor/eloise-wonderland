@@ -150,7 +150,8 @@ class FarmScreen implements FarmUi {
     this.scene = new FarmScene(this.root, save, {
       tap: (target, tile) => this.tap(target, tile),
       harvest: (field) => this.harvestField(field),
-      ghostMoved: () => this.editor.renderTools(),
+      ghostMoved: () => this.editor.ghostMoved(),
+      longPress: (target) => this.editor.arrange(target),
       ghostFits: (ghost) => this.editor.ghostFits(ghost),
       visitor: () => this.openSheet('orders'),
     });

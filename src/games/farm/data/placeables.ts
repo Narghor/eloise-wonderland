@@ -24,6 +24,10 @@ export interface Placeable {
   treasure?: boolean;
   /** Joins its neighbours of this family wearing the same skin (farmJoins.ts): one tile, never turned. */
   joins?: JoinFamily;
+  /** A small decoration may sit on it (farmMap.ts, docs/ferme.md 16): one at a time. */
+  carries?: boolean;
+  /** Stands on the ground, or sits on a decoration that carries. */
+  perches?: boolean;
 }
 
 const machine = (id: MachineId, name: string, level: number, price: number): Placeable => ({ id, name, kind: 'machine', size: [2, 2], price, unlock: atLevel(level), maxCount: 1 });
@@ -43,22 +47,23 @@ export const PLACEABLES: readonly Placeable[] = [
   pen('cowshed', 'Étable', 6, 250),
   tree('hazel', 'Noisetier', 5, 150, 3),
   // Decorations (docs/ferme.md 7.6): purely decorative in lot 1.
-  { ...deco('fence', 'Barrière en bois', [1, 1], 5, 1), joins: 'fence' },
+  { ...deco('fence', 'Barrière en bois', [1, 1], 5, 1), joins: 'fence', carries: true },
   { ...deco('fenceGate', 'Portillon', [1, 1], 15, 1), joins: 'fence' },
   deco('pathDirt', 'Chemin de terre', [1, 1], 2, 1, true),
   deco('hedge', 'Haie', [1, 1], 8, 2),
   deco('flowersPink', 'Parterre de roses', [1, 1], 12, 2),
   deco('pathStone', 'Chemin pavé', [1, 1], 4, 2, true),
   deco('flowersYellow', 'Parterre de boutons-d’or', [1, 1], 12, 3),
+  { ...deco('flowerPot', 'Pot de fleurs', [1, 1], 15, 3), perches: true },
   deco('scarecrow', 'Épouvantail', [1, 1], 30, 3),
   deco('flowersWhite', 'Parterre de marguerites', [1, 1], 12, 4),
-  deco('bench', 'Banc', [2, 1], 40, 4),
-  deco('well', 'Puits', [2, 2], 120, 5),
-  deco('logPile', 'Tas de bûches', [2, 1], 25, 5),
+  { ...deco('bench', 'Banc', [2, 1], 40, 4), carries: true },
+  { ...deco('well', 'Puits', [2, 2], 120, 5), carries: true },
+  { ...deco('logPile', 'Tas de bûches', [2, 1], 25, 5), carries: true },
   deco('wheelbarrow', 'Brouette', [1, 1], 35, 6),
   deco('appleTree', 'Pommier', [2, 2], 90, 7),
-  deco('lantern', 'Lanterne', [1, 1], 60, 8),
-  deco('birdhouse', 'Nichoir', [1, 1], 45, 9),
+  { ...deco('lantern', 'Lanterne', [1, 1], 60, 8), perches: true },
+  { ...deco('birdhouse', 'Nichoir', [1, 1], 45, 9), perches: true },
   deco('pond', 'Petite mare', [2, 2], 150, 10),
   // The wild, cleared one piece at a time (land.ts).
   wild('bush', 'Buisson', [1, 1]),

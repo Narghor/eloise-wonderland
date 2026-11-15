@@ -21,7 +21,7 @@ export type TreeId = 'hazel';
 export type DecorId =
   | 'fence' | 'hedge' | 'flowersPink' | 'flowersYellow' | 'flowersWhite' | 'pathStone' | 'pathDirt'
   | 'bench' | 'well' | 'scarecrow' | 'lantern' | 'wheelbarrow' | 'appleTree' | 'logPile' | 'birdhouse' | 'pond'
-  | 'fenceGate'
+  | 'fenceGate' | 'flowerPot'
   // Treasures: found only in Gaston's parcels, never sold.
   | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
 

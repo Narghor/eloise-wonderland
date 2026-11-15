@@ -44,8 +44,10 @@ export function footprint(o: Pick<PlacedObject, 'type' | 'rot'>): [number, numbe
   return o.rot % 2 === 1 ? [h, w] : [w, h];
 }
 
+/** What stands on the ground of a tile; a decoration sitting on another takes no tile. */
 export function objectAt(save: FarmSave, x: number, y: number): PlacedObject | null {
   for (const o of save.objects) {
+    if (o.on !== undefined) continue;
     const [w, h] = footprint(o);
     if (x >= o.x && x < o.x + w && y >= o.y && y < o.y + h) return o;
   }
@@ -105,17 +107,18 @@ export function buyRefusal(save: FarmSave, p: Placeable): BuyRefusal {
 }
 
 /**
- * Pays (unless it comes from the decoration store) and places a new object. Returns it, or null when
- * the spot or the purse refuses.
+ * Pays (unless it comes from the decoration store) and places a new object, on the ground at (x, y) or sitting
+ * on `on`. Returns it, or null when the spot or the purse refuses.
  */
-export function buyAndPlace(save: FarmSave, id: PlaceableId, x: number, y: number, rot: Rotation, now: number): PlacedObject | null {
+export function buyAndPlace(save: FarmSave, id: PlaceableId, x: number, y: number, rot: Rotation, now: number, on?: PlacedObject): PlacedObject | null {
   const p = placeable(id);
   const [w, h] = footprint({ type: id, rot });
-  if (!canStand(save, x, y, w, h)) return null;
+  if (on ? !canPerch(save, id, on) : !canStand(save, x, y, w, h)) return null;
   const stored = p.kind === 'deco' && (save.decorStore[id as DecorId] ?? 0) > 0;
   if (stored) save.decorStore[id as DecorId]! -= 1;
   else if (buyRefusal(save, p) !== null || !spend(save, priceOf(save, p))) return null;
-  const object = newObject(save, id, x, y, rot, now);
+  const object = newObject(save, id, on?.x ?? x, on?.y ?? y, rot, now);
+  if (on) object.on = on.uid;
   // A stored decoration was already counted when it was first bought.
   if (!stored) {
     emit(save, { type: 'buy', target: id, kind: p.kind, count: 1 });
@@ -144,14 +147,66 @@ function newObject(save: FarmSave, id: PlaceableId, x: number, y: number, rot: R
   return object;
 }
 
-/** Moves and turns an object; production goes on untouched. False when the new spot does not fit. */
-export function moveObject(save: FarmSave, object: PlacedObject, x: number, y: number, rot: Rotation): boolean {
+/**
+ * Moves and turns an object, to the ground at (x, y) or onto `on`; what it carries comes along, production goes on
+ * untouched. False when the new spot does not fit.
+ */
+export function moveObject(save: FarmSave, object: PlacedObject, x: number, y: number, rot: Rotation, on?: PlacedObject): boolean {
+  if (on) {
+    if (!canPerch(save, object.type, on, object)) return false;
+    object.on = on.uid;
+    object.x = on.x;
+    object.y = on.y;
+    object.rot = rot;
+    return true;
+  }
   const [w, h] = footprint({ type: object.type, rot });
   if (!canStand(save, x, y, w, h, object)) return false;
+  delete object.on;
   object.x = x;
   object.y = y;
   object.rot = rot;
+  const carried = carriedBy(save, object);
+  if (carried) {
+    carried.x = x;
+    carried.y = y;
+  }
   return true;
+}
+
+// -----------------------------------------------
+// DECORATIONS SITTING ON OTHERS (docs/ferme.md 16)
+// -----------------------------------------------
+
+/** What sits on a support, if anything. */
+export function carriedBy(save: FarmSave, support: PlacedObject): PlacedObject | undefined {
+  return save.objects.find((o) => o.on === support.uid);
+}
+
+/** Whether a `type` may sit on `support`: it perches, the support carries, and nothing else (but `self`) sits there. */
+export function canPerch(save: FarmSave, type: PlaceableId, support: PlacedObject, self?: PlacedObject): boolean {
+  if (!placeable(type).perches || !placeable(support.type).carries || support.on !== undefined) return false;
+  const there = carriedBy(save, support);
+  return !there || there === self;
+}
+
+/** The free support nearest to (x, y), at most `reach` tiles away on each axis, that `type` could sit on. */
+export function freePerchNear(save: FarmSave, type: PlaceableId, x: number, y: number, reach: number): PlacedObject | null {
+  let best: PlacedObject | null = null;
+  let bestDistance = Infinity;
+  for (const o of save.objects) {
+    const distance = (o.x - x) ** 2 + (o.y - y) ** 2;
+    if (Math.abs(o.x - x) > reach || Math.abs(o.y - y) > reach || distance >= bestDistance || !canPerch(save, type, o)) continue;
+    best = o;
+    bestDistance = distance;
+  }
+  return best;
+}
+
+/** The support under a tile that `type` could sit on, or null. */
+export function perchAt(save: FarmSave, type: PlaceableId, x: number, y: number, self?: PlacedObject): PlacedObject | null {
+  const support = objectAt(save, x, y);
+  return support && canPerch(save, type, support, self) ? support : null;
 }
 
 /** Obstacles are cleared, not moved; everything else moves, the mailbox included. */
@@ -163,12 +218,15 @@ export function canStore(object: PlacedObject): boolean {
   return placeable(object.type).kind === 'deco';
 }
 
-/** Puts a decoration away in the store, to place it again later for free. */
+/** Puts a decoration away in the store, to place it again later for free; what sits on it goes with it. */
 export function storeObject(save: FarmSave, object: PlacedObject): boolean {
   if (!canStore(object)) return false;
-  save.objects = save.objects.filter((o) => o !== object);
-  const id = object.type as DecorId;
-  save.decorStore[id] = (save.decorStore[id] ?? 0) + 1;
+  const gone = [object, carriedBy(save, object)].filter((o): o is PlacedObject => o !== undefined);
+  save.objects = save.objects.filter((o) => !gone.includes(o));
+  for (const o of gone) {
+    const id = o.type as DecorId;
+    save.decorStore[id] = (save.decorStore[id] ?? 0) + 1;
+  }
   return true;
 }
 

@@ -713,3 +713,27 @@ portillon a ses deux poteaux et se raccorde à l'est et à l'ouest.
   sinon elle le cachait.
 - Vérifié : `farm-check` (7 vérifications de plus, 27 au total), captures de la carte, de la planche et du mode achat.
 - **Reste de l'étape 1** : le raccord de la haie et des chemins (même mécanique, une famille de plus chacun).
+- Publié le 15/11 au soir (commit 033e2e7, sans entrée Nouveautés, choix de Flo).
+
+**Étape 2 : les décos posées sur d'autres, modèle validé par Flo et codé (15/11 au soir, non joué sur téléphone).**
+- **Qui se pose dessus** (`perches`) : la Lanterne et le Nichoir (par terre, ils gardent leur pied ; posés, seule la
+  tête se dessine, `perchedSprite`), et le **Pot de fleurs** (nouveau, niveau 3, 15 Éloisettes).
+- **Qui porte** (`carries`) : la barrière (pas le portillon), le banc, le puits, le tas de bûches. Un seul objet par
+  support. Où il s'assoit : `seatOf` dans `farmArt.ts`, par support, vue et skin. Un piquet blanc ou un plessis qui
+  porte quelque chose se dessine avec un poteau (`JOIN_CARRIES`).
+- **Sauvegarde** : `PlacedObject.on` = l'uid du support ; l'objet posé garde la case du support (recopiée par
+  `moveObject`, seul endroit qui déplace) et n'en occupe aucune (`objectAt` l'ignore). Au chargement, un objet dont
+  le support a disparu, ne porte pas ou porte déjà autre chose part au rangement (`settlePerches`).
+- **Pose** : le fantôme d'un objet posable s'accroche au support libre de la case survolée (vert sur la case du
+  support), sinon il va par terre. Après une pose sur un support, le fantôme suivant va sur le support libre le plus
+  proche (4 cases au plus), sinon par terre.
+- **Aménager** : toucher le dessin de l'objet posé le choisit (avant son support) ; déplacer un support l'emporte ;
+  ranger un support le range aussi (« Banc et pot de fleurs : rangés »).
+- Vérifié : `farm-check` (7 de plus, 34 au total), captures de la carte et du fantôme accroché.
+- **Reste** : l'étape 3 (passe de style commune) ; d'autres objets posables ou porteurs plus tard (torche, arrosoir,
+  bottes de foin comme support...).
+- **Retours de Flo, faits avec l'étape 2** : un **appui long** (450 ms) sur un objet hors d'Aménager ouvre Aménager avec
+  cet objet choisi, et le même doigt le fait glisser (`SceneEvents.longPress`, `FarmEditor.arrange`). Sur un support
+  qui porte quelque chose, l'appui long sur le dessin de l'objet posé prend l'objet posé. Le bouton **Fini**
+  d'Aménager quitte le bandeau du haut pour le bas de l'écran, au-dessus des onglets ; le bandeau ne garde que la
+  consigne, et les boutons d'un objet choisi s'arrêtent au-dessus de Fini.

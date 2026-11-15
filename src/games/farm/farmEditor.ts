@@ -7,7 +7,12 @@ import { unlockText } from './farmProgress';
 import type { PlaceableId } from './data/types';
 import { spriteImage, uiIcon } from './farmArt';
 import type { FarmHud } from './farmHud';
-import { buyAndPlace, buyRefusal, canMove, canStand, canStore, footprint, freeSpotNear, moveObject, storeObject } from './farmMap';
+import {
+  buyAndPlace, buyRefusal, canMove, canPerch, canStand, canStore, carriedBy, footprint, freePerchNear, freeSpotNear, moveObject, perchAt, storeObject,
+} from './farmMap';
+
+/** After a decoration sat on a support, the next free support within this many tiles gets the next ghost. */
+const NEXT_PERCH_REACH = 4;
 import { charmLine } from './farmPanels';
 import type { FarmSave, PlacedObject } from './farmSave';
 import type { FarmScene, Ghost } from './farmScene';
@@ -36,6 +41,8 @@ export class FarmEditor {
   /** Bought or placed since the shop: the way out then says "Fini", not "Annuler". */
   private placedInRow = 0;
   private banner: HTMLElement | null = null;
+  /** The way out of Amenager, at the bottom where the thumb is (the hint stays at the top). */
+  private done: HTMLElement | null = null;
   private tools: HTMLElement | null = null;
 
   constructor(host: EditorHost) {
@@ -64,7 +71,20 @@ export class FarmEditor {
     host.scene.editMode = true;
     host.hud.setEditing(true);
     host.hud.setPressed('build');
-    this.showBanner(`Aménager : touche un objet pour le déplacer, le tourner ou le ranger. ${charmLine(host.save)}`, 'Fini', () => this.exit());
+    this.showBanner(`Aménager : touche un objet pour le déplacer, le tourner ou le ranger. ${charmLine(host.save)}`);
+    this.done?.remove();
+    this.done = el('button', { class: 'farm-btn farm-edit-done', type: 'button' }, spriteImage(uiIcon('check'), 2), 'Fini');
+    this.done.addEventListener('click', () => this.exit());
+    this.done.addEventListener('pointerdown', (e) => e.stopPropagation());
+    host.overlay.append(this.done);
+  }
+
+  /** A long press on an object outside Amenager: opens it with that object picked, ready to drag. */
+  arrange(object: PlacedObject): boolean {
+    if (this.isActive || !canMove(object)) return false;
+    this.enter();
+    this.select(object);
+    return this.host.scene.ghost?.uid === object.uid;
   }
 
   exit(): void {
@@ -78,6 +98,8 @@ export class FarmEditor {
     hud.setPressed(null);
     this.banner?.remove();
     this.banner = null;
+    this.done?.remove();
+    this.done = null;
     this.renderTools();
   }
 
@@ -88,11 +110,36 @@ export class FarmEditor {
       const [w, h] = footprint(ghost);
       ghost.x = Math.max(0, tile[0] - Math.floor(w / 2));
       ghost.y = Math.max(0, tile[1] - Math.floor(h / 2));
-      this.renderTools();
+      this.ghostMoved();
       return;
     }
     if (target && 'uid' in target) this.select(target);
     else this.applySelection();
+  }
+
+  /** The ghost reached a new tile (dragged or tapped). */
+  ghostMoved(): void {
+    const ghost = this.host.scene.ghost;
+    if (ghost) this.snap(ghost);
+    this.renderTools();
+  }
+
+  /** A decoration that perches sits on the free support under its tile; anywhere else it stands on the ground. */
+  private snap(ghost: Ghost): void {
+    if (!placeable(ghost.type).perches) return;
+    const support = perchAt(this.host.save, ghost.type, ghost.x, ghost.y, this.objectOf(ghost));
+    if (support) ghost.on = support.uid;
+    else delete ghost.on;
+  }
+
+  /** The object a ghost moves, or undefined for a new one. */
+  private objectOf(ghost: Ghost): PlacedObject | undefined {
+    return ghost.uid !== undefined ? this.host.save.objects.find((o) => o.uid === ghost.uid) : undefined;
+  }
+
+  /** The support a ghost sits on, if any. */
+  private supportOf(ghost: Ghost): PlacedObject | undefined {
+    return ghost.on !== undefined ? this.host.save.objects.find((o) => o.uid === ghost.on) : undefined;
   }
 
   startPlacing(id: PlaceableId): void {
@@ -115,8 +162,12 @@ export class FarmEditor {
 
   ghostFits(ghost: Ghost): boolean {
     const { save } = this.host;
+    const self = this.objectOf(ghost);
+    if (ghost.on !== undefined) {
+      const support = this.supportOf(ghost);
+      return !!support && canPerch(save, ghost.type, support, self);
+    }
     const [w, h] = footprint(ghost);
-    const self = ghost.uid !== undefined ? save.objects.find((o) => o.uid === ghost.uid) : undefined;
     return canStand(save, ghost.x, ghost.y, w, h, self);
   }
 
@@ -127,7 +178,9 @@ export class FarmEditor {
     const a = this.host.scene.anchorOf(ghost);
     const w = this.tools.offsetWidth;
     const x = Math.min(Math.max(a.x, w / 2 + 8), box.width - w / 2 - 8);
-    const y = Math.min(a.bottom, box.height - 150);
+    // Never over the Fini button: the tools stop just above it.
+    const floor = this.done ? this.done.offsetTop - this.tools.offsetHeight - 20 : box.height - 150;
+    const y = Math.min(a.bottom, box.height - 150, floor);
     this.tools.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, 12px)`;
   }
 
@@ -153,9 +206,11 @@ export class FarmEditor {
         store.addEventListener('click', () => {
           host.scene.ghost = null;
           host.scene.selected = null;
+          const carried = carriedBy(host.save, object);
           storeObject(host.save, object);
           playThunk();
-          host.toast(`${placeable(object.type).name} : rangé, à reposer depuis la Boutique.`);
+          const names = carried ? `${placeable(object.type).name} et ${placeable(carried.type).name.toLowerCase()} : rangés` : `${placeable(object.type).name} : rangé`;
+          host.toast(`${names}, à reposer depuis la Boutique.`);
           this.renderTools();
           host.commit();
         });
@@ -206,16 +261,10 @@ export class FarmEditor {
     return button;
   }
 
-  /** The hint at the top; with a button only when nothing under the map offers the way out. */
-  private showBanner(text: string, done?: string, onDone?: () => void): void {
+  /** The hint at the top; the ways out sit lower, by the thumb (the Fini button, the ghost's Annuler). */
+  private showBanner(text: string): void {
     this.banner?.remove();
-    const parts: HTMLElement[] = [el('p', { text })];
-    if (done && onDone) {
-      const b = el('button', { class: 'farm-btn', type: 'button', text: done });
-      b.addEventListener('click', onDone);
-      parts.push(b);
-    }
-    this.banner = el('div', { class: 'farm-edit-banner farm-box' }, ...parts);
+    this.banner = el('div', { class: 'farm-edit-banner farm-box' }, el('p', { text }));
     this.host.overlay.append(this.banner);
   }
 
@@ -224,7 +273,11 @@ export class FarmEditor {
     this.applySelection();
     if (!canMove(object)) return this.host.toast('Un obstacle ne se déplace pas : il se dégage (touche-le hors du mode Aménager).');
     const worn = skinOf(object);
-    scene.ghost = { type: object.type, x: object.x, y: object.y, rot: object.rot, uid: object.uid, ...(worn ? { skin: worn } : {}) };
+    scene.ghost = {
+      type: object.type, x: object.x, y: object.y, rot: object.rot, uid: object.uid,
+      ...(worn ? { skin: worn } : {}),
+      ...(object.on !== undefined ? { on: object.on } : {}),
+    };
     scene.selected = object.uid;
     this.renderTools();
   }
@@ -237,8 +290,10 @@ export class FarmEditor {
     const object = host.save.objects.find((o) => o.uid === ghost.uid);
     host.scene.ghost = null;
     host.scene.selected = null;
-    if (object && (ghost.x !== object.x || ghost.y !== object.y || ghost.rot !== object.rot)) {
-      if (moveObject(host.save, object, ghost.x, ghost.y, ghost.rot)) {
+    // On a support, the support says where it is: the ghost's own tile does not count.
+    const moved = object && (ghost.on !== object.on || ghost.rot !== object.rot || (ghost.on === undefined && (ghost.x !== object.x || ghost.y !== object.y)));
+    if (object && moved) {
+      if (moveObject(host.save, object, ghost.x, ghost.y, ghost.rot, this.supportOf(ghost))) {
         playThunk();
         host.commit();
       } else host.toast('Pas la place ici : il reste où il était.');
@@ -252,20 +307,23 @@ export class FarmEditor {
     const id = this.placing;
     if (!ghost || !id) return;
     if (!this.ghostFits(ghost)) return host.toast('Pas la place ici.');
-    const placed = buyAndPlace(host.save, id, ghost.x, ghost.y, ghost.rot, Date.now());
+    const support = this.supportOf(ghost);
+    const placed = buyAndPlace(host.save, id, ghost.x, ghost.y, ghost.rot, Date.now(), support);
     if (!placed) return host.toast('Pas assez d’Éloisettes.');
     playThunk();
     this.placedInRow++;
     host.commit();
-    // Fields and decorations often come in rows: offer the next one right beside.
+    // Fields and decorations often come in rows: offer the next one right beside (on the next free post, for a
+    // decoration that sat on one).
     const p = placeable(id);
     const again = (p.kind === 'field' || p.kind === 'deco') && ((p.kind === 'deco' && this.storedCount(id) > 0) || buyRefusal(host.save, p) === null);
     const [w, h] = footprint(ghost);
-    const next = again ? freeSpotNear(host.save, ghost.x + w + w / 2, ghost.y + h / 2, w, h) : null;
+    const nextPerch = again && support ? freePerchNear(host.save, id, support.x, support.y, NEXT_PERCH_REACH) : null;
+    const next = nextPerch ? [nextPerch.x, nextPerch.y] : again ? freeSpotNear(host.save, ghost.x + w + w / 2, ghost.y + h / 2, w, h) : null;
     if (next) {
       ghost.x = next[0];
       ghost.y = next[1];
-      this.renderTools();
+      this.ghostMoved();
     } else this.exit();
   }
 
