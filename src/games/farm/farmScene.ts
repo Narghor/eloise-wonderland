@@ -33,6 +33,7 @@ import {
   readyBubble,
   signSprite,
   soilTile,
+  swingFrameSprite,
   uiIcon,
   wildTreeSprite,
   type Sprite,
@@ -629,7 +630,10 @@ export class FarmScene {
       return joinedSprite(o.type, skinOf(o), joinMask(this.joins, o.x, o.y, key) | (carries ? JOIN_CARRIES : 0));
     }
     void now;
-    return objectSprite(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
+    const view = o.rot % 2 === 1 ? 'profile' : 'face';
+    // Someone on the swing: its seat is drawn with them, where it has swung to (farmStrollerActs).
+    if (o.type === 'swing' && this.strollers.isSwinging(o.uid)) return swingFrameSprite(view);
+    return objectSprite(o.type, view);
   }
 
   /** What sits on each support this frame, by the support's uid; the one being moved is the ghost's to draw. */
@@ -771,7 +775,7 @@ export class FarmScene {
     }
     const painter = { stamp: (s: Sprite, x: number, y: number, mirrored: boolean) => this.stamp(s, x, y, mirrored), shadow: (x: number, y: number, w: number) => this.shadow(x, y, w) };
     this.village.queue(list, painter);
-    this.strollers.queue(list, painter);
+    this.strollers.queue(list, painter, ctx);
     if (this.ghost) list.push({ base: Infinity, draw: () => this.drawGhost(this.ghost!) });
     for (const paint of flat) paint();
     list.sort((a, b) => a.base - b.base);

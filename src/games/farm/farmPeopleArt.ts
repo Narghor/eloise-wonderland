@@ -200,7 +200,7 @@ function dress(row: string, i: number, look: Look, view: PersonView): string {
 // fits; the body's middle column is always the drawing's middle (POSED_MIDDLE), mirrored or not.
 
 export type Pose = 'stand' | 'sitFront' | 'sitSide' | 'sitKick' | 'crouchFront' | 'crouchSide';
-export type Held = 'cup' | 'paper' | 'paperTurning' | 'flower';
+export type Held = 'cup' | 'waterCup' | 'paper' | 'paperTurning' | 'flower';
 
 export interface Posture {
   view: PersonView;
@@ -276,6 +276,16 @@ export function posedSprite(id: PersonId, p: Posture): Sprite {
   });
 }
 
+/** Drawn as a child (Jules): pushed on the swing, never the one pushing. */
+export function isChild(id: PersonId): boolean {
+  return LOOKS[id].body === 'child';
+}
+
+/** How many rows of pixels a posture has, head and body, without the outline margin: its feet are on the last one. */
+export function postureRows(id: PersonId, p: Posture): number {
+  return HEAD_ROWS + postureBody(LOOKS[id].body, p).length;
+}
+
 /** The row of a posed drawing (outline margin included) that rests on the seat, for a sitting pose. */
 export function lapRow(id: PersonId): number {
   return 1 + HEAD_ROWS + LAP_ROW[LOOKS[id].body];
@@ -318,8 +328,9 @@ function postureExtras(p: Posture): [number, number, string][] {
     }
   }
   const [hx, hy] = p.hand ?? [0, 0];
-  if (p.held === 'cup') {
-    out.push([hx + 1, hy - 1, C.white], [hx + 2, hy - 1, C.white], [hx + 1, hy, '#e8e0d2'], [hx + 2, hy, '#e8e0d2'], [hx + 3, hy - 1, C.white], [hx + 1, hy - 2, '#b07a52'], [hx + 2, hy - 2, '#b07a52']);
+  if (p.held === 'cup' || p.held === 'waterCup') {
+    const drink = p.held === 'cup' ? '#b07a52' : C.water;
+    out.push([hx + 1, hy - 1, C.white], [hx + 2, hy - 1, C.white], [hx + 1, hy, '#e8e0d2'], [hx + 2, hy, '#e8e0d2'], [hx + 3, hy - 1, C.white], [hx + 1, hy - 2, drink], [hx + 2, hy - 2, drink]);
   } else if (p.held === 'flower') {
     out.push([hx + 1, hy - 1, C.leaf], [hx + 1, hy - 2, '#f06a96'], [hx + 2, hy - 3, '#f06a96'], [hx + 1, hy - 3, C.gold], [hx, hy - 3, '#f06a96'], [hx + 1, hy - 4, '#f06a96']);
   } else if (p.held === 'paper' || p.held === 'paperTurning') {

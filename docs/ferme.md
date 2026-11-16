@@ -1147,6 +1147,54 @@ quelles.
   trinquent à la table, 390 px). Scénarios de capture : scratchpad (perdus) ; modèle = importer
   `farmStrollerActs`/`farmArt` dans `page.eval` et dessiner chaque place comme la scène.
 
+**Étape 2 CODÉE (16/11, « go continuer » de Flo ; non commitée, pas jouée sur téléphone)** : nichoir, mare, fontaine,
+puits, d'après la planche validée (source retrouvée dans un ancien scratchpad). Une seule personne par déco (pas
+d'activité à deux).
+- **Nichoir** (à gauche ou à droite, sur son poteau seulement) : montre l'oiseau, qui sort et fait un tour du côté de
+  la maison ; ou accroupi, jette des graines, l'oiseau descend picorer puis rentre.
+- **Mare** (à gauche ou à droite) : jette du pain, deux canards viennent de l'autre bout de la mare (côté opposé au
+  promeneur, donc pas toujours des roseaux quand la mare est retournée), barbotent et repartent, dessinés sans leurs
+  pattes ; ou pêche (canne, fil, bouchon qui plonge, poisson qui saute, ronds dans l'eau).
+- **Fontaine** : assis sur le rebord devant (deux places, jambes sur le muret, gouttes qui sautent au pied des
+  chutes) ; ou à côté, jette une pièce (arc, ronds, éclat doré).
+- **Puits** : à côté de la manivelle (droite de face, bout de la barre de profil, gauche si retourné), le bras levé
+  vers elle autant qu'il peut (elle est dessinée haut sous le toit ; Jules n'y arrive pas tout à fait), la poignée
+  tourne ; puis boit un gobelet d'eau. Ou devant, de dos, se penche et chante : des notes montent de l'eau.
+- Code : `Spot` gagne `aim` (le trou, l'eau, la manivelle), `depth` (le bas du dessin de la déco) et `inFront` (le
+  promeneur du puits est dessiné devant lui malgré ses pieds plus hauts). Les effets nouveaux sont des **marques**
+  (`marksOf`) : une seule liste dit quand redessiner (`effectKey`) et quoi dessiner ; couche `air` par-dessus tout
+  (oiseau en vol, pièce, canne), couche `deco` juste après le dessin de la déco (canards, bouchon, ronds, graines,
+  oiseau qui picore, poignée), poussée par `FarmStrollers.queue` (qui reçoit maintenant le `ctx`). Les fondus vont par
+  cinquièmes : quelques images, pas une par rafraîchissement. `postureRows` (farmPeopleArt) donne la hauteur d'une
+  posture pour placer la main ; `waterCup` = la tasse pleine d'eau.
+- farm-check **78** : nichoir et fontaine ajoutés à la ferme d'essai, les quatre décos voient leurs activités, et
+  jamais un promeneur debout sur autre chose que sa déco (les 16 activités vues en 90 min simulées).
+- Vu : planche des 13 places × 3 moments (scénario de scratchpad, perdu à terme : même modèle que l'étape 1, avec
+  `spotsOf(o, { canReach: () => true })`). Corrigé après la 1re planche : promeneur du puits qui flottait à mi-hauteur
+  (pieds descendus au bas des pierres), oiseau qui tournait sur la tête de Léon, canards qui se chevauchaient, notes
+  qui sortaient du toit.
+
+**Étape 3 CODÉE (16/11, « go » de Flo dans la même conversation ; pas jouée sur téléphone)** : la balançoire.
+- Dessin découpé dans `farmArt` : `swingFrameSprite` (poteaux, poutre, guirlande, prairie) et `swingSeatSprite(vue,
+  dx, dy)` (cordes et siège, sur une toile de la taille de la balançoire) ; `swing()` les assemble au repos, pixel pour
+  pixel comme avant. Quand quelqu'un est assis dessus (`FarmStrollers.isSwinging`), la scène dessine le cadre seul et
+  le siège est une marque `deco` qui bouge ; le promeneur suit le siège (`seatOffset`, décalage appliqué dans
+  `doingPlaced`, retourné avec la balançoire). « Réduire les animations » : balançoire normale, assis immobile.
+- **De face** (rotation 0/2) : le siège monte et descend de 2 px, jambes qui battent ; une seule personne.
+- **De profil** (1/3) : balancement de ±0,6 rad sur une corde de 24 px (2 s), jambes tendues en allant, repliées au
+  retour, une main sur la corde. **Pousser** : 2e place derrière la balançoire (`Spot.withChild`), prise seulement
+  par un adulte quand un enfant (Jules, `isChild`) a le siège ou y va ; ils prennent alors l'horloge commune (±0,45 rad,
+  2,2 s) et l'adulte tend les bras quand le siège revient vers lui. Si l'enfant s'en va, l'adulte repart aussi.
+  `planStops` reçoit qui arrive (un enfant ne pousse jamais).
+- farm-check **79** : balançoire de face dans la ferme d'essai (`swingFront` vu) ; 6 h × 6 graines sur une balançoire
+  de profil : on s'y balance, et le pousseur est toujours un adulte, toujours avec Jules sur le siège (15 156 images
+  à pousser, 0 fautive).
+- Vu : planche (face, profil, profil retourné, poussé des deux côtés, 3 moments) et dans la vraie scène (ferme niv. 12
+  avec les décos des étapes 2 et 3 : un promeneur se balance de profil, un seul siège visible, aucune erreur).
+  Scénarios : scratchpad (perdus) ; pour la vraie scène, créer la ferme par `import('/src/games/farm/farmMap.ts')`
+  (`newFarm`, `buyAndPlace`) + `saveFarm` depuis `#/`, puis fermer en boucle l'aide et les « Niveau N » (boutons
+  « C'est parti » / « Super »).
+
 ### Les visages des villageois (16/11 nuit, retour d'Eloise : « moche », il manquait un NEZ ; style C choisi sur planche)
 
 Planche : https://claude.ai/artifact/VTTk5B8356B7HWPr2B7fQ4 (0 aujourd'hui, 1 + nez, A grands yeux brillants,

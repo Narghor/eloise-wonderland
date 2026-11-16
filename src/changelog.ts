@@ -18,6 +18,11 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-16-promeneurs-jeux',
+    date: '16 novembre',
+    news: ['🦆 Les promeneurs s’amusent encore plus : ils nourrissent les canards, pêchent dans la mare, font un vœu à la fontaine, tirent l’eau du puits, montrent les oiseaux du nichoir et se balancent. Un grand vient même pousser Jules sur la balançoire !'],
+  },
+  {
     id: '2026-11-16-promeneurs-decos',
     date: '16 novembre',
     news: ['☕ Les promeneurs s’installent à la ferme : ils s’assoient sur les bancs, prennent le thé et respirent les fleurs. Et les villageois ont enfin un nez !'],

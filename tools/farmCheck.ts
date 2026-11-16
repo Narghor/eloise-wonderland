@@ -554,9 +554,9 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   farm.nuts = 100000;
   farm.objects = farm.objects.filter((o) => placeable(o.type).kind !== 'obstacle');
   // The tea table and the hay are treasures: found in a parcel before they can be bought.
-  farm.album.push('teaTable', 'hayBales');
+  farm.album.push('teaTable', 'hayBales', 'fountain', 'swing');
   const placed = new Map<number, string>();
-  for (const id of ['bench', 'teaTable', 'flowersPink', 'hayBales', 'fountain', 'pond', 'well'] as const) {
+  for (const id of ['bench', 'teaTable', 'flowersPink', 'hayBales', 'fountain', 'pond', 'well', 'birdhouse', 'swing'] as const) {
     const [w, h] = placeable(id).size;
     // A free tile all around each one, so every spot can be reached.
     const spot = freeSpotNear(farm, 13, 11, w + 2, h + 2);
@@ -564,9 +564,11 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
     if (o) placed.set(o.uid, id);
   }
   const strollers = new FarmStrollers(farm, false, () => false, mulberry32(11));
-  const together = new Set(['bench', 'teaTable']);
+  const together = new Set(['bench', 'teaTable', 'swing']);
   let crowded = 0;
   let pairs = 0;
+  let standing = 0;
+  const [, gateY] = gateTile(farm);
   const done = new Set<string>();
   for (let t = 0; t < 90 * 60_000; t += 100) {
     strollers.update(100, false);
@@ -574,6 +576,8 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
     for (const p of strollers.people) {
       if (p.at !== null) at.set(p.at, (at.get(p.at) ?? 0) + 1);
       if (p.doing) done.add(p.doing);
+      const [tx, ty] = [Math.floor(p.x / 16), Math.floor((p.y - 2) / 16)];
+      if (p.y < gateY * 16 && !isWalkable(farm, tx, ty) && !p.on.includes(objectAt(farm, tx, ty)?.uid ?? -1)) standing++;
     }
     for (const [uid, n] of at) {
       if (n > 2 || (n === 2 && !together.has(placed.get(uid) ?? ''))) crowded++;
@@ -582,12 +586,49 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   }
   check('two strollers share only a bench or a tea table, never more than two', crowded === 0, `${crowded} images`);
   check('the strollers sit, sip tea and see to the flowers', (done.has('swingFeet') || done.has('readPaper')) && done.has('sipTea') && ['sniff', 'butterfly', 'pickFlower'].some((a) => done.has(a)), [...done].join(', '));
+  check('every decoration placed', placed.size === 9, [...placed.values()].join(', '));
+  check('at the birdhouse, the pond, the fountain, the well and the swing they do something', ['pointBird', 'feedBirds'].some((a) => done.has(a)) && ['feedDucks', 'fish'].some((a) => done.has(a)) && ['wishCoin', 'sitRim'].some((a) => done.has(a)) && ['crankWell', 'singWell'].some((a) => done.has(a)) && done.has('swingFront'), [...done].join(', '));
+  check('at a decoration, a stroller stands on nothing but its own tiles', standing === 0, `${standing} images`);
   check('two at the same bench or table do something together', pairs > 0 && (done.has('chat') || done.has('cheers')), `${pairs} images à deux`);
   const sitter = strollers.people.find((p) => p.at !== null && p.doing !== null) ?? null;
   const seat = sitter && farm.objects.find((o) => o.uid === sitter.at);
   if (seat) seat.x -= 1;
   strollers.update(100, false);
   check('a decoration moved under a stroller sends them on their way', !!sitter && strollers.people.every((p) => p.who !== sitter.who || p.at === null));
+}
+// -----------------------------------------------
+// THE SWING SEEN FROM THE SIDE: a grown-up pushes a child, never anyone else (docs/ferme.md 22)
+// -----------------------------------------------
+{
+  let pushes = 0;
+  let wrongPush = 0;
+  let swung = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const farm = newFarm(now);
+    farm.level = 12;
+    farm.nuts = 100000;
+    farm.objects = farm.objects.filter((o) => placeable(o.type).kind !== 'obstacle');
+    farm.album.push('swing');
+    const spot = freeSpotNear(farm, 13, 11, 4, 4);
+    const swing = spot && buyAndPlace(farm, 'swing', spot[0] + 1, spot[1] + 1, seed % 2 ? 1 : 3, now);
+    for (const id of ['flowersPink', 'flowersYellow', 'bench'] as const) {
+      const [w, h] = placeable(id).size;
+      const free = freeSpotNear(farm, 13, 15, w + 2, h + 2);
+      if (free) buyAndPlace(farm, id, free[0] + 1, free[1] + 1, 0, now);
+    }
+    const strollers = new FarmStrollers(farm, false, () => false, mulberry32(seed));
+    for (let t = 0; t < 6 * 3_600_000; t += 100) {
+      strollers.update(100, false);
+      const there = strollers.people.filter((p) => swing && p.at === swing.uid && p.doing);
+      if (there.some((p) => p.doing === 'swingSide' || p.doing === 'swingPushed')) swung++;
+      const pusher = there.find((p) => p.doing === 'pushSwing');
+      if (!pusher) continue;
+      pushes++;
+      const seated = there.find((p) => p.doing === 'swingPushed');
+      if (pusher.who === 'jules' || !seated || seated.who !== 'jules') wrongPush++;
+    }
+  }
+  check('on a swing seen from the side they swing, and a grown-up pushes Jules, nobody else', swung > 0 && pushes > 0 && wrongPush === 0, `${pushes} images à pousser, ${wrongPush} fautives`);
 }
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);
 if (failures > 0) process.exitCode = 1;

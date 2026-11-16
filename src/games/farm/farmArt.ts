@@ -1909,14 +1909,34 @@ function flowerArch(view: View): Sprite {
 }
 
 function swing(view: View): Sprite {
-  const garland = (P: Painter, x0: number, x1: number, y: number) => {
+  return sprite(30, 40, (P) => {
+    swingFrame(P, view);
+    swingSeat(P, view, 0, 0);
+  });
+}
+
+/** The swing without its ropes and seat: drawn while someone swings, the seat moving on its own (swingSeatSprite). */
+export function swingFrameSprite(view: View): Sprite {
+  return cached(`swing-frame-${view}`, () => sprite(30, 40, (P) => swingFrame(P, view)));
+}
+
+/**
+ * The ropes and the seat, on a canvas the size of the swing's: seen from the front the seat rises (dy < 0) and falls;
+ * from the side it swings forward (dx > 0) and back on its rope, from the pivot.
+ */
+export function swingSeatSprite(view: View, dx: number, dy: number): Sprite {
+  return cached(`swing-seat-${view}-${dx}-${dy}`, () => sprite(30, 40, (P) => swingSeat(P, view, dx, dy)));
+}
+
+function swingFrame(P: Painter, view: View): void {
+  const garland = (x0: number, x1: number, y: number) => {
     const colours = [ROSE, C.gold, C.white, '#b9a2ff'];
     for (let x = x0, i = 0; x <= x1; x += 3, i++) {
       P.px(x, y + 1, C.leaf);
       P.px(x + 1, y, colours[i % colours.length]);
     }
   };
-  const meadow = (P: Painter, w: number) => {
+  const meadow = (w: number) => {
     for (let x = 1; x < w - 1; x += 2) P.px(x, 39, x % 4 ? C.leaf : C.leafLight);
     for (const [x, c] of [[4, ROSE], [9, C.gold], [w - 6, C.white], [w - 3, ROSE]] as const) {
       P.px(x, 38, c);
@@ -1924,48 +1944,51 @@ function swing(view: View): Sprite {
     }
   };
   if (view === 'face') {
-    return sprite(30, 40, (P) => {
-      // A slim post on each side with a little brace, and a beam on top: light, not a wall.
-      for (const x of [2, 26]) {
-        P.rect(x, 3, 2, 37, C.wood);
-        P.rect(x, 3, 1, 37, C.woodLight);
-        P.rect(x + 1, 3, 1, 37, C.woodDark);
-      }
-      P.line(4, 7, 7, 4, C.woodDark);
-      P.line(25, 7, 22, 4, C.woodDark);
-      // A rose vine climbing the left post.
-      for (let y = 12; y < 38; y += 5) {
-        P.px(1, y, C.leaf);
-        P.px(4, y + 2, C.leafDark);
-        P.px(1, y + 1, ROSE);
-      }
-      P.rect(0, 1, 30, 3, C.wood);
-      P.rect(0, 1, 30, 1, C.woodLight);
-      P.rect(0, 3, 30, 1, C.woodDark);
-      garland(P, 2, 27, 4);
-      // Ropes, the seat and its pink cushion.
-      P.line(10, 5, 10, 27, '#d8c9a8');
-      P.line(19, 5, 19, 27, '#d8c9a8');
-      P.rect(8, 27, 14, 3, C.woodLight);
-      P.rect(8, 29, 14, 1, C.woodDark);
-      P.rect(9, 25, 12, 2, '#f48fb1');
-      P.rect(10, 25, 4, 1, '#ffc0d6');
-      meadow(P, 30);
-    });
+    // A slim post on each side with a little brace, and a beam on top: light, not a wall.
+    for (const x of [2, 26]) {
+      P.rect(x, 3, 2, 37, C.wood);
+      P.rect(x, 3, 1, 37, C.woodLight);
+      P.rect(x + 1, 3, 1, 37, C.woodDark);
+    }
+    P.line(4, 7, 7, 4, C.woodDark);
+    P.line(25, 7, 22, 4, C.woodDark);
+    // A rose vine climbing the left post.
+    for (let y = 12; y < 38; y += 5) {
+      P.px(1, y, C.leaf);
+      P.px(4, y + 2, C.leafDark);
+      P.px(1, y + 1, ROSE);
+    }
+    P.rect(0, 1, 30, 3, C.wood);
+    P.rect(0, 1, 30, 1, C.woodLight);
+    P.rect(0, 3, 30, 1, C.woodDark);
+    garland(2, 27, 4);
+    meadow(30);
+    return;
   }
-  return sprite(30, 40, (P) => {
-    P.line(15, 2, 4, 39, C.woodDark);
-    P.line(16, 2, 5, 39, C.wood);
-    P.line(15, 2, 25, 39, C.woodDark);
-    P.line(16, 2, 26, 39, C.wood);
-    P.rect(12, 1, 7, 3, C.wood);
-    P.rect(12, 1, 7, 1, C.woodLight);
-    garland(P, 12, 18, 4);
-    P.line(15, 4, 15, 27, '#d8c9a8');
-    P.rect(13, 27, 5, 3, C.woodLight);
-    P.rect(13, 25, 5, 2, '#f48fb1');
-    meadow(P, 30);
-  });
+  P.line(15, 2, 4, 39, C.woodDark);
+  P.line(16, 2, 5, 39, C.wood);
+  P.line(15, 2, 25, 39, C.woodDark);
+  P.line(16, 2, 26, 39, C.wood);
+  P.rect(12, 1, 7, 3, C.wood);
+  P.rect(12, 1, 7, 1, C.woodLight);
+  garland(12, 18, 4);
+  meadow(30);
+}
+
+/** Ropes, the seat and its pink cushion. */
+function swingSeat(P: Painter, view: View, dx: number, dy: number): void {
+  if (view === 'face') {
+    P.line(10, 5, 10, 27 + dy, '#d8c9a8');
+    P.line(19, 5, 19, 27 + dy, '#d8c9a8');
+    P.rect(8, 27 + dy, 14, 3, C.woodLight);
+    P.rect(8, 29 + dy, 14, 1, C.woodDark);
+    P.rect(9, 25 + dy, 12, 2, '#f48fb1');
+    P.rect(10, 25 + dy, 4, 1, '#ffc0d6');
+    return;
+  }
+  P.line(15, 4, 15 + dx, 27 + dy, '#d8c9a8');
+  P.rect(13 + dx, 27 + dy, 5, 3, C.woodLight);
+  P.rect(13 + dx, 25 + dy, 5, 2, '#f48fb1');
 }
 
 /** The legendary one: a royal fountain, stone and gold, a golden swan whose jet falls into a high bowl, then two falls. */
