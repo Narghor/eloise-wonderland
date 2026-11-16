@@ -18,6 +18,13 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-16-promeneurs',
+    date: '16 novembre',
+    news: [
+      '🚶 La ferme : des villageois viennent maintenant se promener chez toi, de préférence sur les chemins, et s’arrêtent pour admirer tes décos. Plus ta ferme a de charme, plus ils sont nombreux. Touche-les : ils te laissent un petit pourboire. Si tu préfères être tranquille, tu peux les désactiver dans le menu ⋯.',
+    ],
+  },
+  {
     id: '2026-11-16-ferme',
     date: '16 novembre',
     news: ['🌻 Refonte et lot de contenu pour la ferme'],

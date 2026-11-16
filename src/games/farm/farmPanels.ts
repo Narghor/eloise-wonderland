@@ -703,7 +703,8 @@ export function charmLine(save: FarmSave): string {
   const value = charm(save);
   const { step, next } = charmStep(value);
   const now = `Charme ${value} · ${step.name}`;
-  return next ? `${now}. À ${next.min} : Gaston toutes les ${duration(next.parcelMinutes)}, commandes +${next.orderBonusPercent} %.` : `${now}. Le plus haut palier !`;
+  const visitors = next && next.strollers > step.strollers ? `, ${next.strollers} promeneurs` : '';
+  return next ? `${now}. À ${next.min} : Gaston toutes les ${duration(next.parcelMinutes)}, commandes +${next.orderBonusPercent} %${visitors}.` : `${now}. Le plus haut palier !`;
 }
 
 /** What placing one more of a decoration adds: "+1,5 de charme", nothing for a second copy of a treasure. */
@@ -718,7 +719,7 @@ function decorShop(ui: FarmUi): Node[] {
   return [
     el('p', { class: 'farm-charm', text: charmLine(ui.save) }),
     el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), charmAdded(ui.save, p.id)))),
-    el('p', { class: 'farm-note', text: 'Un trésor trouvé dans un colis s’achète ensuite autant de fois que tu veux. Chaque déco posée ajoute du charme (un trésor, une seule fois) : Gaston passe plus souvent et les commandes paient un peu mieux. Les décos se tournent et se rangent dans « Aménager ».' }),
+    el('p', { class: 'farm-note', text: 'Un trésor trouvé dans un colis s’achète ensuite autant de fois que tu veux. Chaque déco posée ajoute du charme (un trésor, une seule fois) : Gaston passe plus souvent, les commandes paient un peu mieux et plus de promeneurs viennent la visiter. Les décos se tournent et se rangent dans « Aménager ».' }),
   ];
 }
 

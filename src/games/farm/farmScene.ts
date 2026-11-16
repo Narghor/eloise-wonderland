@@ -38,6 +38,7 @@ import {
   type Sprite,
 } from './farmArt';
 import { footprint, gateTile, isOwned, isRoad, type ParcelOffer } from './farmMap';
+import { FarmStrollers } from './farmStrollers';
 import { FarmVillage } from './farmVillage';
 import { breedsOf, fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
 import { have } from './farmProgress';
@@ -77,6 +78,8 @@ export interface SceneEvents {
   ghostFits(ghost: Ghost): boolean;
   /** A tap on a villager waiting at the gate for their order. */
   visitor(orderId: number): void;
+  /** A tap on a stroller: `first` the first time (a tip is due), `at` over their head, in screen pixels. */
+  stroller(first: boolean, at: { x: number; y: number }): void;
 }
 
 interface Actor {
@@ -225,6 +228,8 @@ export class FarmScene {
   onFrame: (() => void) | null = null;
   /** The villagers and Gaston on the road. */
   readonly village: FarmVillage;
+  /** The villagers visiting the farm (docs/ferme.md 22). */
+  readonly strollers: FarmStrollers;
 
   private readonly ctx: CanvasRenderingContext2D;
   private readonly host: HTMLElement;
@@ -270,7 +275,8 @@ export class FarmScene {
     this.host = host;
     this.save = save;
     this.events = events;
-    this.village = new FarmVillage(save, this.reduced);
+    this.strollers = new FarmStrollers(save, this.reduced, (who) => this.village.isOnMap(who));
+    this.village = new FarmVillage(save, this.reduced, (who) => this.strollers.release(who));
     this.canvas.className = 'farm-canvas';
     this.canvas.setAttribute('aria-label', 'La ferme, vue de dessus');
     this.ctx = this.canvas.getContext('2d')!;
@@ -528,6 +534,7 @@ export class FarmScene {
     if (this.width > 0) {
       this.walk(dt);
       this.village.update(dt);
+      this.strollers.update(dt, now - this.lastInput > PLAYER_AWAY_MS);
       this.glideZoom(dt);
       this.glidePan(dt);
       this.flutter(dt);
@@ -735,7 +742,9 @@ export class FarmScene {
       else list.push({ base: at.y + sprite.height, draw: paint });
       if (kind === 'pen') this.queueAnimals(o, list, at.y + sprite.height);
     }
-    this.village.queue(list, { stamp: (s, x, y, mirrored) => this.stamp(s, x, y, mirrored), shadow: (x, y, w) => this.shadow(x, y, w) });
+    const painter = { stamp: (s: Sprite, x: number, y: number, mirrored: boolean) => this.stamp(s, x, y, mirrored), shadow: (x: number, y: number, w: number) => this.shadow(x, y, w) };
+    this.village.queue(list, painter);
+    this.strollers.queue(list, painter);
     if (this.ghost) list.push({ base: Infinity, draw: () => this.drawGhost(this.ghost!) });
     for (const paint of flat) paint();
     list.sort((a, b) => a.base - b.base);
@@ -749,6 +758,7 @@ export class FarmScene {
     if (!this.editMode) {
       for (const o of this.save.objects) this.drawReady(o, clock, now);
       this.village.drawBubbles(ctx, now);
+      this.strollers.drawHearts(ctx);
     }
   }
 
@@ -1286,6 +1296,13 @@ export class FarmScene {
     return this.village.hit(w.x, w.y);
   }
 
+  /** Whether a stroller is under a screen point; none while arranging the farm. */
+  private strollerAtClient(clientX: number, clientY: number): boolean {
+    if (this.editMode || this.ghost) return false;
+    const w = this.toWorld(clientX, clientY);
+    return this.strollers.isAt(w.x, w.y);
+  }
+
   /** The field under a screen point; a bubble floating over it does not hide it from a sowing or harvesting swipe. */
   fieldAtClient(clientX: number, clientY: number): PlacedObject | null {
     const target = this.objectAtWorld(this.toWorld(clientX, clientY));
@@ -1353,7 +1370,7 @@ export class FarmScene {
       if (!this.editMode && !this.ghost && target && 'uid' in target) this.holdTimer = window.setTimeout(() => this.hold(gesture, target), LONG_PRESS_MS);
     });
     c.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'mouse' && e.buttons === 0) c.classList.toggle('is-pointing', this.targetAtClient(e.clientX, e.clientY) !== null || this.visitorAtClient(e.clientX, e.clientY) !== null);
+      if (e.pointerType === 'mouse' && e.buttons === 0) c.classList.toggle('is-pointing', this.targetAtClient(e.clientX, e.clientY) !== null || this.visitorAtClient(e.clientX, e.clientY) !== null || this.strollerAtClient(e.clientX, e.clientY));
       if (!this.pointers.has(e.pointerId)) return;
       this.wake();
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1413,7 +1430,9 @@ export class FarmScene {
       if (g && g.mode === 'pending' && e.type === 'pointerup') {
         const visitor = this.visitorAtClient(g.x, g.y);
         const w = this.toWorld(g.x, g.y);
+        const stroller = visitor === null && !this.editMode && !this.ghost ? this.strollers.touch(w.x, w.y) : null;
         if (visitor !== null) this.events.visitor(visitor);
+        else if (stroller) this.events.stroller(stroller.first, this.toScreen(stroller.head.x, stroller.head.y));
         else this.events.tap(g.target, [Math.floor(w.x / TILE), Math.floor(w.y / TILE)]);
       }
     };

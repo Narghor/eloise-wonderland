@@ -28,6 +28,16 @@ import {
 } from '../src/games/farm/farmOrders';
 import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, TREASURES, breed, type Prize } from '../src/games/farm/data/parcels';
 import { MERCHANT_SHARE as DATA_MERCHANT_SHARE, TREE_NUTS_SPREAD, treeNuts } from '../src/games/farm/farmProduction';
+import { strollerTip } from '../src/games/farm/farmStrollers';
+
+/**
+ * The strollers' tips (docs/ferme.md 22), at their most: she touches every stroller who comes while she plays.
+ * MESURE of 16/11 (one hour of the real FarmStrollers): a visit lasts about 1.75 minute and one comes at most every
+ * 30 seconds, so the strollers per minute are the charm step's places / 1.75, at most 2. STROLLER_TIPS=0 turns them off.
+ */
+const STROLLER_VISIT_MINUTES = 1.75;
+const STROLLER_ARRIVALS_PER_MINUTE = 2;
+const STROLLER_TIPS = process.env.STROLLER_TIPS !== '0';
 
 const DAYS = Number(process.argv[2] ?? 90);
 const SEED = Number(process.argv[3] ?? 7);
@@ -382,6 +392,13 @@ class Farm {
   /** Books what one source gave, until the last level (what comes after does not pace the game). */
   note(book: Record<string, number>, source: string, n: number): void {
     if (this.level < MAX_LEVEL) book[source] = (book[source] ?? 0) + n;
+  }
+
+  /** One minute of play: the tips of the strollers met in it (see STROLLER_TIPS). */
+  tipStrollers(): void {
+    if (!STROLLER_TIPS) return;
+    const perMinute = Math.min(charmStep(this.charm).step.strollers / STROLLER_VISIT_MINUTES, STROLLER_ARRIVALS_PER_MINUTE);
+    this.earn(strollerTip(this.level) * perMinute, 'promeneurs');
   }
 
   earn(coins: number, source: string): void {
@@ -867,7 +884,10 @@ function play(profile: Profile, seed: number): Farm {
       farm.openMail(begin);
       const end = begin + length;
       const next = i + 1 < visits.length ? day * MIN_PER_DAY + visits[i + 1][0] : (day + 1) * MIN_PER_DAY + visits[0][0];
-      for (let t = begin; t < end; t++) farm.act(t, end, next, rule);
+      for (let t = begin; t < end; t++) {
+        farm.act(t, end, next, rule);
+        farm.tipStrollers();
+      }
       farm.playMinutes += length;
     });
     // The 3 small daily tasks, done over the day.

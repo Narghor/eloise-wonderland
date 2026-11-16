@@ -1488,6 +1488,13 @@
   min-width: 58px;
 }
 
+.farm-volume input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  margin: 0 0 0 auto;
+  accent-color: var(--ui-accent);
+}
+
 .farm-volume input[type='range'] {
   width: 110px;
   accent-color: var(--ui-accent);

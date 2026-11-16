@@ -45,15 +45,17 @@ export interface CharmStep {
   orderBonusPercent: number;
   /** Gaston comes every this many minutes. */
   parcelMinutes: number;
+  /** Villagers strolling on the farm at once (farmStrollers.ts). */
+  strollers: number;
 }
 
 export const CHARM_STEPS: readonly CharmStep[] = [
-  { min: 0, name: 'Ferme toute simple', orderBonusPercent: 0, parcelMinutes: 240 },
-  { min: 20, name: 'Ferme mignonne', orderBonusPercent: 3, parcelMinutes: 225 },
-  { min: 50, name: 'Ferme coquette', orderBonusPercent: 6, parcelMinutes: 210 },
-  { min: 100, name: 'Ferme charmante', orderBonusPercent: 9, parcelMinutes: 195 },
-  { min: 180, name: 'Ferme ravissante', orderBonusPercent: 12, parcelMinutes: 180 },
-  { min: 300, name: 'Ferme de rêve', orderBonusPercent: 15, parcelMinutes: 165 },
+  { min: 0, name: 'Ferme toute simple', orderBonusPercent: 0, parcelMinutes: 240, strollers: 1 },
+  { min: 20, name: 'Ferme mignonne', orderBonusPercent: 3, parcelMinutes: 225, strollers: 2 },
+  { min: 50, name: 'Ferme coquette', orderBonusPercent: 6, parcelMinutes: 210, strollers: 2 },
+  { min: 100, name: 'Ferme charmante', orderBonusPercent: 9, parcelMinutes: 195, strollers: 3 },
+  { min: 180, name: 'Ferme ravissante', orderBonusPercent: 12, parcelMinutes: 180, strollers: 3 },
+  { min: 300, name: 'Ferme de rêve', orderBonusPercent: 15, parcelMinutes: 165, strollers: 4 },
 ];
 
 export function charmStep(charm: number): { step: CharmStep; next: CharmStep | null } {

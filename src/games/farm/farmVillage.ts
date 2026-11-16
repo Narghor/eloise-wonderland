@@ -5,6 +5,7 @@ import { gateTile } from './farmMap';
 import { canDeliver } from './farmOrders';
 import { basketSprite, bikeSprite, villagerSprite, type PersonView } from './farmPeopleArt';
 import type { FarmSave, Order } from './farmSave';
+import { pathPoints, type Point } from './farmStrollers';
 
 // -----------------------------------------------
 // THE VILLAGE ON THE MAP: villagers come to the gate for the orders that can be served, Gaston rides to the mailbox
@@ -26,11 +27,6 @@ const DROP_MS = 1400;
 const SYNC_MS = 400;
 /** Where everyone comes from and goes back to: down the road, in the forest south of the map. */
 const ROAD_END_Y = (MAP_SIZE + 6) * TILE;
-
-interface Point {
-  x: number;
-  y: number;
-}
 
 interface Walker {
   who: PersonId;
@@ -59,13 +55,21 @@ export interface VillagePainter {
 export class FarmVillage {
   private readonly save: FarmSave;
   private readonly reduced: boolean;
+  /** A villager strolling on the farm (farmStrollers) stops there for the gate: where they were, or null. */
+  private readonly takeFromStroll: (who: PersonId) => Point | null;
   private walkers: Walker[] = [];
   private syncIn = 0;
   private started = false;
 
-  constructor(save: FarmSave, reduced: boolean) {
+  constructor(save: FarmSave, reduced: boolean, takeFromStroll: (who: PersonId) => Point | null) {
     this.save = save;
     this.reduced = reduced;
+    this.takeFromStroll = takeFromStroll;
+  }
+
+  /** This villager is on the map for an order, or is Gaston on his round. */
+  isOnMap(who: PersonId): boolean {
+    return this.walkers.some((w) => w.who === who);
   }
 
   /** The villagers standing at the gate for their order, first arrived first. */
@@ -178,8 +182,15 @@ export class FarmVillage {
       const spot = { x: gate.x + WAITING_OFFSETS[slot], y: gate.y };
       const w = this.walkers.find((v) => v.order === order.id && v.state !== 'leaving');
       if (!w) {
+        // Strolling on the farm: from where they are, along the paths, to the gate.
+        const strolling = this.takeFromStroll(order.who);
+        if (strolling && !this.reduced) {
+          const [gx, gy] = gateTile(this.save);
+          this.walkers.push(this.walker(order.who, order.id, strolling, [...pathPoints(this.save, strolling, [gx, gy]), this.gatePoint(), spot], false));
+          return;
+        }
         // Opening the farm finds them already waiting; later ones walk up the road.
-        const already = !this.started || this.reduced;
+        const already = !this.started || this.reduced || strolling !== null;
         const walker = this.walker(order.who, order.id, already ? spot : { x: gate.x, y: ROAD_END_Y }, already ? [] : [gate, spot], false);
         if (already) walker.state = 'waiting';
         this.walkers.push(walker);

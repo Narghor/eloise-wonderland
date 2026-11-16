@@ -466,6 +466,8 @@ src/games/farm/
   farmJoins.ts     les pièces qui se raccordent (barrière, portillon) : skins, voisins, tronçon (section 16)
   farmScene.ts     le canvas : caméra, dessin, toucher et glisser
   farmVillage.ts   les villageois et Gaston sur la route (section 15), dessinés par la scène
+  farmPaths.ts     les cases où l'on marche et le chemin le moins cher entre deux cases (section 22)
+  farmStrollers.ts les promeneurs : visites, arrêts devant les décos, pourboire, option (section 22)
   farmArt.ts       les dessins (et son moteur de sprites, exporté)
   farmPeopleArt.ts les villageois en pied (côté, face, dos) et le vélo de Gaston
   farmHud.ts       bandeau et barre du bas
@@ -1023,3 +1025,58 @@ recette, chaque quête demande des choses qui existent à son niveau) et les rè
   minutes ; 10 et plus inchangés). MESURE (graines 1 à 4, posée / régulière / accro) : niv. 8 j8 → j12-14 / j6 → j8-9 /
   j3-4,5 → j4-6 ; niv. 10 j13 → j22 / j9,5 → j14,5 / j5 → j7,5 ; niv. 15 j43 → j52 / j27 → j32 / j13 → j15 ; niv. 30
   j194 → j206 / j118 → j124 / j55 → j56. Une partie en cours garde son XP : la barre s'allonge.
+
+## 22. Les promeneurs (idée de Flo du 16/11, VALIDÉE et CODÉE le 16/11, non commité, pas joué sur téléphone)
+
+Des villageois viennent visiter la ferme et s'y promènent, de préférence sur les chemins.
+
+- **Pourquoi** : la ferme vit sans effort ; les chemins servent enfin ; surtout, le **Charme devient visible** (Eloise
+  se fiche des décos parce qu'elles ne *font* rien) : une ferme plus charmante attire plus de promeneurs, qui s'arrêtent
+  devant les décos.
+- **Combien** (`CharmStep.strollers`, `data/charm.ts`) : 1 / 2 / 2 / 3 / 3 / 4 promeneurs à la fois, de « toute
+  simple » à « de rêve ». Les trésors seuls mènent à « charmante » (3) ; le 4e se gagne en achetant des décos. Un
+  nouveau arrive 20 à 40 s après le précédent, jusqu'au plafond ; à l'ouverture de la ferme, la moitié (arrondie au-dessus)
+  est déjà devant une déco. Le Charme qui baisse ne renvoie personne : les suivants ne viennent pas.
+- **Qui** : les 7 villageois sauf Gaston (il reste le facteur à vélo) ; jamais quelqu'un déjà sur la carte pour une
+  commande, ni quelqu'un dont la commande peut être livrée. Si sa commande devient livrable pendant sa promenade, il
+  rejoint la cour par les chemins et devient le villageois qui attend (`FarmVillage` le reprend : `release`).
+- **Trajets** (`farmPaths.ts`) : case par case, en quatre directions (les trois vues des dessins) ; chemins, cour et
+  pont coûtent 1, l'herbe 3 (un chemin est pris tant qu'il n'est pas trois fois plus long) ; bloqué : tout ce qui est
+  posé au sol (bâtiments, champs, enclos, arbres, décos, friche, boîte aux lettres, charrette), l'eau, les terres pas
+  achetées ; le portillon se traverse, le pont une fois construit. Quelque chose posé en travers du chemin pendant la
+  marche : il recalcule.
+- **Arrêts** : 3 décos par visite (moins si la ferme en a moins ; pas les chemins, barrières, haies), tirées au sort
+  selon leur Charme (la mare et les trésors plus souvent qu'un parterre), la plus proche d'abord ; jamais deux promeneurs
+  devant la même. Il se place au sud, de dos, face à la déco (centré sous une déco de 2 cases si tout le côté est
+  libre) ; sinon à côté, de profil, tourné vers elle ; sinon derrière. **Arrêt de 15 à 25 s** ; un cœur monte au-dessus
+  de sa tête avec la chance Charme ÷ (Charme + 10) du Charme de la déco (mare 60 %, trésor 86 %, parterre 11 %). Ferme
+  sans déco : il va sur deux cases au hasard près de la cour (sur un chemin s'il y en a) et repart.
+- **Toucher un promeneur** : un cœur et un petit bruit ; la première fois, **3 % d'une commande moyenne de son
+  niveau** (`strollerTip` : 1 au niveau 1, 5 au niveau 10, 10 au niveau 20) qui flotte « +N » au-dessus de lui. Une
+  seule fois par promeneur. Pas d'XP (le rythme des niveaux vient d'être ralenti, section 21). Les villageois de la cour
+  passent avant, puis les promeneurs, puis les objets.
+- **Option** (demande de Flo) : « Promeneurs » dans le menu ⋯ (case à cocher, cochée par défaut), gardée sur
+  l'appareil comme le volume de la musique (`localStorage` `farm-strollers`). Décochée, ceux qui sont là rentrent.
+- **Batterie** : les promeneurs ne retiennent pas la carte à 15 i/s (les villageois des commandes, si) : ils marchent
+  à 8 i/s après 30 s sans toucher. Après 3 min sans toucher (`PLAYER_AWAY_MS`), personne de nouveau ; ceux qui sont là
+  finissent leur visite. « Réduire les animations » : ils apparaissent devant leur déco et disparaissent.
+- **MESURE (16/11, une heure de `FarmStrollers` sur la ferme de la maquette)** : avec des arrêts de 6 à 12 s et 2-3
+  décos (la première version), une visite durait ~1 min et 3 ou 4 places donnaient le même nombre à l'écran (2,1 en
+  moyenne) : le dernier palier ne se voyait pas. Avec 3 décos et 15-25 s : visite ~1 min 45, **1,0 / 2,0 / 2,9 / 3,3**
+  promeneurs présents en moyenne pour 1 / 2 / 3 / 4 places, 35 / 72 / 102 / 120 visites par heure.
+- **MESURE (simulateur, graine 1, elle touche TOUS les promeneurs qui passent pendant qu'elle joue = le maximum)** :
+  promeneurs 6 % des Éloisettes (posée, régulière), 7 % (régulière qui décore à 30 %), 10 % (accro) : autant que les
+  noisetiers. Rythme des niveaux inchangé à un ou deux jours près (le hasard des colis bouge). `STROLLER_TIPS=0` les
+  retire du simulateur.
+- **MESURE batterie (ferme niv. 10 de la maquette, téléphone émulé, sonde de la section 20)**, avant → après :
+  images par seconde **identiques** (après un toucher 60 → 60, calme 13,1 → 13,0, après 30 s 7,9 → 7,9, après 3 min
+  2,0 → 2,0, cachée 0,3 → 0,3) ; le calcul d'une image passe de ~0,6 à ~0,7 ms (un ou deux promeneurs de plus à
+  dessiner, un trajet calculé de temps en temps), toujours négligeable devant le coût de repeindre l'écran.
+- **Fichiers** : `farmPaths.ts` (cases praticables, `WalkMap`), `farmStrollers.ts` (les visites, le pourboire,
+  l'option), branchés dans `farmScene` (mise à jour, dessin, toucher), `farmScreen` (`thankStroller`), `farmHud`
+  (l'option) ; `charmLine` dit « N promeneurs » au palier suivant quand il en ajoute. `farm-check` : 14 vérifications
+  (chemin préféré, rien traversé, champs / boîte / terres non achetées bloqués, nombre par palier, pourboire, jamais
+  plus que le Charme, jamais Gaston ni un villageois déjà là ni deux fois le même, jamais debout sur un objet, pourboire
+  une fois, reprise par le village, la moitié à l'ouverture et personne de nouveau quand elle est absente).
+- **Maquette et captures** : `drive.mjs` sur une ferme niv. 10 (chemin pavé, puits, mare, banc, parterres) ; vu en jeu :
+  Pivoine devant la mare à l'ouverture, Léon devant le puits, le toucher (+5, cœur), l'option dans le menu.

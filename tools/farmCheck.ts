@@ -21,7 +21,9 @@ import { CROPS } from '../src/games/farm/data/crops';
 import { RECIPES } from '../src/games/farm/data/machines';
 import { QUESTS } from '../src/games/farm/data/quests';
 import type { ItemId, PlaceableId, TreeId, Unlock } from '../src/games/farm/data/types';
-import { totalCharm } from '../src/games/farm/data/charm';
+import { CHARM_STEPS, totalCharm } from '../src/games/farm/data/charm';
+import { WalkMap, isWalkable } from '../src/games/farm/farmPaths';
+import { FarmStrollers, strollerCap, strollerTip } from '../src/games/farm/farmStrollers';
 import { PITY, PRIZES, TREASURES } from '../src/games/farm/data/parcels';
 import { ITEMS } from '../src/games/farm/data/items';
 import {
@@ -472,6 +474,72 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   }
   const missing = QUESTS.filter((q) => !farm.questsDone.includes(q.id)).map((q) => q.id);
   check('the whole story can be played to its end', missing.length === 0 && stuck.length === 0, [...missing, ...stuck].join(', '));
+}
+// -----------------------------------------------
+// THE STROLLERS: they walk the paths, never through anything, as many as the charm says, and tip once (docs/ferme.md 22)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.level = 10;
+  farm.nuts = 100000;
+  farm.objects = farm.objects.filter((o) => placeable(o.type).kind !== 'obstacle');
+  const [gx, gy] = gateTile(farm);
+  // A stone path up from the gate, then east along row 14; a well between the gate and (15,16).
+  for (let y = gy - 1; y >= 14; y--) buyAndPlace(farm, 'pathStone', gx, y, 0, now);
+  for (let x = gx + 1; x <= gx + 3; x++) buyAndPlace(farm, 'pathStone', x, 14, 0, now);
+  const well = buyAndPlace(farm, 'well', gx + 2, 15, 0, now);
+  const walk = new WalkMap(farm, [gx, gy]);
+  const toEast = walk.routeTo([gx + 3, 14]);
+  check('a stroller takes the path when it is not more than three times longer', toEast.length > 0 && toEast.slice(1).every(([x, y]) => objectAt(farm, x, y)?.type === 'pathStone'), JSON.stringify(toEast));
+  const behindWell = walk.routeTo([gx + 3, 17]);
+  check('a route never crosses anything standing', !!well && behindWell.length > 0 && behindWell.every(([x, y]) => isWalkable(farm, x, y) && objectAt(farm, x, y) !== well));
+  check('the fields, the mailbox and land not bought cannot be walked', !isWalkable(farm, 10, 10) && !isWalkable(farm, 9, 9) && !isWalkable(farm, 2, 2));
+  check('the strollers by charm step are 1, 2, 2, 3, 3, 4', CHARM_STEPS.map((s) => s.strollers).join() === '1,2,2,3,3,4');
+  check('a tip is 3 % of an average order, at least 1', strollerTip(1) === 1 && strollerTip(10) === 5 && strollerTip(20) === Math.round(averageOrderNuts(20) * 0.03));
+
+  for (const id of ['flowersPink', 'flowersYellow', 'scarecrow', 'bench', 'pond', 'lantern'] as const) {
+    const [w, h] = placeable(id).size;
+    const spot = freeSpotNear(farm, 14, 12, w, h);
+    if (spot) buyAndPlace(farm, id, spot[0], spot[1], 0, now);
+  }
+  const busy = new Set<string>(['marthe']);
+  const strollers = new FarmStrollers(farm, false, (who) => busy.has(who), mulberry32(7));
+  const cap = strollerCap(farm);
+  let tooMany = 0;
+  let twice = 0;
+  let wrongPerson = 0;
+  let blocked = 0;
+  let seen = 0;
+  for (let t = 0; t < 20 * 60_000; t += 100) {
+    strollers.update(100, false);
+    const people = strollers.people;
+    seen = Math.max(seen, people.length);
+    if (people.filter((p) => !p.leaving).length > cap) tooMany++;
+    if (new Set(people.map((p) => p.who)).size !== people.length) twice++;
+    if (people.some((p) => p.who === 'gaston' || busy.has(p.who))) wrongPerson++;
+    for (const p of people) if (p.y < gy * 16 && !isWalkable(farm, Math.floor(p.x / 16), Math.floor(p.y / 16))) blocked++;
+  }
+  check('never more strollers than the charm allows, and some come', tooMany === 0 && seen > 0, `places ${cap}, vus ${seen}`);
+  check('a stroller is never someone already on the map, nor Gaston, nor twice', twice === 0 && wrongPerson === 0);
+  check('a stroller never stands on anything', blocked === 0, `${blocked} images`);
+  const one = strollers.people[0];
+  const first = one && strollers.touch(one.x, one.y - 10);
+  const again = one && strollers.touch(one.x, one.y - 10);
+  check('touching a stroller tips once, then only a heart', !!first && first.first && !!again && !again.first);
+  const released = one && strollers.release(one.who);
+  check('a stroller whose order can be served is handed to the village', !!released && !strollers.isStrolling(one.who));
+
+  const quiet = new FarmStrollers(farm, false, () => false, mulberry32(3));
+  quiet.update(100, false);
+  const atOpening = quiet.people.length;
+  let arrivedWhileAway = 0;
+  let last = atOpening;
+  for (let t = 0; t < 10 * 60_000; t += 100) {
+    quiet.update(100, true);
+    if (quiet.people.length > last) arrivedWhileAway++;
+    last = quiet.people.length;
+  }
+  check('half of them are there at opening; nobody new comes while the player is away', atOpening === Math.ceil(strollerCap(farm) / 2) && arrivedWhileAway === 0 && last === 0, `${atOpening} à l'ouverture, ${last} restants`);
 }
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);
 if (failures > 0) process.exitCode = 1;

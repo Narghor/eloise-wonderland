@@ -62,10 +62,11 @@ import {
   trayJobs,
   type Gain,
 } from './farmProduction';
-import { claimQuest, finishStage, giveToProject, have, isUnlocked, openChest, settle, unlockText, type Notice } from './farmProgress';
+import { claimQuest, earn, finishStage, giveToProject, have, isUnlocked, openChest, settle, unlockText, type Notice } from './farmProgress';
 import { loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
 import { FarmScene } from './farmScene';
 import { pressSeedRow } from './farmSeedSwipe';
+import { strollerTip, strollersEnabled } from './farmStrollers';
 import { swipeToClose } from './farmSwipe';
 import { testBar } from './farmTestBar';
 
@@ -158,6 +159,7 @@ class FarmScreen implements FarmUi {
       longPress: (target) => this.editor.arrange(target),
       ghostFits: (ghost) => this.editor.ghostFits(ghost),
       visitor: () => this.openSheet('orders'),
+      stroller: (first, at) => this.thankStroller(first, at),
     });
     this.hud = new FarmHud({
       sheet: (id, tab) => this.openSheet(id, tab, true),
@@ -171,6 +173,8 @@ class FarmScreen implements FarmUi {
       seeds: () => (this.seeds ? this.closeSeeds() : this.openSeeds(null)),
       musicVolume: () => musicVolume(),
       setMusicVolume: (v) => this.music.setVolume(v),
+      strollers: () => strollersEnabled(),
+      setStrollers: (on) => this.scene.strollers.setEnabled(on),
     });
     this.feedback = new FarmFeedback(this.root, this.overlay, this.scene, this.hud);
     this.dialogs = new FarmDialogs(this.overlay, save, () => this.commit());
@@ -238,6 +242,15 @@ class FarmScreen implements FarmUi {
     this.hud.refresh(this.save);
     window.clearTimeout(this.commitTimer);
     this.commitTimer = window.setTimeout(() => this.commit(), 350);
+  }
+
+  /** A stroller touched: a heart, and the first time a small tip (docs/ferme.md 22). */
+  private thankStroller(first: boolean, at: { x: number; y: number }): void {
+    playPop();
+    if (!first) return;
+    const tip = strollerTip(this.save.level);
+    this.act(() => earn(this.save, tip));
+    this.feedback.float(at, `+${tip}`, uiIcon('nut'));
   }
 
   private tick(): void {

@@ -23,6 +23,9 @@ export interface HudActions {
   nextLevel(): void;
   musicVolume(): number;
   setMusicVolume(value: number): void;
+  /** Whether villagers come and stroll on the farm (docs/ferme.md 22). */
+  strollers(): boolean;
+  setStrollers(on: boolean): void;
 }
 
 const TABS: { id: SheetId | 'build' | 'seeds'; label: string; icon: UiIcon }[] = [
@@ -104,6 +107,7 @@ export class FarmHud {
       item(this.zoomIcon, this.zoomLabel, actions.zoom),
       volumeRow('🎵', 'Musique', actions.musicVolume(), (v) => actions.setMusicVolume(v)),
       volumeRow('🔔', 'Effets', getEffectsVolume(), (v) => setEffectsVolume(v), playPop),
+      switchRow('🚶', 'Promeneurs', actions.strollers(), (on) => actions.setStrollers(on)),
     );
     this.side = el('div', { class: 'farm-side' }, menu, toggle);
     this.setZoom(false);
@@ -163,6 +167,14 @@ export class FarmHud {
       el('span', { text: ready.length > 0 ? `${person(shown.who).name} t’attend` : `${person(shown.who).name} · ${todo ? `${objectiveProgress(save, todo, starts)} / ${todo.count}` : ''}` }),
     );
   }
+}
+
+/** A labelled on/off switch. */
+function switchRow(icon: string, label: string, on: boolean, change: (on: boolean) => void): HTMLElement {
+  const box = el('input', { type: 'checkbox', 'aria-label': label });
+  box.checked = on;
+  box.addEventListener('change', () => change(box.checked));
+  return el('label', { class: 'farm-side-item farm-volume' }, el('span', { class: 'farm-side-icon', text: icon }), el('span', { class: 'farm-volume-label', text: label }), box);
 }
 
 /** A labelled slider from 0 to 100 %; `done` plays once the finger lets go (to hear the new level). */
