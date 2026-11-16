@@ -12,7 +12,8 @@ import { FARM_HELP } from './farmHelp';
 import { rewardLine } from './farmPanels';
 import { openParcel, type Opened } from './farmParcels';
 import type { AwayNews } from './farmProduction';
-import type { Notice } from './farmProgress';
+import { unlocksAt, type Notice } from './farmProgress';
+import { levelReward, xpToNext } from './data/levels';
 import type { FarmSave } from './farmSave';
 
 // -----------------------------------------------
@@ -86,6 +87,29 @@ export class FarmDialogs {
       );
       confetti(box, 30);
       return box;
+    });
+  }
+
+  /** What the next level opens, everything of it, and the XP still to earn. */
+  nextLevel(): void {
+    const next = xpToNext(this.save.level);
+    const ok = () => el('button', { class: 'farm-btn is-wide', type: 'button', text: 'D’accord' });
+    this.show(() => {
+      if (next === null) {
+        return el('div', { class: 'farm-dialog-box farm-box' }, el('h2', { text: `Niveau ${this.save.level}` }), el('p', { class: 'farm-note', text: 'C’est le niveau maximum : ta ferme a tout débloqué !' }), ok());
+      }
+      const level = this.save.level + 1;
+      const unlocks = unlocksAt(level);
+      return el(
+        'div',
+        { class: 'farm-dialog-box farm-box' },
+        el('div', { class: 'farm-big-level', text: String(level) }),
+        el('h2', { text: `Au niveau ${level}` }),
+        el('p', { class: 'farm-note', text: `Encore ${(next - this.save.xp).toLocaleString('fr-FR')} XP.` }),
+        el('div', { class: 'farm-pay' }, ...rewardLine(levelReward(level))),
+        ...(unlocks.length > 0 ? [el('p', { class: 'farm-note', text: 'Nouveau à la ferme :' }), el('ul', {}, ...unlocks.map((u) => el('li', { text: u })))] : []),
+        ok(),
+      );
     });
   }
 

@@ -460,6 +460,13 @@ function bakery(view: View): Sprite {
   });
 }
 
+/** A small stone chimney three pixels wide, its cap one pixel wider each side; drawn before the roof that hides its foot. */
+function stoneStack(P: Painter, x: number, top: number, h: number): void {
+  P.rect(x, top, 3, h, C.stoneDark);
+  P.rect(x, top, 1, h, C.stone);
+  P.rect(x - 1, top - 1, 5, 2, C.greyDark);
+}
+
 function dairy(view: View): Sprite {
   const wall = '#fbf7ef';
   const board = '#e6e0d4';
@@ -480,6 +487,7 @@ function dairy(view: View): Sprite {
   };
   return sprite(30, 42, (P) => {
     if (view === 'face') {
+      stoneStack(P, 21, 1, 7);
       tiledRoof(P, 6, 12, 30, ROOF_BLUE);
       clapboards(P, 1, 20, 28, 17);
       eave(P, 0, 18, 30, ROOF_BLUE, '#d9d2c4');
@@ -496,6 +504,7 @@ function dairy(view: View): Sprite {
       framedWindow(P, 15, 26, 9, 5, { flowers: true, frame: C.blueDark, glass: '#cfe6f2' });
       milkCan(P, 24, 33);
     } else {
+      stoneStack(P, 20, 3, 8);
       clapboards(P, 4, 20, 22, 17);
       tiledGable(P, 15, 4, 16, 0.75, ROOF_BLUE, wall);
       P.disc(15, 13, 2, C.blueDark);
@@ -523,9 +532,7 @@ function spinning(view: View): Sprite {
   const beam = TIMBER;
   return sprite(30, 46, (P) => {
     if (view === 'face') {
-      P.rect(4, 1, 3, 7, C.stoneDark);
-      P.rect(4, 1, 1, 7, C.stone);
-      P.rect(3, 0, 5, 2, C.greyDark);
+      stoneStack(P, 4, 1, 7);
       tiledRoof(P, 6, 14, 30, ROOF_BROWN);
       P.rect(1, 22, 28, 18, plaster);
       P.rect(23, 22, 6, 18, plasterShade);
@@ -552,6 +559,7 @@ function spinning(view: View): Sprite {
       for (const [x, y] of [[17, 27], [15, 30], [14, 33]] as const) P.px(x, y, C.strawLight);
       for (const [x, y] of [[21, 26], [29, 34], [21, 42], [13, 34]] as const) P.px(x, y, C.woodLight);
     } else {
+      stoneStack(P, 19, 3, 8);
       P.rect(3, 22, 24, 18, plaster);
       P.rect(21, 23, 5, 17, plasterShade);
       tiledGable(P, 15, 5, 17, 0.72, ROOF_BROWN, plaster);
@@ -641,7 +649,8 @@ function cookiery(view: View): Sprite {
 const CHIMNEYS: Partial<Record<PlaceableId, Partial<Record<View, { x: number; y: number }>>>> = {
   bakery: { face: { x: 23, y: 0 }, profile: { x: 24, y: 0 } },
   cookiery: { face: { x: 7, y: 0 }, profile: { x: 24, y: 0 } },
-  spinning: { face: { x: 6, y: 1 } },
+  spinning: { face: { x: 6, y: 1 }, profile: { x: 21, y: 3 } },
+  dairy: { face: { x: 23, y: 1 }, profile: { x: 22, y: 3 } },
 };
 
 export function chimneyOf(id: PlaceableId, view: View): { x: number; y: number } | null {

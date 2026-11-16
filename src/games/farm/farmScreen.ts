@@ -65,7 +65,7 @@ import {
 import { claimQuest, finishStage, giveToProject, have, isUnlocked, openChest, settle, unlockText, type Notice } from './farmProgress';
 import { loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
 import { FarmScene } from './farmScene';
-import { seedSwipe } from './farmSeedSwipe';
+import { pressSeedRow } from './farmSeedSwipe';
 import { swipeToClose } from './farmSwipe';
 import { testBar } from './farmTestBar';
 
@@ -167,6 +167,7 @@ class FarmScreen implements FarmUi {
         this.hud.setZoom(this.scene.isFar);
       },
       help: () => this.dialogs.help(),
+      nextLevel: () => this.dialogs.nextLevel(),
       seeds: () => (this.seeds ? this.closeSeeds() : this.openSeeds(null)),
       musicVolume: () => musicVolume(),
       setMusicVolume: (v) => this.music.setVolume(v),
@@ -553,8 +554,8 @@ class FarmScreen implements FarmUi {
     this.hud.setPressed(this.sheet?.id ?? (this.editor.isEditing ? 'build' : null));
   }
 
-  seedSwipe(id: CropId, event: PointerEvent): void {
-    seedSwipe(this, id, event);
+  pressSeedRow(row: HTMLElement, id: CropId | null, event: PointerEvent): void {
+    pressSeedRow(this, row, id, event);
   }
 
   chosenField(): PlacedObject | null {

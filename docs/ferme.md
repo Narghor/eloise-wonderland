@@ -301,7 +301,7 @@ La valeur d'un produit fabriqué = la valeur de ses entrées + 20 à 40 % ; les 
 
 | arbre (2 × 2) | niveau | prix | donne |
 |---|---|---|---|
-| **Noisetier** (3 au plus) | 5 | 150 🌰 | 5 à 10 Éloisettes toutes les 4 h |
+| **Noisetier** (3 au plus) | 5 | 150 🌰 | ~35 % d'une commande moyenne de son niveau (±25 %), toutes les 4 h : ~35 au niv. 5, ~63 au niv. 10, ~175 au niv. 30 (16/11 ; avant : 5 à 10) |
 
 ### 7.5 La friche
 
@@ -998,14 +998,22 @@ recette, chaque quête demande des choses qui existent à son niveau) et les rè
 - Les autres jeux du site (casino, aquarium…) n'ont pas été revus : seul l'anti-veille les concerne.
 ## 21. Retours de test de Flo (16/11 au soir, non commité)
 
-- **Graines au-delà de l'écran (fraises…) impossibles à faire défiler** : chaque graine avait `touch-action: none` et
-  la rangée en est pleine, donc le doigt ne la faisait jamais défiler. Les graines passent en `pan-x` : un glissé de
-  côté fait défiler la rangée (le navigateur prend le doigt, `pointercancel` : rien n'est semé), un glissé vers le haut
-  emmène la graine sur les champs comme avant. À la souris, la molette fait défiler la rangée de côté.
-  Le défilement au doigt n'a pas pu être vérifié en headless (Chrome headless ne fait défiler aucune zone au doigt
-  simulé) : **à tester sur téléphone**.
+- **Graines au-delà de l'écran (fraises…) impossibles à faire défiler** : 1er essai (commit 9dd6618, `touch-action: pan-x` laissé au navigateur) RATÉ sur le téléphone de Flo ; en plus, la graine verrouillée et les graines trop chères étaient des boutons `disabled`, qui peuvent avaler le doigt. Refait : la rangée gère elle-même le glissé (`pressSeedRow`, farmSeedSwipe ; rangée et graines en `touch-action: none`, graines éteintes en `.is-off` + `aria-disabled`, jamais `disabled`) : le premier mouvement de plus de 8 px décide, de côté = la rangée défile (avec élan après un coup de doigt), vers le haut = la graine part semer, partout dans la rangée, graine verrouillée comprise. À la souris, glisser ou la molette. Vérifié en headless (doigt et souris, niveau 6, depuis la fraise verrouillée ; semis vers le haut intact).
 - **Toucher une déco n'ouvre plus de bulle** (elle disait seulement « Aménager ») ; `decoBubble` supprimée. On la
   déplace toujours par Aménager ou un appui long.
 - **La petite bulle « prêt » se touche** (cadeau de la boîte aux lettres, produit d'un enclos ou d'une machine, cookies
   à donner, commande de la charrette) : `readyBubbleAt` dans farmScene, testée avant l'objet lui-même ; le dessin et le
   toucher partagent `readyIcon` / `readyBubblePlace`. Les glissés de semis et de récolte l'ignorent (`objectAtWorld`).
+- **Le Noisetier « un peu nul »** (5 à 10 Éloisettes toutes les 4 h = 4 à 7 % d'une commande ; MESURE : 0-1 % des
+  Éloisettes gagnées) : il donne maintenant **35 % d'une commande moyenne de son niveau**, ±25 %
+  (`TREE_YIELDS.hazel.gives.orderPercent`, `treeNuts` dans farmProduction, `orderBasket` / `averageOrderNuts` dans
+  farmOrders = la seule formule de la taille d'une commande, simulateur compris). La bulle dit « environ N Éloisettes ».
+  MESURE (simulateur, graine 1) : noisetiers 10-11 % des Éloisettes (posée, régulière), 5 % (accro) ; rythme des
+  niveaux inchangé à un jour près ; Éloisettes en poche +10 à 15 %. Pommier et Cerisier inchangés. farm-check 60.
+- **« bientôt : … » illisible dans le bandeau** (MESURE : 95 px de texte sur un téléphone de 360 px ; un niveau ouvre
+  2 à 8 choses, le bandeau n'en montrait qu'une) : le bandeau dit seulement « X / Y XP » ; le TOUCHER ouvre la fiche
+  « Au niveau N » (`FarmDialogs.nextLevel`) : XP restante, récompense, tout ce que le niveau ouvre (`unlocksAt`).
+- **La Laiterie ne montrait pas qu'elle travaille** (pas de cheminée, donc pas de fumée) : cheminée de pierre en face et
+  en profil, et sur la Filature de profil (`stoneStack` dans farmArt, `CHIMNEYS`). Toutes les machines fument
+  maintenant en travaillant, le Moulin tourne ses ailes.
+- **Boutique, Bâtiments** : dans l'ordre du niveau qui les ouvre (tri stable : l'ordre des données entre égaux).

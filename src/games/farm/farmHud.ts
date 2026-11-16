@@ -4,7 +4,7 @@ import { xpToNext } from './data/levels';
 import { person } from './data/people';
 import { faceSprite, spriteImage, uiIcon, type UiIcon } from './farmArt';
 import { deliverableCount } from './farmOrders';
-import { isChestReady, isQuestReady, objectiveProgress, openQuests, unlocksAt } from './farmProgress';
+import { isChestReady, isQuestReady, objectiveProgress, openQuests } from './farmProgress';
 import type { FarmSave } from './farmSave';
 
 // -----------------------------------------------
@@ -19,6 +19,8 @@ export interface HudActions {
   zoom(): void;
   help(): void;
   seeds(): void;
+  /** What the next level opens, in full: the band only has room for the XP. */
+  nextLevel(): void;
   musicVolume(): number;
   setMusicVolume(value: number): void;
 }
@@ -55,11 +57,13 @@ export class FarmHud {
     const back = el('a', { class: 'farm-back', href: '#/', 'aria-label': 'Retour aux jeux' }, spriteImage(uiIcon('back'), 3));
     const boosters = el('button', { class: 'farm-round farm-box', type: 'button', 'aria-label': 'Mes boosters' }, spriteImage(uiIcon('sack'), 3), this.boosterCount);
     boosters.addEventListener('click', () => actions.sheet('bag'));
+    const level = el('button', { class: 'farm-level farm-box', type: 'button', 'aria-label': 'Le prochain niveau' }, this.levelBadge, el('div', { class: 'farm-level-meta' }, this.levelText, el('div', { class: 'farm-xp' }, this.xpFill)));
+    level.addEventListener('click', () => actions.nextLevel());
     this.top = el(
       'div',
       { class: 'farm-top' },
       back,
-      el('div', { class: 'farm-level farm-box' }, this.levelBadge, el('div', { class: 'farm-level-meta' }, this.levelText, el('div', { class: 'farm-xp' }, this.xpFill))),
+      level,
       this.money,
       boosters,
     );
@@ -133,9 +137,7 @@ export class FarmHud {
   refresh(save: FarmSave): void {
     const next = xpToNext(save.level);
     this.levelBadge.textContent = String(save.level);
-    // What the next level opens, so there is always something just ahead.
-    const soon = unlocksAt(save.level + 1)[0]?.split(' : ')[1];
-    this.levelText.textContent = next === null ? 'Niveau maximum' : `${save.xp} / ${next} XP${soon ? ` · bientôt : ${soon}` : ''}`;
+    this.levelText.textContent = next === null ? 'Niveau maximum' : `${save.xp} / ${next} XP`;
     this.xpFill.style.transform = `scaleX(${next === null ? 1 : Math.min(1, save.xp / next)})`;
     this.nuts.textContent = save.nuts.toLocaleString('fr-FR');
     const boosters = Object.values(save.boosters).reduce((a, b) => a + b, 0);

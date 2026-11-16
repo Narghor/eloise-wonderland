@@ -24,10 +24,10 @@ import { CHARM_STEPS, charmOf, charmStep, totalCharm } from '../src/games/farm/d
 import { project } from '../src/games/farm/data/projects';
 import type { BreedId, ItemId, PlaceableId, Rarity, TreeId, Unlock } from '../src/games/farm/data/types';
 import {
-  CART_BACK_MINUTES, CART_NUTS, CART_PARCEL_CHANCE, CART_SENT_AWAY_MINUTES, CART_XP, ORDER_NUTS, ORDER_XP, SPECIAL_CHANCE, SPECIAL_LEVEL,
+  CART_BACK_MINUTES, CART_NUTS, CART_PARCEL_CHANCE, CART_SENT_AWAY_MINUTES, CART_XP, ORDER_NUTS, ORDER_XP, SPECIAL_CHANCE, SPECIAL_LEVEL, orderBasket,
 } from '../src/games/farm/farmOrders';
 import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, TREASURES, breed, type Prize } from '../src/games/farm/data/parcels';
-import { MERCHANT_SHARE as DATA_MERCHANT_SHARE } from '../src/games/farm/farmProduction';
+import { MERCHANT_SHARE as DATA_MERCHANT_SHARE, TREE_NUTS_SPREAD, treeNuts } from '../src/games/farm/farmProduction';
 
 const DAYS = Number(process.argv[2] ?? 90);
 const SEED = Number(process.argv[3] ?? 7);
@@ -72,8 +72,8 @@ const DEMAND_ONE_LEVEL = !!process.env.DEMAND_ONE_LEVEL;
 
 const hazel = placeable('hazel');
 const DATA_HAZEL = TREE_YIELDS.hazel;
-const HAZEL_NUTS = 'nuts' in DATA_HAZEL.gives ? DATA_HAZEL.gives.nuts : ([0, 0] as const);
-const HAZEL = { level: levelOf(hazel.unlock), price: hazel.price, max: hazel.maxCount ?? 1, minutes: DATA_HAZEL.minutes, coins: HAZEL_NUTS, xp: DATA_HAZEL.xp };
+const HAZEL_PERCENT = 'orderPercent' in DATA_HAZEL.gives ? DATA_HAZEL.gives.orderPercent : 0;
+const HAZEL = { level: levelOf(hazel.unlock), price: hazel.price, max: hazel.maxCount ?? 1, minutes: DATA_HAZEL.minutes, xp: DATA_HAZEL.xp };
 
 /** Trees that give fruit (the apple and cherry trees of lot 2): bought like the hazel, picked on each visit. */
 interface FruitTree { id: string; level: number; price: number; max: number; minutes: number; item: string; count: number; xp: number }
@@ -496,7 +496,7 @@ class Farm {
   rollOrder(now: number): Order {
     const pool = this.orderable();
     const n = Math.min(pool.length, 1 + (this.random() < 0.5 ? 1 : 0) + (this.level >= 5 && this.random() < 0.25 ? 1 : 0));
-    const target = (12 + 10 * this.level) * (0.7 + 0.6 * this.random());
+    const target = orderBasket(this.level) * (0.7 + 0.6 * this.random());
     const items: Record<string, number> = {};
     let value = 0;
     const picked = new Set<number>();
@@ -602,7 +602,7 @@ class Farm {
     }
     this.hazels.forEach((readyAt, i) => {
       if (readyAt <= now) {
-        this.earn(HAZEL.coins[0] + Math.floor(this.random() * (HAZEL.coins[1] - HAZEL.coins[0] + 1)), 'noisetiers');
+        this.earn(Math.round(treeNuts(HAZEL_PERCENT, this.level) * (1 - TREE_NUTS_SPREAD + 2 * TREE_NUTS_SPREAD * this.random())), 'noisetiers');
         this.gainXp(HAZEL.xp, now, 'noisetiers');
         this.hazels[i] = now + HAZEL.minutes;
       }

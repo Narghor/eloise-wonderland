@@ -36,12 +36,22 @@ export function orderable(save: FarmSave): ItemId[] {
   return list;
 }
 
+/** The value of the goods in an average order at this level (orders draw from half to one and a half times it). */
+export function orderBasket(level: number): number {
+  return 12 + 10 * level;
+}
+
+/** What an average order pays at this level, before charm and "coup de coeur". */
+export function averageOrderNuts(level: number): number {
+  return orderBasket(level) * ORDER_NUTS;
+}
+
 /** One to three products, their quantities following the level. */
 export function rollOrder(save: FarmSave, random: () => number): Order {
   const pool = orderable(save);
   const n = Math.min(pool.length, 1 + (random() < 0.5 ? 1 : 0) + (save.level >= 5 && random() < 0.25 ? 1 : 0));
   // From a small basket to a big one: the same mean as before, a wider spread so no two orders look alike.
-  const target = (12 + 10 * save.level) * (0.45 + 1.1 * random());
+  const target = orderBasket(save.level) * (0.45 + 1.1 * random());
   const picked = new Set<ItemId>();
   while (picked.size < n) picked.add(pool[Math.floor(random() * pool.length)]);
   const items: Partial<Record<ItemId, number>> = {};

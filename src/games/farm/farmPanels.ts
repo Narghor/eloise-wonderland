@@ -31,6 +31,7 @@ import {
   readyAnimals,
   sellPrice,
   trayJobs,
+  treeNuts,
 } from './farmProduction';
 import {
   charm,
@@ -64,8 +65,8 @@ export interface FarmUi {
   openSheet(id: SheetId, tab?: string): void;
   toast(text: string): void;
   startPlacing(id: PlaceableId): void;
-  /** Starts a seed swipe from a seed button of the field bubble. */
-  seedSwipe(crop: CropId, event: PointerEvent): void;
+  /** A finger or the mouse pressed in the seed row: on a seed that can be sown (`crop`), or on a locked one or a gap (null). */
+  pressSeedRow(row: HTMLElement, crop: CropId | null, event: PointerEvent): void;
   sow(field: PlacedObject, crop: CropId): void;
   collect(object: PlacedObject): void;
   queue(machine: PlacedObject, itemId: ItemId): void;
@@ -174,12 +175,14 @@ function growth(readyAt: number, total: number, now: number): HTMLElement[] {
 export function seedRow(ui: FarmUi, chosen: PlacedObject | null, close: () => void): Node[] {
   // The seeds already open and only the next one to unlock: the later ones are nothing to act on yet.
   const next = CROPS.find((c) => !isUnlocked(ui.save, c.unlock));
+  // Never `disabled`: a disabled button may swallow the finger, and every seed must let the row be dragged.
+  const sowable = new Map<Element, CropId>();
   const seeds = CROPS.filter((c) => c === next || isUnlocked(ui.save, c.unlock)).map((c) => {
     const open = c !== next;
     const affordable = ui.save.nuts >= c.seed;
     const b = el(
       'button',
-      { class: `farm-seed${c.id === ui.save.lastSeed ? ' is-last' : ''}`, type: 'button', ...(open && affordable ? {} : { disabled: '' }) },
+      { class: `farm-seed${c.id === ui.save.lastSeed ? ' is-last' : ''}${open && affordable ? '' : ' is-off'}`, type: 'button', ...(open && affordable ? {} : { 'aria-disabled': 'true' }) },
       open ? img(itemIcon(c.id), 2) : img(uiIcon('lock'), 2),
       item(c.id).name,
       ...(open
@@ -190,19 +193,21 @@ export function seedRow(ui: FarmUi, chosen: PlacedObject | null, close: () => vo
           ]
         : [el('small', { text: unlockText(c.unlock) })]),
     );
-    b.addEventListener('pointerdown', (e) => {
-      if (!open || !affordable) return;
-      e.preventDefault();
-      ui.seedSwipe(c.id, e);
-    });
+    if (open && affordable) sowable.set(b, c.id);
     return b;
   });
   const shut = el('button', { class: 'farm-close', type: 'button', 'aria-label': 'Fermer les graines', text: '×' });
   shut.addEventListener('click', close);
+  const row = el('div', { class: 'farm-seedbar-row' }, ...seeds);
+  row.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const seed = (e.target as Element).closest('.farm-seed');
+    ui.pressSeedRow(row, (seed && sowable.get(seed)) ?? null, e);
+  });
   return [
     el('span', { class: 'farm-grip', 'aria-hidden': 'true' }),
     el('div', { class: 'farm-seedbar-head' }, el('p', { text: chosen ? 'Touche une graine pour ce champ, ou fais-la glisser sur les champs vides.' : 'Fais glisser une graine sur les champs vides.' }), shut),
-    el('div', { class: 'farm-seedbar-row' }, ...seeds),
+    row,
   ];
 }
 
@@ -301,7 +306,7 @@ export function machineBubble(ui: FarmUi, machine: PlacedObject): Node[] {
 
 export function treeBubble(ui: FarmUi, tree: PlacedObject): Node[] {
   const y = TREE_YIELDS[tree.type as TreeId];
-  const gives = 'nuts' in y.gives ? `${y.gives.nuts[0]} à ${y.gives.nuts[1]} Éloisettes` : itemCount(y.gives.item, y.gives.count);
+  const gives = 'orderPercent' in y.gives ? `environ ${treeNuts(y.gives.orderPercent, ui.save.level)} Éloisettes` : itemCount(y.gives.item, y.gives.count);
   const hours = y.minutes / 60;
   return [
     el('h3', { text: placeable(tree.type).name }),
@@ -615,8 +620,6 @@ function shopCard(ui: FarmUi, p: Placeable, onBuy: () => void, extra?: string): 
   const refusal = buyRefusal(ui.save, p);
   const stored = p.kind === 'deco' ? ui.save.decorStore[p.id as DecorId] ?? 0 : 0;
   let foot: HTMLElement;
-  if (stored > 0) foot = el('span', { class: 'farm-price', text: `${stored} rangée${stored > 1 ? 's' : ''}` });
-  else if (refusal === 'locked') foot = el('span', { class: 'farm-price' }, img(uiIcon('lock'), 1), unlockText(p.unlock));
   // A machine's or a pen's next copy opens later (COPY_LEVELS): say when.
   const own = ownCount(ui.save, p.id);
   const nextCopy = hasCopies(p) ? copyLevel(p, own + 1) : null;
@@ -639,7 +642,9 @@ function shopCard(ui: FarmUi, p: Placeable, onBuy: () => void, extra?: string): 
 }
 
 function buildingsShop(ui: FarmUi): Node[] {
-  const list = PLACEABLES.filter((p) => p.kind === 'field' || p.kind === 'machine' || p.kind === 'pen' || p.kind === 'tree');
+  // In the order they open, the first level first (a sort keeps the data's order between equals).
+  const baseLevel = (p: Placeable) => ('level' in p.unlock ? p.unlock.level : Infinity);
+  const list = PLACEABLES.filter((p) => p.kind === 'field' || p.kind === 'machine' || p.kind === 'pen' || p.kind === 'tree').sort((a, b) => baseLevel(a) - baseLevel(b));
   const fields = ownCount(ui.save, 'field');
   return [
     el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), p.kind === 'field' ? `${fields} / ${capOf(ui.save, p)}` : p.kind === 'tree' ? `${ownCount(ui.save, p.id)} / ${p.maxCount}` : hasCopies(p) && ownCount(ui.save, p.id) > 0 ? `${ownCount(ui.save, p.id)} sur ta ferme` : undefined))),

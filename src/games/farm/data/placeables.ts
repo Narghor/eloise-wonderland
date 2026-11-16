@@ -133,15 +133,18 @@ export function isTree(id: PlaceableId): id is TreeId {
 
 export const DECOR = PLACEABLES.filter((p) => p.kind === 'deco' && !p.treasure && !p.retired);
 
-/** What a tree gives every `minutes`, never replanted: Eloisettes (the hazel) or fruit. */
+/**
+ * What a tree gives every `minutes`, never replanted: fruit, or Eloisettes (the hazel) worth `orderPercent` of an
+ * average order at the farm's level, so a pick never becomes pocket change as the farm grows.
+ */
 export interface TreeYield {
   minutes: number;
   xp: number;
-  gives: { nuts: readonly [number, number] } | { item: ItemId; count: number };
+  gives: { orderPercent: number } | { item: ItemId; count: number };
 }
 
 export const TREE_YIELDS: Record<TreeId, TreeYield> = {
-  hazel: { minutes: 240, xp: 1, gives: { nuts: [5, 10] } },
+  hazel: { minutes: 240, xp: 1, gives: { orderPercent: 35 } },
   apple: { minutes: 180, xp: 2, gives: { item: 'apple', count: 4 } },
   cherry: { minutes: 300, xp: 3, gives: { item: 'cherry', count: 4 } },
 };

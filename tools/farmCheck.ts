@@ -27,7 +27,7 @@ import { ITEMS } from '../src/games/farm/data/items';
 import {
   buyAndPlace, buyRefusal, capOf, ensureCart, priceOf, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
 } from '../src/games/farm/farmMap';
-import { CART_BACK_MINUTES, deliverCart, orderable, refillCart, rollOrder } from '../src/games/farm/farmOrders';
+import { CART_BACK_MINUTES, averageOrderNuts, deliverCart, orderable, refillCart, rollOrder } from '../src/games/farm/farmOrders';
 import { deliverMail, isPrizeOpen, openParcel } from '../src/games/farm/farmParcels';
 import { breedsOf, buyAnimal, collectMachine, collectPen, collectTree, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
 import { loadFarm, saveFarm, type FarmSave } from '../src/games/farm/farmSave';
@@ -392,6 +392,17 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   const early = collectTree(farm, tree, now);
   const ripe = collectTree(farm, tree, now + TREE_YIELDS.apple.minutes * MINUTE_MS);
   check('an apple tree gives apples when ripe, not before', early === null && ripe?.item === 'apple' && (farm.stock.apple ?? 0) === ripe.count);
+  // The hazel keeps up with the farm: about a third of an average order, whatever the level.
+  const hazelSpot = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 2, 2)!;
+  const hazelTree = buyAndPlace(farm, 'hazel', hazelSpot[0], hazelSpot[1], 0, now)!;
+  const hazelPick = (level: number) => {
+    farm.level = level;
+    hazelTree.readyAt = now;
+    return collectTree(farm, hazelTree, now, () => 0.5)?.count ?? 0;
+  };
+  const picks = [5, 10, 30].map(hazelPick);
+  check('a hazel gives about a third of an order at levels 5, 10 and 30', picks.every((n, i) => Math.abs(n / averageOrderNuts([5, 10, 30][i]) - 0.35) < 0.02));
+  farm.level = 9;
 
   // An old save with a decorative apple tree on the map and one put away.
   const deco = buyAndPlace(farm, 'fence', spot[0] + 3, spot[1], 0, now)!;

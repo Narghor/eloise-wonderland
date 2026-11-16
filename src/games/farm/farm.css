@@ -123,6 +123,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+  text-align: left;
   padding: 4px 10px 4px 4px;
   border-radius: 10px;
   flex: 1 1 auto;
@@ -508,8 +510,7 @@
   background: var(--card-bg);
   border: 2px solid var(--card-border);
   font: 500 11px/1.15 var(--ui-font);
-  /* A sideways drag scrolls the row; a drag up takes the seed to the fields. */
-  touch-action: pan-x;
+  touch-action: none;
 }
 
 .farm-seed small {
@@ -527,7 +528,7 @@
   border-color: var(--ui-accent);
 }
 
-.farm-seed[disabled] {
+.farm-seed.is-off {
   opacity: 0.45;
   cursor: default;
 }
@@ -751,7 +752,8 @@
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  touch-action: pan-x;
+  /* The row is dragged by our own code (farmSeedSwipe), the same way on every browser, finger or mouse. */
+  touch-action: none;
 }
 
 .farm-seedbar-row .farm-seed {

@@ -8,6 +8,7 @@ import type { BreedId, CropId, ItemId, MachineId, PenId, TreeId } from './data/t
 import { MINUTE_MS } from './farmTime';
 import { HUNGRY, type FarmSave, type PlacedObject } from './farmSave';
 import { penRoom } from './farmMap';
+import { averageOrderNuts } from './farmOrders';
 import { addItem, earn, emit, gainXp, have, hasItems, isUnlocked, ownCount, spend, takeItems } from './farmProgress';
 
 // -----------------------------------------------
@@ -203,10 +204,18 @@ export function buySlot(save: FarmSave, machine: PlacedObject): boolean {
 // TREES
 // -----------------------------------------------
 
+/** A tree's Eloisettes vary by this share either side of their mean. */
+export const TREE_NUTS_SPREAD = 0.25;
+
 /** What a tree gives when it is ready: Eloisettes for the hazel, fruit for the others. */
 export function treeGives(tree: PlacedObject): ItemId | 'nuts' {
   const gives = TREE_YIELDS[tree.type as TreeId].gives;
-  return 'nuts' in gives ? 'nuts' : gives.item;
+  return 'orderPercent' in gives ? 'nuts' : gives.item;
+}
+
+/** The Eloisettes a tree giving `orderPercent` of an order brings on average at this level. */
+export function treeNuts(orderPercent: number, level: number): number {
+  return Math.round((averageOrderNuts(level) * orderPercent) / 100);
 }
 
 export function collectTree(save: FarmSave, tree: PlacedObject, now: number, random: () => number = Math.random): Gain | null {
@@ -215,8 +224,8 @@ export function collectTree(save: FarmSave, tree: PlacedObject, now: number, ran
   tree.readyAt = now + y.minutes * MINUTE_MS;
   gainXp(save, y.xp);
   emit(save, { type: 'collect', target: tree.type, kind: 'tree', count: 1 });
-  if ('nuts' in y.gives) {
-    const nuts = y.gives.nuts[0] + Math.floor(random() * (y.gives.nuts[1] - y.gives.nuts[0] + 1));
+  if ('orderPercent' in y.gives) {
+    const nuts = Math.round(treeNuts(y.gives.orderPercent, save.level) * (1 - TREE_NUTS_SPREAD + 2 * TREE_NUTS_SPREAD * random()));
     earn(save, nuts);
     return { item: 'nuts', count: nuts, xp: y.xp };
   }
