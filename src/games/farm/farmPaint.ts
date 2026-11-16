@@ -1,4 +1,5 @@
 import { mulberry32 } from '../../random';
+import { JOIN_EAST, JOIN_NORTH, JOIN_SOUTH, JOIN_WEST } from './data/skins';
 
 // -----------------------------------------------
 // THE FARM'S PAINTING KIT
@@ -8,6 +9,8 @@ import { mulberry32 } from '../../random';
 
 export const TILE = 16;
 export const OUTLINE = '#4a3135';
+/** The villagers' skin, on the map and in the portraits. */
+export const SKIN = '#f5cfae';
 export type Sprite = HTMLCanvasElement;
 export type View = 'face' | 'profile';
 export type FieldStage = 'empty' | 'sprout' | 'growing' | 'ripe';
@@ -145,6 +148,22 @@ export const C = {
   blue: '#5b86b8', blueDark: '#45699a', blueLight: '#86acd6',
   red: '#e0475b', orange: '#f08a2b', orangeDark: '#d46a1f',
 };
+
+export const ROSE = '#f06a96';
+export const ROSE_DARK = '#c94a76';
+export const ROSE_LIGHT = '#ffb3cc';
+export const SPARKLE = '#fff6c8';
+/** The halo around falling water. */
+export const WATER_MIST = '#d6eefc';
+
+/** A small four-point twinkle. */
+export function twinkle(P: Painter, x: number, y: number): void {
+  P.px(x, y, SPARKLE);
+  P.px(x - 1, y, '#ffe9a0');
+  P.px(x + 1, y, '#ffe9a0');
+  P.px(x, y - 1, '#ffe9a0');
+  P.px(x, y + 1, '#ffe9a0');
+}
 
 // -----------------------------------------------
 // BUILDING KIT: one light from the top left, three or four tones per material (docs/ferme.md 16, step 3)
@@ -332,4 +351,50 @@ export function cookieDisc(P: Painter, cx: number, cy: number, r: number): void 
   for (const [dx, dy] of [[-2, -1], [1, -2], [2, 1], [-1, 2], [0, 0]] as const) {
     if (Math.abs(dx) < r - 1 && Math.abs(dy) < r - 1) P.px(cx + dx, cy + dy, COOKIE.chip);
   }
+}
+
+// -----------------------------------------------
+// PATHS: one tile that joins its neighbours of the same kind (docs/ferme.md 16)
+// -----------------------------------------------
+
+export interface PathLook {
+  base: string;
+  edge: string;
+  rim: string;
+}
+
+/** Paints only inside the path, clear of its worn edges: `clip` cuts to it, `inside` tells whether a pixel is in it. */
+export type PathInside = (P: Painter, clip: (x: number, y: number, w: number, h: number, col: string) => void, inside: (x: number, y: number) => boolean) => void;
+
+/** One tile of path: worn edges and rounded corners wherever no path of the same kind goes on; `sides` is a join mask. */
+export function pathTile(sides: number, look: PathLook, paintInside: PathInside): Sprite {
+  return sprite(TILE, TILE, (P) => {
+    const openN = (sides & JOIN_NORTH) === 0;
+    const openE = (sides & JOIN_EAST) === 0;
+    const openS = (sides & JOIN_SOUTH) === 0;
+    const openW = (sides & JOIN_WEST) === 0;
+    const last = TILE - 1;
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        // A rounded outer corner: its tip stays grass.
+        const corner = (openN && openW && x + y < 2) || (openN && openE && last - x + y < 2) || (openS && openW && x + last - y < 2) || (openS && openE && 2 * last - x - y < 2);
+        if (corner) continue;
+        const d = Math.min(openN ? y : 9, openS ? last - y : 9, openW ? x : 9, openE ? last - x : 9);
+        P.px(x, y, d === 0 ? look.rim : d === 1 ? look.edge : look.base);
+      }
+    }
+    const x0 = openW ? 2 : 0;
+    const x1 = openE ? TILE - 2 : TILE;
+    const y0 = openN ? 2 : 0;
+    const y1 = openS ? TILE - 2 : TILE;
+    const inside = (x: number, y: number) => x >= x0 && x < x1 && y >= y0 && y < y1;
+    const clip = (x: number, y: number, w: number, h: number, col: string) => {
+      const l = Math.max(x, x0);
+      const t = Math.max(y, y0);
+      const r = Math.min(x + w, x1);
+      const b = Math.min(y + h, y1);
+      if (r > l && b > t) P.rect(l, t, r - l, b - t, col);
+    };
+    paintInside(P, clip, inside);
+  }, false, 0);
 }

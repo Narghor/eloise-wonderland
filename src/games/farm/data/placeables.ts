@@ -30,13 +30,17 @@ export interface Placeable {
   perches?: boolean;
   /** No longer sold; its id stays for old saves, which turn it into something else on load (farmSave.ts). */
   retired?: boolean;
+  /** A big, very dear decoration, one per farm: where the Eloisettes go once everything else is bought (docs/ferme.md 23). */
+  showpiece?: boolean;
 }
 
 /** Machines and pens: their copies open with the levels (COPY_LEVELS), not with a fixed count. */
 const machine = (id: MachineId, name: string, level: number, price: number): Placeable => ({ id, name, kind: 'machine', size: [2, 2], price, unlock: atLevel(level) });
 const pen = (id: PenId, name: string, level: number, price: number): Placeable => ({ id, name, kind: 'pen', size: [3, 3], price, unlock: atLevel(level) });
-const tree = (id: TreeId, name: string, level: number, price: number, maxCount: number): Placeable => ({ id, name, kind: 'tree', size: [2, 2], price, unlock: atLevel(level), maxCount });
+/** A tree stands on its trunk's tile; its crown spreads over the tiles around, so a path may run behind it. */
+const tree = (id: TreeId, name: string, level: number, price: number, maxCount: number): Placeable => ({ id, name, kind: 'tree', size: [1, 1], price, unlock: atLevel(level), maxCount });
 const deco = (id: DecorId, name: string, size: [number, number], price: number, level: number, flat = false): Placeable => ({ id, name, kind: 'deco', size, price, unlock: atLevel(level), ...(flat ? { flat } : {}) });
+const showpiece = (id: DecorId, name: string, size: [number, number], price: number, level: number): Placeable => ({ ...deco(id, name, size, price, level), maxCount: 1, showpiece: true });
 const treasure = (id: DecorId, name: string, size: [number, number], price: number): Placeable => ({ id, name, kind: 'deco', size, price, unlock: atLevel(1), treasure: true });
 const wild = (id: ObstacleId, name: string, size: [number, number]): Placeable => ({ id, name, kind: 'obstacle', size, price: 0, unlock: atLevel(1) });
 
@@ -86,6 +90,39 @@ export const PLACEABLES: readonly Placeable[] = [
   { ...deco('lantern', 'Lanterne', [1, 1], 60, 8), perches: true },
   { ...deco('birdhouse', 'Nichoir', [1, 1], 45, 9), perches: true },
   deco('pond', 'Petite mare', [2, 2], 150, 10),
+  // The big lot of 16/11 (docs/ferme.md 23): something at every level up to 21, cheap enough to place by the dozen.
+  deco('tulips', 'Massif de tulipes', [1, 1], 20, 5),
+  { ...deco('pathFlag', 'Chemin dallé', [1, 1], 6, 6, true), joins: 'pathFlag' },
+  { ...deco('wateringCan', 'Arrosoir', [1, 1], 30, 6), perches: true },
+  deco('flowerBarrel', 'Tonneau fleuri', [1, 1], 60, 6),
+  deco('lavender', 'Touffe de lavande', [1, 1], 25, 7),
+  { ...deco('candleJar', 'Photophore', [1, 1], 40, 7), perches: true },
+  deco('picnicTable', 'Table de pique-nique', [2, 1], 300, 8),
+  deco('sunflowers', 'Tournesols', [1, 1], 30, 9),
+  { ...deco('pathGravel', 'Allée de gravier', [1, 1], 5, 9, true), joins: 'pathGravel' },
+  deco('birdBath', 'Bain d’oiseaux', [1, 1], 250, 9),
+  deco('lamppost', 'Lampadaire', [1, 1], 350, 10),
+  deco('deckChair', 'Chaise longue', [2, 1], 500, 11),
+  deco('weathervane', 'Girouette', [1, 1], 400, 11),
+  deco('hydrangeas', 'Hortensias', [1, 1], 40, 12),
+  { ...deco('pathPlank', 'Chemin de planches', [1, 1], 10, 13, true), joins: 'pathPlank' },
+  deco('parasol', 'Parasol', [1, 1], 400, 13),
+  deco('lilyPond', 'Bassin aux nénuphars', [2, 2], 2000, 14),
+  deco('climbingRose', 'Rosier grimpant', [1, 1], 120, 15),
+  deco('stringLights', 'Guirlande lumineuse', [2, 1], 800, 15),
+  deco('hammock', 'Hamac', [2, 1], 1500, 16),
+  deco('flowerCart', 'Charrette fleurie', [2, 1], 1200, 17),
+  deco('planter', 'Jardinière', [2, 1], 200, 18),
+  deco('gardenBridge', 'Pont de jardin', [3, 2], 5000, 19),
+  deco('porchSwing', 'Balancelle', [2, 1], 3000, 21),
+  // Showpieces: one of each, from two days to two weeks of a regular player's Eloisettes at their level (docs/ferme.md 23).
+  showpiece('pergola', 'Pergola fleurie', [3, 2], 10000, 10),
+  showpiece('bandstand', 'Kiosque à musique', [3, 3], 40000, 14),
+  showpiece('greenhouse', 'Serre', [3, 2], 80000, 17),
+  showpiece('treehouse', 'Cabane dans l’arbre', [3, 3], 150000, 20),
+  showpiece('dovecote', 'Pigeonnier', [2, 2], 250000, 23),
+  showpiece('carousel', 'Manège de chevaux de bois', [3, 3], 400000, 26),
+  showpiece('hedgeMaze', 'Labyrinthe de haies', [4, 4], 1000000, 30),
   // The wild, cleared one piece at a time (land.ts).
   wild('bush', 'Buisson', [1, 1]),
   wild('stump', 'Souche', [1, 1]),

@@ -21,13 +21,13 @@ import { CROPS } from '../src/games/farm/data/crops';
 import { RECIPES } from '../src/games/farm/data/machines';
 import { QUESTS } from '../src/games/farm/data/quests';
 import type { ItemId, PlaceableId, TreeId, Unlock } from '../src/games/farm/data/types';
-import { CHARM_STEPS, totalCharm } from '../src/games/farm/data/charm';
+import { CHARM_STEPS, MAX_DECOR_CHARM, charmOf, totalCharm } from '../src/games/farm/data/charm';
 import { WalkMap, isWalkable } from '../src/games/farm/farmPaths';
 import { FarmStrollers, strollerCap, strollerTip } from '../src/games/farm/farmStrollers';
 import { PITY, PRIZES, TREASURES } from '../src/games/farm/data/parcels';
 import { ITEMS } from '../src/games/farm/data/items';
 import {
-  buyAndPlace, buyRefusal, capOf, ensureCart, priceOf, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
+  buyAndPlace, buyRefusal, capOf, decorShopList, ensureCart, priceOf, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
 } from '../src/games/farm/farmMap';
 import { CART_BACK_MINUTES, averageOrderNuts, deliverCart, orderable, refillCart, rollOrder } from '../src/games/farm/farmOrders';
 import { deliverMail, isPrizeOpen, openParcel } from '../src/games/farm/farmParcels';
@@ -415,6 +415,11 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   const back = loadFarm()!;
   const turned = back.objects.find((o) => o.uid === deco.uid);
   check('an old decorative apple tree becomes a ripe fruit tree, a stored one is paid back', turned?.type === 'apple' && turned.readyAt === 0 && !back.decorStore.appleTree && back.nuts === nutsBefore + 2 * placeable('appleTree').price);
+  // Before version 3 a tree took 2 x 2 tiles: it stands on its trunk's tile, the lower left one of its old square.
+  back.version = 2;
+  saveFarm(back);
+  const trunk = loadFarm()!.objects.find((o) => o.uid === hazelTree.uid);
+  check('a tree of a version 2 save moves onto its trunk tile', placeable('hazel').size.join() === '1,1' && trunk?.x === hazelTree.x && trunk.y === hazelTree.y + 1);
 
   const duck = PRIZES.epic.find((p) => p.kind === 'breed' && p.breed === 'mandarinDuck')!;
   check('a rare duck only comes once ducks are unlocked', !isPrizeOpen(back, duck) && ((back.level = 19), isPrizeOpen(back, duck)));
@@ -629,6 +634,43 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
     }
   }
   check('on a swing seen from the side they swing, and a grown-up pushes Jules, nobody else', swung > 0 && pushes > 0 && wrongPush === 0, `${pushes} images à pousser, ${wrongPush} fautives`);
+}
+
+// -----------------------------------------------
+// THE BIG DECORATION LOT (docs/ferme.md 23)
+// -----------------------------------------------
+{
+  check('no decoration brings more charm than a legendary treasure; the old ones keep theirs',
+    charmOf('pergola') === MAX_DECOR_CHARM && charmOf('hedgeMaze') === MAX_DECOR_CHARM && charmOf('pond') === 15 && charmOf('fountain') === 60,
+    `${charmOf('pergola')}, ${charmOf('pond')}`);
+
+  const farm = newFarm(now);
+  farm.level = 8;
+  const shop = decorShopList(farm);
+  const lockedLevels = new Set(shop.decor.filter((p) => buyRefusal(farm, p) === 'locked').map((p) => ('level' in p.unlock ? p.unlock.level : 0)));
+  check('at level 8 the shop shows what is open and the next level only',
+    [...lockedLevels].join() === '9' && shop.decor.some((p) => p.id === 'picnicTable') && !shop.decor.some((p) => p.id === 'lamppost'),
+    [...lockedLevels].join());
+  check('at level 8 only the next showpiece shows', shop.showpieces.map((p) => p.id).join() === 'pergola');
+
+  farm.level = 10;
+  farm.nuts = 30000;
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 5, 4)!;
+  const pergola = buyAndPlace(farm, 'pergola', x + 1, y + 1, 0, now);
+  check('a showpiece is one per farm, stored or not', !!pergola && buyRefusal(farm, placeable('pergola')) === 'max'
+    && storeObject(farm, pergola!) && buyRefusal(farm, placeable('pergola')) === 'max');
+
+  const [px, py] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2 + 5, 3, 1)!;
+  buyAndPlace(farm, 'pathFlag', px, py, 0, now);
+  buyAndPlace(farm, 'pathFlag', px + 1, py, 0, now);
+  buyAndPlace(farm, 'pathGravel', px + 2, py, 0, now);
+  const index = joinIndex(farm.objects);
+  check('a flagstone path joins its kind, not the gravel', joinMask(index, px + 1, py, 'pathFlag') === JOIN_WEST && joinMask(index, px + 2, py, 'pathGravel') === 0);
+
+  const [bx, by] = freeSpotNear(farm, MAP_SIZE / 2 - 4, MAP_SIZE / 2, 2, 1)!;
+  const bench = buyAndPlace(farm, 'bench', bx, by, 0, now)!;
+  const can = buyAndPlace(farm, 'wateringCan', 0, 0, 0, now, bench);
+  check('the watering can sits on a bench', !!can && can.on === bench.uid);
 }
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);
 if (failures > 0) process.exitCode = 1;

@@ -37,11 +37,20 @@ export type DecorId =
   | 'fence' | 'hedge' | 'flowersPink' | 'flowersYellow' | 'flowersWhite' | 'pathStone' | 'pathDirt'
   | 'bench' | 'well' | 'scarecrow' | 'lantern' | 'wheelbarrow' | 'appleTree' | 'logPile' | 'birdhouse' | 'pond'
   | 'fenceGate' | 'flowerPot'
+  // The big decoration lot of 16/11 (docs/ferme.md 23).
+  | 'tulips' | 'lavender' | 'sunflowers' | 'hydrangeas' | 'climbingRose' | 'planter'
+  | 'pathFlag' | 'pathGravel' | 'pathPlank'
+  | 'wateringCan' | 'picnicTable' | 'deckChair' | 'parasol' | 'hammock' | 'porchSwing'
+  | 'birdBath' | 'lilyPond' | 'gardenBridge'
+  | 'candleJar' | 'lamppost' | 'stringLights'
+  | 'flowerBarrel' | 'weathervane' | 'flowerCart'
+  // Showpieces: one of each, very dear (data/placeables.ts).
+  | 'pergola' | 'bandstand' | 'greenhouse' | 'treehouse' | 'dovecote' | 'carousel' | 'hedgeMaze'
   // Treasures: found first in Gaston's parcels, then bought in the shop.
   | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
 
 /** Pieces that join their neighbours of the same family: a fence and its gate, a hedge, each kind of path. */
-export type JoinFamily = 'fence' | 'hedge' | 'pathDirt' | 'pathStone';
+export type JoinFamily = 'fence' | 'hedge' | 'pathDirt' | 'pathStone' | 'pathFlag' | 'pathGravel' | 'pathPlank';
 
 /** The looks a joined piece can wear (data/skins.ts). */
 export type SkinId = 'fenceRanch' | 'fencePicket' | 'fenceWattle';

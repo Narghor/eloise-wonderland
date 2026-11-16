@@ -18,6 +18,14 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-16-grand-lot-decos',
+    date: '16 novembre',
+    news: [
+      '🌷 Un grand lot de décos pour la ferme : tulipes, lavande, tournesols, un hamac avec un chat qui dort dedans, des guirlandes qui s’allument la nuit, un bassin aux nénuphars, un pont de jardin… Et sept grandes pièces à s’offrir avec tes Éloisettes, de la pergola fleurie au labyrinthe de haies !',
+      '🌳 Les arbres ne prennent plus que la case de leur tronc, et les portraits des villageois sont plus jolis.',
+    ],
+  },
+  {
     id: '2026-11-16-promeneurs-jeux',
     date: '16 novembre',
     news: ['🦆 Les promeneurs s’amusent encore plus : ils nourrissent les canards, pêchent dans la mare, font un vœu à la fontaine, tirent l’eau du puits, montrent les oiseaux du nichoir et se balancent. Un grand vient même pousser Jules sur la balançoire !'],

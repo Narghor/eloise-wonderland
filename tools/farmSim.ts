@@ -273,7 +273,8 @@ class Farm {
   /** The decorating player spends her decoration budget: every decoration in turn, or the most charm per Eloisette. */
   buyDecor(now: number): void {
     if (!this.decor) return;
-    const open = DECOR.filter((d) => levelOf(d.unlock) <= this.level);
+    // The showpieces come out of the purse, not out of this budget (buyShowpieces).
+    const open = DECOR.filter((d) => !d.showpiece && levelOf(d.unlock) <= this.level);
     const cheapest = [...open].sort((a, b) => charmOf(b.id) / b.price - charmOf(a.id) / a.price || a.price - b.price)[0];
     for (;;) {
       const pick = this.decor.style === 'cheap' ? cheapest : open[this.decorTurn % open.length];
@@ -285,6 +286,21 @@ class Farm {
       this.decorTurn++;
       this.placeDecor(pick, now);
     }
+  }
+
+  /** When each showpiece was bought. */
+  showpieceAt: Partial<Record<PlaceableId, number>> = {};
+
+  /**
+   * Every player buys the showpieces in the order they open, once the farm has its machines and its land: whatever
+   * the purse holds beyond twice the reserve (docs/ferme.md 23).
+   */
+  buyShowpieces(now: number): void {
+    const next = DECOR.filter((d) => d.showpiece && this.showpieceAt[d.id] === undefined).sort((a, b) => levelOf(a.unlock) - levelOf(b.unlock))[0];
+    if (!next || levelOf(next.unlock) > this.level || this.coins < next.price + 2 * (20 + 5 * this.level)) return;
+    this.coins -= next.price;
+    this.showpieceAt[next.id] = now;
+    this.placeDecor(next, now);
   }
 
   /** Collects Gaston's rounds and opens every parcel, as a player would on each visit. */
@@ -589,6 +605,7 @@ class Farm {
     if (rule) this.useBoosters(now);
     this.sellSurplus();
     this.buyDecor(now);
+    this.buyShowpieces(now);
   }
 
   collect(now: number): void {
@@ -921,6 +938,7 @@ for (const profile of PICKED) {
   const steps = CHARM_STEPS.slice(1).map((s, i) => `${s.min} ${when(farm.charmAt[i + 1]).trim()}`).join(' · ');
   const deco = farm.decor ? `, deco : ${farm.decorBought} achats, ${Math.round(farm.decorSpent)} Eloisettes` : '';
   console.log(`    charme ${Math.round(farm.charm)} a la fin ; paliers : ${steps}${deco}`);
+  console.log(`    grandes pieces : ${DECOR.filter((p) => p.showpiece).map((p) => `${p.id} ${when(farm.showpieceAt[p.id]).trim()}`).join(' · ')}`);
   if (process.env.FARM_DETAIL) {
     console.log(`    XP : ${shares(farm.xpFrom)}\n    Eloisettes : ${shares(farm.coinsFrom)}`);
     console.log(`    ${detail(farm)}`);

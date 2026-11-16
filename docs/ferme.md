@@ -1204,3 +1204,90 @@ de quête, commandes). Lettres de la palette commune (`SHARED`) : `e` haut de l'
 `p` joue (#f7a3b0) à côté de l'œil, `n` nez (#e0a07c, 2 px de face ; de profil 1 px de peau qui dépasse du bord du
 visage), `o` bouche (#b8545e) ; les anciennes joues `c` au bas du visage sont parties. Léon et Basile gardent
 moustache et barbe à la place de la bouche ; les joues de Capucine sont sous ses lunettes sur le portrait.
+
+## 23. Retours d'Eloise du 16/11 au soir : arbres, portraits, décos
+
+### Les arbres prennent une case (FAIT le 16/11, non commité, pas joué sur téléphone)
+
+Retour : « les arbres prennent trop de place, on ne peut pas mettre de chemin derrière ». MESURE : un arbre fruitier
+occupait 2 × 2 cases pour un tronc de 4 px ; le feuillage (30 px de large, 42 de haut) dépassait déjà au-dessus.
+Choix de Flo : **un arbre = la case de son tronc** (`tree()` dans data/placeables.ts, `size [1, 1]`). Le feuillage passe
+par-dessus les cases voisines ; deux arbres côte à côte ont leurs feuillages qui se chevauchent (effet verger).
+- Vieilles sauvegardes : `FARM_VERSION` 3, `standTreesOnTrunks` (farmSave) pose chaque arbre sur la case en bas à
+  gauche de son ancien carré (`y + 1`). farm-check 80.
+- Toucher (farmScene `objectAtWorld`) : un objet DEBOUT sous le doigt d'abord, puis le dessin des machines, enclos et
+  arbres, et un chemin (plat) seulement en dernier : toucher un feuillage ou un toit dessiné par-dessus un chemin
+  prend l'arbre ou la machine, plus le chemin.
+- Vu en capture : chemin pavé derrière trois arbres et un banc, chemin de terre devant, toucher le feuillage au-dessus
+  du pavé ouvre la bulle du Cerisier.
+
+### Les portraits (style A choisi par Flo le 16/11, intégré, non commité, pas joué sur téléphone)
+
+Retour : « les icônes des personnages sont encore moches dans les quêtes / commandes ». MESURE : `faceSprite` fait
+14 × 14 pixels, peau d'une seule teinte, pas d'épaules, affiché à 28 px dans un cadre de 34 ; le reste de l'interface
+a un contour et 3 tons. Planche : https://claude.ai/artifact/Az5H4KHvDF3cbFu4X5FESq (aujourd'hui / **A buste** 22 × 22,
+épaules dans la tenue de la carte, tablier, carreaux de Basile, boutons dorés de Gaston, cadre 48 px / **B grosse
+tête** 24 × 24, grands yeux 2 × 3 avec reflet, juste le col, cadre 52 px). Les deux gardent le visage C de la carte.
+Dessin par un petit rastériseur à calques (masque + 3 tons, lumière en haut à gauche) branché sur `sprite()` de
+farmPaint : source scratchpad `farm3/portraits/board.ts` (perdue à terme : la planche publiée la contient, minifiée).
+**A choisi** (« A :) »). Intégré : `farmArtFaces.ts` (le rastériseur à calques, style A seul ; `farmArt` le
+réexporte, les appelants ne changent pas), `SKIN` déménage dans farmPaint (une seule source pour la carte et les
+portraits). `.farm-face` passe de 34 à 48 px (portrait ×2), 72 px dans un dialogue parlé (×3, `.farm-speech .farm-face`) ;
+pastille de l'appel de la cour décalée (left 38 px) ; barre TEST descendue à +130 px sous la pastille de quête. Vu en
+capture : pastille de quête, Quêtes, Commandes (Capucine et ses lunettes lisibles), dialogue de Marthe. PAS VU :
+l'appel de la cour (farmGateCall).
+
+### Le gros lot de décos + dépenser les Éloisettes (VALIDÉ par Flo le 16/11, à faire dans une conversation dédiée)
+
+Retour : Eloise « veut bien plus de déco, elle aime beaucoup ce qu'on a fait ». Aujourd'hui : 17 décos en boutique
++ 6 trésors de colis. Les Éloisettes s'entassent (section 19, « Décisions de Flo » : à remesurer). Choix de Flo : faire
+les deux d'un coup.
+1. Liste chiffrée par thèmes, environ 25 à 30 décos : fleurs (massifs variés, lavande, tournesols, rosier grimpant),
+   chemins (dalles, gravier, planches), mobilier de jardin (table de pique-nique, chaise longue, hamac, parasol),
+   eau (passerelle, bassin aux nénuphars), lumières (guirlande, lampadaire), et de GRANDES pièces très chères qui
+   absorbent les Éloisettes (kiosque, pergola, serre, cabane…). Prix et niveaux mesurés au simulateur.
+2. Planche à choisir à l'œil (Flo et Eloise).
+3. Code : data/placeables.ts, dessins, promeneurs qui s'en servent si c'est simple (section 22).
+
+**MESURE du 16/11 (avant le lot, `FARM_DETAIL=1 node tools/farm-sim.mjs 200 1`)** : Éloisettes en poche de la
+régulière : niv. 10 21 600 (j15), niv. 15 119 500, niv. 20 440 000, niv. 30 1 270 000 ; gain par jour ~2 000 au
+niv. 10, ~6 000 au 15, ~9 000 au 20, ~15 000 au 30. Les décos de 2 à 400 valaient une à trois heures de gain.
+
+**Validé par Flo (16/11) et CODÉ le 16/11 (non commité, pas joué sur téléphone).**
+- **Plafond de charme** : une déco rapporte un dixième de son prix, **60 au plus** (`MAX_DECOR_CHARM` = un trésor
+  légendaire, data/charm.ts). Sans lui, la pergola (10 000) donnait 1 000 de charme, toute l'échelle d'un coup.
+  Aucune déco d'avant ne change (la plus chère, la mare, 15).
+- **24 décos** (data/placeables.ts, niveau · prix ; annoncées « 22 » à Flo, erreur de compte : la liste est la même) : tulipes 5 · 20, chemin dallé 6 · 6, arrosoir 6 · 30 (se pose),
+  tonneau fleuri 6 · 60, lavande 7 · 25, photophore 7 · 40 (se pose), table de pique-nique 8 · 300, tournesols 9 · 30,
+  allée de gravier 9 · 5, bain d'oiseaux 9 · 250, lampadaire 10 · 350, chaise longue 11 · 500, girouette 11 · 400,
+  hortensias 12 · 40, chemin de planches 13 · 10, parasol 13 · 400, bassin aux nénuphars 14 · 2 000, rosier grimpant
+  15 · 120, guirlande lumineuse 15 · 800, hamac 16 · 1 500, charrette fleurie 17 · 1 200, jardinière 18 · 200, pont de
+  jardin 19 · 5 000, balancelle 21 · 3 000. Les trois chemins se raccordent chacun avec son espèce (familles
+  `pathFlag`, `pathGravel`, `pathPlank`).
+- **7 grandes pièces** (`showpiece`, une par ferme, `maxCount` 1, rangée ou non : `buyRefusal` compte le rangement) :
+  pergola fleurie 10 · 10 000, kiosque à musique 14 · 40 000, serre 17 · 80 000, cabane dans l'arbre 20 · 150 000,
+  **pigeonnier** 23 · 250 000 (au lieu du moulin à vent proposé : il ressemblait au Moulin, une machine),
+  manège de chevaux de bois 26 · 400 000, labyrinthe de haies 30 · 1 000 000.
+- **Boutique Déco** (`decorShopList`, farmMap) : triée par niveau ; ce qui est ouvert, plus les décos du **prochain
+  niveau seulement** sous cadenas, puis les trésors trouvés ; les grandes pièces ouvertes et **la prochaine seule**,
+  sous la ligne « Grandes pièces : une seule de chaque par ferme. De beaux projets pour tes Éloisettes. » Au niv. 8 :
+  7 décos neuves achetables, 4 du niv. 9 sous cadenas, la pergola en vue.
+- **Dessins** : `farmArtDecor.ts` (face et profil pour les pièces longues, un seul dessin + miroir pour les rondes,
+  `GARDEN_SYMMETRIC`) ; chemin commun `pathTile` (farmPaint), rose et scintillement déménagés dans farmPaint.
+  **Lumières de nuit** généralisées : `glowsOf` (farmArt) remplace le cas de la lanterne dans farmScene ; brillent
+  le lampadaire, le photophore, les ampoules de la guirlande, du kiosque et du manège, la fenêtre de la cabane.
+- **Promeneurs** (gestes existants seulement) : tulipes, lavande, hortensias comme les parterres ; tournesols à côté
+  seulement (ils cachent qui est derrière) ; table de pique-nique de face comme la table à thé (à deux : trinquer) ;
+  bain d'oiseaux comme le nichoir ; bassin : pêcher ou jeter une pièce. Le reste : l'arrêt simple. Les grandes pièces
+  attirent (poids = charme, 60).
+- **MESURE après le lot** (simulateur : chaque profil achète la grande pièce suivante dès qu'il a son prix + deux
+  réserves, `buyShowpieces`) : la régulière les prend le jour où elles s'ouvrent (pergola j15, kiosque j28, serre j46,
+  cabane j66, pigeonnier j85, manège j102) ; Éloisettes en poche au niv. 20 : 322 000 (au lieu de 440 000), au niv. 30
+  : **403 000 (au lieu de 1 270 000)** ; le labyrinthe (1 000 000) reste un objectif au-delà du niv. 30. Les six
+  grandes pièces mènent seules à « Ferme de rêve » (300 de charme) : accepté, elles coûtent ce qu'elles coûtent.
+- Vérifié : farm-check **86** (plafond, boutique au niv. 8, une grande pièce par ferme rangée ou non, chemins dallé /
+  gravier, arrosoir sur un banc) ; planche et vraie scène (ferme niv. 30 garnie, de jour et de nuit, boutique niv. 8).
+  Scénarios de capture : scratchpad (perdus) ; méthode de la section 22 + fuseau `Emulation.setTimezoneOverride`
+  (`Etc/GMT±N`) pour forcer la nuit, bouton « Vue d'ensemble » pour voir loin.
+- **Pas fait** : le manège ne tourne pas, la balancelle et le hamac ne bougent pas, personne ne s'assoit dans les
+  grandes pièces (gestes neufs à dessiner si Eloise le demande).

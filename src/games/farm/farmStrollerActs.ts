@@ -146,15 +146,46 @@ function places(o: PlacedObject): Place[] {
         together: 'cheers',
         over,
       }));
+    case 'picnicTable':
+      // At either end of the table seen from the front, a glass of lemonade; along it, its benches are in the way.
+      if (profile) return [];
+      return [0, 1].map((i) => ({
+        index: i,
+        tiles: [[i ? o.x + 2 : o.x - 1, o.y]],
+        point: { x: i ? left + 2 * TILE + 6 : left - 6, y: o.y * TILE + 12 },
+        view: 'side',
+        face: i ? -1 : 1,
+        lift: null,
+        alone: ['sipTea'],
+        together: 'cheers',
+        over,
+      }));
     case 'flowersPink':
     case 'flowersYellow':
     case 'flowersWhite':
-      // Behind the bed, facing us, the flowers before the knees; or crouched beside it.
-      return [
+    case 'tulips':
+    case 'lavender':
+    case 'hydrangeas':
+    case 'sunflowers': {
+      // Behind the bed, facing us, the flowers before the knees; or crouched beside it. Sunflowers hide whoever
+      // stands behind them: beside only.
+      const all: Place[] = [
         { index: 0, tiles: [[o.x, o.y - 1]], point: { x: left + 8, y: o.y * TILE + 9 }, view: 'front', face: 1, lift: null, alone: ['sniff'], together: null, over },
         { index: 1, tiles: [[o.x - 1, o.y]], point: { x: left - 5, y: o.y * TILE + 12 }, view: 'side', face: 1, lift: null, alone: ['butterfly', 'pickFlower'], together: null, over },
         { index: 2, tiles: [[o.x + 1, o.y]], point: { x: left + TILE + 5, y: o.y * TILE + 12 }, view: 'side', face: -1, lift: null, alone: ['butterfly', 'pickFlower'], together: null, over },
       ];
+      return o.type === 'sunflowers' ? all.slice(1) : all;
+    }
+    case 'birdBath': {
+      // The water of the basin, where the robin bathes.
+      const basin = { x: left + 8, y: bottom - 11 };
+      return [0, 1].map((i) => beside(i, i === 1, 6, ['pointBird', 'feedBirds'], basin));
+    }
+    case 'lilyPond': {
+      // The middle of the water: a line for the koi, or a coin for luck.
+      const water = { x: left + 16, y: bottom - 9 };
+      return [0, 1].map((i) => beside(i, i === 1, 5, ['fish', 'wishCoin'], water));
+    }
     case 'birdhouse': {
       // The round hole of the little house, on its pole (a birdhouse sitting on a fence is never stopped at).
       const hole = { x: left + 8, y: bottom - 17 };

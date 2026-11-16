@@ -2,7 +2,7 @@ import { mulberry32 } from '../../random';
 import { PEN_CAPACITY } from './data/animals';
 import { STARTING_FIELDS, fieldPrice, maxFields } from './data/crops';
 import { STARTING_QUEUE } from './data/machines';
-import { COPY_LEVELS, TREE_YIELDS, copyLevel, hasCopies, placeable, type Placeable } from './data/placeables';
+import { COPY_LEVELS, DECOR, PLACEABLES, TREE_YIELDS, copyLevel, hasCopies, placeable, type Placeable } from './data/placeables';
 import type { TreasureId } from './data/parcels';
 import {
   MAP_SIZE,
@@ -104,12 +104,33 @@ export function capOf(save: FarmSave, p: Placeable): number {
 }
 
 /**
+ * What the decoration shop shows (docs/ferme.md 23), by level: what is open, the decorations of the next level only,
+ * the treasures already found, then the showpieces open and the next one; never the whole list of locked cards.
+ */
+export function decorShopList(save: FarmSave): { decor: Placeable[]; showpieces: Placeable[] } {
+  const levelOf = (p: Placeable) => ('level' in p.unlock ? p.unlock.level : 1);
+  const open = (p: Placeable) => isUnlocked(save, p.unlock);
+  const byLevel = (a: Placeable, b: Placeable) => levelOf(a) - levelOf(b);
+  const plain = DECOR.filter((p) => !p.showpiece).sort(byLevel);
+  const nextLevel = Math.min(...plain.filter((p) => !open(p)).map(levelOf));
+  const treasures = PLACEABLES.filter((p) => p.treasure && save.album.includes(p.id as TreasureId));
+  const showpieces = DECOR.filter((p) => p.showpiece).sort(byLevel);
+  const nextShowpiece = showpieces.find((p) => !open(p));
+  return {
+    decor: [...plain.filter((p) => open(p) || levelOf(p) === nextLevel), ...treasures],
+    showpieces: showpieces.filter((p) => open(p) || p === nextShowpiece),
+  };
+}
+
+/**
  * Why a placeable cannot be bought now, or null when it can. A stored decoration is always free to place; a
- * treasure is bought only once a parcel has brought the first one.
+ * treasure is bought only once a parcel has brought the first one. A stored decoration still counts against its cap
+ * (a showpiece put away is not a reason to buy a second one).
  */
 export function buyRefusal(save: FarmSave, p: Placeable): BuyRefusal {
   if (p.treasure ? !save.album.includes(p.id as TreasureId) : !isUnlocked(save, p.unlock)) return 'locked';
-  if (ownCount(save, p.id) >= capOf(save, p)) return 'max';
+  const stored = p.kind === 'deco' ? save.decorStore[p.id as DecorId] ?? 0 : 0;
+  if (ownCount(save, p.id) + stored >= capOf(save, p)) return 'max';
   if (save.nuts < priceOf(save, p)) return 'nuts';
   return null;
 }

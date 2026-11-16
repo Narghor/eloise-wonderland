@@ -323,9 +323,10 @@
   text-align: left;
 }
 
+/* A portrait is 24 pixels with its outline (farmArtFaces), shown twice its size. */
 .farm-face {
-  width: 34px;
-  height: 34px;
+  width: 48px;
+  height: 48px;
   border-radius: 7px;
   background: var(--ui-soft);
   display: grid;
@@ -386,7 +387,7 @@
 
 .farm-gate-call .farm-count {
   top: -6px;
-  left: 26px;
+  left: 38px;
   right: auto;
 }
 
@@ -1269,6 +1270,12 @@
   box-shadow: var(--ui-shadow);
 }
 
+/* In a dialog the portrait is shown three times its size. */
+.farm-speech .farm-face {
+  width: 72px;
+  height: 72px;
+}
+
 .farm-speech {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1291,7 +1298,7 @@
 .farm-test {
   position: absolute;
   left: calc(env(safe-area-inset-left) + 8px);
-  top: calc(env(safe-area-inset-top) + 116px);
+  top: calc(env(safe-area-inset-top) + 130px);
   display: grid;
   gap: 4px;
   padding: 6px;

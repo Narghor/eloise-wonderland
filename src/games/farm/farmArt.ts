@@ -5,13 +5,17 @@ import { mulberry32 } from '../../random';
 import {
   TILE, OUTLINE, canvas, sprite, cached, mapSprite, C, ROOF_RED, ROOF_BLUE, ROOF_BROWN, ROOF_SLATE, DOOR, DOOR_BLUE, TIMBER, TIMBER_LIGHT,
   WARM_STONE, GLINT, tiledRoof, eave, tiledGable, stones, framedWindow, plankDoor, yard, sideAndFrontFence, backFence, planks,
-  ROOF_PINK, COOKIE, cookieDisc, IRON, IRON_LIGHT, RIDGES,
+  ROOF_PINK, COOKIE, cookieDisc, IRON, IRON_LIGHT, RIDGES, SKIN, ROSE, ROSE_DARK, ROSE_LIGHT, SPARKLE, WATER_MIST, twinkle, pathTile,
 } from './farmPaint';
 import type { Sprite, View, FieldStage, Painter, PixelMap } from './farmPaint';
 import { LOT2_CROP_PAINT, LOT2_ITEM_MAPS, type Lot2Crop, type Lot2Item } from './farmArtItems';
 import { LOT2_CHIMNEYS, lot2Machine } from './farmArtMachines';
 import { LOT2_PEN_AREAS, lot2Animal, lot2Breed, lot2Pen, type Lot2Pen } from './farmArtAnimals';
-export { TILE, OUTLINE, sprite, cached, C } from './farmPaint';
+import { faceSprite } from './farmArtFaces';
+import { GARDEN_SYMMETRIC, gardenDecor, gardenGlows, gardenPath, isGardenDecor, isGardenPath, type GardenDecor, type GardenPath, type Glow } from './farmArtDecor';
+export type { Glow } from './farmArtDecor';
+export { TILE, OUTLINE, SKIN, sprite, cached, C } from './farmPaint';
+export { faceSprite } from './farmArtFaces';
 export type { Sprite, View, FieldStage, Painter } from './farmPaint';
 
 // -----------------------------------------------
@@ -1103,6 +1107,10 @@ const FENCE_ART: Record<SkinId, (P: Painter, sides: number, gate: boolean, climb
 export function joinedSprite(type: PlaceableId, skin: SkinId | null, mask: number): Sprite {
   if (type === 'hedge') return hedgeSprite(mask);
   if (type === 'pathDirt' || type === 'pathStone') return pathSprite(type === 'pathStone', mask);
+  if (isGardenPath(type)) {
+    const sides = mask & (ACROSS | ALONG);
+    return cached(`path-${type}-${sides}`, () => gardenPath(type, sides));
+  }
   return fenceSprite(skin ?? 'fenceRanch', mask, type === 'fenceGate');
 }
 
@@ -1156,35 +1164,8 @@ function hedgeSprite(mask: number): Sprite {
 /** One tile of path: worn edges and rounded corners wherever no path of the same kind goes on. */
 function pathSprite(stone: boolean, mask: number): Sprite {
   const sides = mask & (ACROSS | ALONG);
-  return cached(`path-${stone ? 'stone' : 'dirt'}-${sides}`, () => sprite(TILE, TILE, (P) => {
-    const openN = (sides & JOIN_NORTH) === 0;
-    const openE = (sides & JOIN_EAST) === 0;
-    const openS = (sides & JOIN_SOUTH) === 0;
-    const openW = (sides & JOIN_WEST) === 0;
-    const pal = stone ? { base: '#d8c4a0', edge: '#c3aa82', rim: '#a88d66' } : { base: '#c99a66', edge: '#b5854f', rim: '#9c7044' };
-    const last = TILE - 1;
-    for (let y = 0; y < TILE; y++) {
-      for (let x = 0; x < TILE; x++) {
-        // A rounded outer corner: its tip stays grass.
-        const corner = (openN && openW && x + y < 2) || (openN && openE && last - x + y < 2) || (openS && openW && x + last - y < 2) || (openS && openE && 2 * last - x - y < 2);
-        if (corner) continue;
-        const d = Math.min(openN ? y : 9, openS ? last - y : 9, openW ? x : 9, openE ? last - x : 9);
-        P.px(x, y, d === 0 ? pal.rim : d === 1 ? pal.edge : pal.base);
-      }
-    }
-    // The inside, clear of the worn edges.
-    const x0 = openW ? 2 : 0;
-    const x1 = openE ? TILE - 2 : TILE;
-    const y0 = openN ? 2 : 0;
-    const y1 = openS ? TILE - 2 : TILE;
-    const inside = (x: number, y: number) => x >= x0 && x < x1 && y >= y0 && y < y1;
-    const clip = (x: number, y: number, w: number, h: number, col: string) => {
-      const l = Math.max(x, x0);
-      const t = Math.max(y, y0);
-      const r = Math.min(x + w, x1);
-      const b = Math.min(y + h, y1);
-      if (r > l && b > t) P.rect(l, t, r - l, b - t, col);
-    };
+  const look = stone ? { base: '#d8c4a0', edge: '#c3aa82', rim: '#a88d66' } : { base: '#c99a66', edge: '#b5854f', rim: '#9c7044' };
+  return cached(`path-${stone ? 'stone' : 'dirt'}-${sides}`, () => pathTile(sides, look, (P, clip, inside) => {
     const r = mulberry32(stone ? 31 : 37);
     if (stone) {
       for (const [x, y, w, h] of [[1, 1, 6, 5], [8, 0, 7, 6], [0, 8, 5, 6], [6, 7, 5, 5], [12, 8, 4, 6], [6, 13, 6, 3]]) {
@@ -1206,7 +1187,7 @@ function pathSprite(stone: boolean, mask: number): Sprite {
         P.px(x, y + 1, '#a9906e');
       }
     }
-  }, false, 0));
+  }));
 }
 
 const FLOWER_COLORS: Record<'flowersPink' | 'flowersYellow' | 'flowersWhite', [string, string, string]> = {
@@ -1459,10 +1440,12 @@ function flowerPot(): Sprite {
 // DECORATIONS SITTING ON OTHERS (docs/ferme.md 16)
 // -----------------------------------------------
 
-export type PercherId = 'lantern' | 'birdhouse' | 'flowerPot';
+export type PercherId = 'lantern' | 'birdhouse' | 'flowerPot' | 'wateringCan' | 'candleJar';
 
 /** A decoration as it looks sitting on a support: without the pole it has on the ground. */
 export function perchedSprite(id: PercherId, view: View): Sprite {
+  // The watering can and the candle jar have no pole: they look the same anywhere.
+  if (id === 'wateringCan' || id === 'candleJar') return objectSprite(id, 'face');
   const v: View = id === 'birdhouse' ? view : 'face';
   return cached(`perched-${id}-${v}`, () => {
     if (id === 'lantern') {
@@ -1477,6 +1460,12 @@ export function perchedSprite(id: PercherId, view: View): Sprite {
     });
     return flowerPot();
   });
+}
+
+/** Where a decoration glows at night: points of its drawing as drawn (margin included, not mirrored). */
+export function glowsOf(id: PlaceableId, view: View): Glow[] {
+  if (id === 'lantern') return [{ x: 6, y: 5, r: 26 }];
+  return isGardenDecor(id) ? gardenGlows(id, GARDEN_SYMMETRIC.has(id) ? 'face' : view) : [];
 }
 
 /**
@@ -1729,20 +1718,6 @@ function bigRock(): Sprite {
 // TREASURES: the decorations only Gaston's parcels bring
 // -----------------------------------------------
 // The rewards people chase: richer colours, and a touch of gold and sparkle on the epic and legendary ones.
-
-const ROSE = '#f06a96';
-const ROSE_DARK = '#c94a76';
-const ROSE_LIGHT = '#ffb3cc';
-const SPARKLE = '#fff6c8';
-
-/** A small four-point twinkle. */
-function twinkle(P: Painter, x: number, y: number): void {
-  P.px(x, y, SPARKLE);
-  P.px(x - 1, y, '#ffe9a0');
-  P.px(x + 1, y, '#ffe9a0');
-  P.px(x, y - 1, '#ffe9a0');
-  P.px(x, y + 1, '#ffe9a0');
-}
 
 function gnome(view: View): Sprite {
   return sprite(13, 20, (P) => {
@@ -2068,9 +2043,6 @@ function fountain(): Sprite {
   });
 }
 
-/** The halo around falling water. */
-const WATER_MIST = '#d6eefc';
-
 // -----------------------------------------------
 // GASTON'S MAILBOX
 // -----------------------------------------------
@@ -2184,10 +2156,15 @@ export function heartSprite(): Sprite {
 // -----------------------------------------------
 
 export function objectSprite(id: ObjectId, view: View): Sprite {
-  const symmetric = SYMMETRIC.has(id);
-  const v: View = symmetric ? 'face' : view;
-  return cached(`obj-${id}-${v}`, () => {
-    switch (id) {
+  if (isGardenPath(id)) return joinedSprite(id, null, 0);
+  if (isGardenDecor(id)) {
+    const v: View = GARDEN_SYMMETRIC.has(id) ? 'face' : view;
+    return cached(`obj-${id}-${v}`, () => gardenDecor(id, v));
+  }
+  const own: Exclude<ObjectId, GardenDecor | GardenPath> = id;
+  const v: View = SYMMETRIC.has(own) ? 'face' : view;
+  return cached(`obj-${own}-${v}`, () => {
+    switch (own) {
       case 'mill': return mill(v);
       case 'bakery': return bakery(v);
       case 'dairy': return dairy(v);
@@ -2200,13 +2177,13 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'sewing':
       case 'iceCream':
       case 'soapWorks':
-      case 'creperie': return lot2Machine(id, v);
+      case 'creperie': return lot2Machine(own, v);
       case 'sheepfold':
       case 'pigsty':
       case 'hive':
       case 'goatShed':
       case 'duckPond':
-      case 'hutch': return lot2Pen(id, v);
+      case 'hutch': return lot2Pen(own, v);
       case 'coop': return coop(v);
       case 'cowshed': return cowshed(v);
       case 'fence': return fenceSprite('fenceRanch', ACROSS, false);
@@ -2214,7 +2191,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'hedge': return hedgeSprite(ACROSS);
       case 'flowersPink':
       case 'flowersYellow':
-      case 'flowersWhite': return flowerBed(id);
+      case 'flowersWhite': return flowerBed(own);
       case 'pathStone': return pathSprite(true, 0);
       case 'pathDirt': return pathSprite(false, 0);
       case 'bench': return bench(v);
@@ -2240,7 +2217,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'mailbox': return mailbox(v, false);
       case 'marketCart': return marketCart(v);
       default: {
-        const unknown: never = id;
+        const unknown: never = own;
         throw new Error(`no drawing for ${String(unknown)}`);
       }
     }
@@ -2415,101 +2392,6 @@ const UI_MAPS: Record<UiIcon, PixelMap> = {
 
 export function uiIcon(name: UiIcon): Sprite {
   return cached(`ui-${name}`, () => mapSprite(UI_MAPS[name].rows, UI_MAPS[name].pal));
-}
-
-// -----------------------------------------------
-// FACES
-// -----------------------------------------------
-
-export const SKIN = '#f5cfae';
-
-export function faceSprite(id: PersonId): Sprite {
-  return cached(`face-${id}`, () =>
-    sprite(14, 14, (P) => {
-      // Hair and hats behind the face.
-      if (id === 'marthe') {
-        P.disc(7, 4, 5, '#c9c3d0');
-        P.disc(7, 1, 2, '#c9c3d0');
-      } else if (id === 'rosalie') {
-        P.disc(7, 5, 6, '#e8789e');
-        P.rect(1, 5, 12, 7, '#e8789e');
-      } else if (id === 'leon') {
-        P.rect(3, 0, 8, 4, '#ffffff');
-        P.rect(2, 3, 10, 2, '#f1ece4');
-      } else if (id === 'basile') {
-        P.rect(2, 1, 10, 4, '#3f6fb0');
-        P.rect(1, 4, 7, 1, '#2f5590');
-      } else if (id === 'jules') {
-        P.disc(7, 5, 6, '#8a5a3b');
-        P.px(3, 0, '#8a5a3b');
-        P.px(9, 0, '#8a5a3b');
-        P.px(12, 2, '#8a5a3b');
-      } else if (id === 'capucine') {
-        P.disc(7, 5, 6, '#3f2f3a');
-        P.rect(1, 5, 12, 6, '#3f2f3a');
-      } else if (id === 'gaston') {
-        P.rect(2, 1, 10, 4, '#2f3f6b');
-      } else if (id === 'pivoine') {
-        P.disc(4, 1, 2, '#ffffff');
-        P.disc(9, 1, 2, '#ffffff');
-        P.rect(3, 0, 8, 4, '#ffffff');
-        P.rect(2, 6, 10, 4, '#a8693e');
-      }
-      P.ellipse(7, 8, 5, 5, SKIN);
-      // Fringes and hat brims over the forehead.
-      if (id === 'marthe') P.rect(2, 4, 10, 2, '#c9c3d0');
-      if (id === 'rosalie') {
-        P.rect(2, 3, 10, 2, '#e8789e');
-        P.px(11, 3, '#ffd84a');
-        P.px(12, 2, '#ffd84a');
-        P.px(12, 4, '#ffd84a');
-        P.px(11, 2, '#fff1a0');
-      }
-      if (id === 'jules') {
-        P.rect(2, 3, 10, 2, '#8a5a3b');
-        P.px(4, 5, '#8a5a3b');
-        P.px(8, 5, '#8a5a3b');
-      }
-      if (id === 'capucine') P.rect(2, 3, 10, 2, '#3f2f3a');
-      if (id === 'gaston') {
-        P.rect(2, 4, 10, 1, '#f2c94c');
-        P.rect(1, 5, 7, 1, '#1f2a4a');
-      }
-      if (id === 'pivoine') P.rect(3, 3, 8, 2, '#f1ece4');
-      if (id === 'capucine') {
-        P.rect(3, 7, 3, 3, '#e8eef5');
-        P.rect(8, 7, 3, 3, '#e8eef5');
-        P.px(6, 8, OUTLINE);
-        P.px(7, 8, OUTLINE);
-      }
-      // Same face as on the map (farmPeopleArt): eyes two pixels tall, blush beside them, a nose, a little mouth.
-      for (const x of [4, 9]) {
-        P.px(x, 8, OUTLINE);
-        P.px(x, 9, '#2e2228');
-      }
-      const cheek = id === 'pivoine' ? '#f27a8a' : '#f7a3b0';
-      // Capucine's glasses frame her eyes: her blush sits under them.
-      const cheekRow = id === 'capucine' ? 10 : 9;
-      P.px(3, cheekRow, cheek);
-      P.px(10, cheekRow, cheek);
-      P.px(6, 10, '#e0a07c');
-      P.px(7, 10, '#e0a07c');
-      if (id === 'jules') {
-        P.px(3, 10, '#d9946a');
-        P.px(10, 10, '#d9946a');
-      }
-      if (id === 'leon') {
-        P.rect(5, 11, 5, 1, C.bark);
-        P.px(4, 10, C.bark);
-        P.px(10, 10, C.bark);
-      } else if (id === 'basile') {
-        P.rect(3, 11, 9, 3, C.bark);
-        P.rect(5, 11, 5, 1, '#c27b74');
-      } else {
-        P.rect(6, 11, 3, 1, '#c27b74');
-      }
-    }),
-  );
 }
 
 // -----------------------------------------------
@@ -2923,6 +2805,11 @@ export function spriteImage(s: Sprite, scale: number, alt = ''): HTMLImageElemen
 // -----------------------------------------------
 
 const BOARD_CROPS: CropId[] = ['wheat', 'corn', 'carrot', 'tomato', 'strawberry', 'sunflower', 'pumpkin', 'cotton'];
+const BOARD_GARDEN: GardenDecor[] = [
+  'tulips', 'lavender', 'sunflowers', 'hydrangeas', 'climbingRose', 'planter', 'wateringCan', 'flowerBarrel', 'candleJar',
+  'picnicTable', 'deckChair', 'parasol', 'hammock', 'porchSwing', 'birdBath', 'lilyPond', 'gardenBridge', 'lamppost',
+  'stringLights', 'weathervane', 'flowerCart', 'pergola', 'bandstand', 'greenhouse', 'treehouse', 'dovecote', 'carousel', 'hedgeMaze',
+];
 const BOARD_OBJECTS: ObjectId[] = [
   'cookiery', 'mill', 'bakery', 'dairy', 'spinning', 'coop', 'cowshed',
   'fence', 'pathDirt', 'hedge', 'flowersPink', 'pathStone', 'flowersYellow', 'scarecrow', 'flowersWhite', 'bench', 'well',
@@ -3011,6 +2898,12 @@ export function artBoard(): HTMLElement {
     [readyBubble(), 'bulle'], [signSprite(), 'panneau'],
   ]);
   section('Trésors des colis (face / profil)', BOARD_TREASURES.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
+  section('Grand lot de décos (face / profil)', BOARD_GARDEN.flatMap((id): [Sprite, string][] => GARDEN_SYMMETRIC.has(id)
+    ? [[objectSprite(id, 'face'), id]]
+    : [[objectSprite(id, 'face'), id], [objectSprite(id, 'profile'), `${id} profil`]]));
+  section('Chemins du grand lot (bout, ligne, angle, croisement)', (['pathFlag', 'pathGravel', 'pathPlank'] as const).flatMap((id): [Sprite, string][] => [
+    [joinedSprite(id, null, 0), id], [joinedSprite(id, null, JOIN_EAST | JOIN_WEST), 'ligne'], [joinedSprite(id, null, JOIN_EAST | JOIN_SOUTH), 'angle'], [joinedSprite(id, null, 15), 'croisement'],
+  ]), 4);
   section('Gaston et ses colis', [
     [objectSprite('mailbox', 'face'), 'boîte'], [mailboxSprite(true, 'face'), 'boîte + courrier'],
     [objectSprite('mailbox', 'profile'), 'boîte profil'], [mailboxSprite(true, 'profile'), 'profil + courrier'],

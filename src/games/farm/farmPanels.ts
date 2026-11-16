@@ -1,6 +1,6 @@
 import { el } from '../../dom';
 import { ANIMALS, PEN_CAPACITY, animal } from './data/animals';
-import { BREED_IDS, PITY, TREASURES, breed, rarityName, type TreasureId } from './data/parcels';
+import { BREED_IDS, PITY, TREASURES, breed, rarityName } from './data/parcels';
 import { placeableBreeds } from './farmParcels';
 import { BOOSTERS, booster } from './data/boosters';
 import { CROPS, crop } from './data/crops';
@@ -16,7 +16,7 @@ import { charmOf, charmStep } from './data/charm';
 import type { BoosterId, BreedId, CropId, DecorId, ItemId, ObstacleId, PenId, PlaceableId, Reward, TreeId } from './data/types';
 import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, treeSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
 import type { SheetId } from './farmHud';
-import { buyRefusal, capOf, parcelOffers, priceOf, type ParcelOffer } from './farmMap';
+import { buyRefusal, capOf, decorShopList, parcelOffers, priceOf, type ParcelOffer } from './farmMap';
 import { canDeliver } from './farmOrders';
 import {
   fieldState,
@@ -714,11 +714,13 @@ function charmAdded(save: FarmSave, id: PlaceableId): string {
 }
 
 function decorShop(ui: FarmUi): Node[] {
-  // A treasure shows once a parcel has brought it: the album keeps the surprise.
-  const list = PLACEABLES.filter((p) => p.kind === 'deco' && !p.retired && (!p.treasure || ui.save.album.includes(p.id as TreasureId)));
+  const { decor, showpieces } = decorShopList(ui.save);
+  const card = (p: Placeable) => shopCard(ui, p, () => ui.startPlacing(p.id), charmAdded(ui.save, p.id));
   return [
     el('p', { class: 'farm-charm', text: charmLine(ui.save) }),
-    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), charmAdded(ui.save, p.id)))),
+    el('div', { class: 'farm-shop' }, ...decor.map(card)),
+    el('p', { class: 'farm-note', text: 'Grandes pièces : une seule de chaque par ferme. De beaux projets pour tes Éloisettes.' }),
+    el('div', { class: 'farm-shop' }, ...showpieces.map(card)),
     el('p', { class: 'farm-note', text: 'Un trésor trouvé dans un colis s’achète ensuite autant de fois que tu veux. Chaque déco posée ajoute du charme (un trésor, une seule fois) : Gaston passe plus souvent, les commandes paient un peu mieux et plus de promeneurs viennent la visiter. Les décos se tournent et se rangent dans « Aménager ».' }),
   ];
 }

@@ -19,7 +19,7 @@ import type { BoosterId, BreedId, CropId, DecorId, ItemId, JoinFamily, PersonId,
 // of shape, with its migration in `loadFarm`.
 
 const GAME_ID = 'farm';
-export const FARM_VERSION = 2;
+export const FARM_VERSION = 3;
 
 /** Version 1 played with lot 1's XP table: its progress in the level is kept as a share of the new one. */
 const LOT1_XP_TABLE = [15, 30, 50, 80, 200, 320, 480, 680, 950, 1600, 2900, 3700, 4500, 5300];
@@ -201,6 +201,7 @@ export function loadFarm(): FarmSave | null {
     cart: readCart(data.cart),
   };
   retireDecorAppleTrees(save);
+  if (count(data.version) < 3) standTreesOnTrunks(save);
   settlePerches(save);
   // Two objects must never share a uid: the newest uid is always above every one in use.
   save.nextUid = Math.max(save.nextUid, ...save.objects.map((o) => o.uid + 1));
@@ -262,6 +263,11 @@ function retireDecorAppleTrees(save: FarmSave): void {
     save.nuts += stored * placeable('appleTree').price;
     delete save.decorStore.appleTree;
   }
+}
+
+/** Version 3: a tree took 2 x 2 tiles, it now takes its trunk's one, the lower left tile of its old square. */
+function standTreesOnTrunks(save: FarmSave): void {
+  for (const o of save.objects) if (placeable(o.type).kind === 'tree') o.y += 1;
 }
 
 /**

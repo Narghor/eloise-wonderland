@@ -18,6 +18,7 @@ import {
   joinedSprite,
   fernSprite,
   fieldSprite,
+  glowsOf,
   treeSprite,
   heartSprite,
   itemIcon,
@@ -853,18 +854,22 @@ export class FarmScene {
     ctx.fillStyle = `rgba(${Math.round(light.r)}, ${Math.round(light.g)}, ${Math.round(light.b)}, ${light.alpha})`;
     ctx.fillRect(view.x0, view.y0, view.x1 - view.x0, view.y1 - view.y0);
     if (light.night > 0) {
-      // Lanterns glow once the evening comes.
+      // Lanterns, lampposts, candles and bulbs glow once the evening comes.
       ctx.globalCompositeOperation = 'lighter';
       for (const o of this.save.objects) {
-        if (o.type !== 'lantern' || o.uid === this.ghost?.uid) continue;
+        if (o.uid === this.ghost?.uid) continue;
+        const glows = glowsOf(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
+        if (glows.length === 0) continue;
         const { sprite, ...at } = this.drawnPlace(o);
-        const x = at.x + sprite.width / 2;
-        const y = at.y + 5;
-        const glow = ctx.createRadialGradient(x, y, 1, x, y, 26);
-        glow.addColorStop(0, `rgba(255, 205, 120, ${0.55 * light.night})`);
-        glow.addColorStop(1, 'rgba(255, 205, 120, 0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(x - 26, y - 26, 52, 52);
+        for (const g of glows) {
+          const x = at.x + (o.rot === 3 ? sprite.width - g.x : g.x);
+          const y = at.y + g.y;
+          const glow = ctx.createRadialGradient(x, y, 1, x, y, g.r);
+          glow.addColorStop(0, `rgba(255, 205, 120, ${0.55 * light.night})`);
+          glow.addColorStop(1, 'rgba(255, 205, 120, 0)');
+          ctx.fillStyle = glow;
+          ctx.fillRect(x - g.r, y - g.r, 2 * g.r, 2 * g.r);
+        }
       }
     }
     ctx.restore();
@@ -1306,10 +1311,12 @@ export class FarmScene {
       if (w.x >= x && w.x < x + sprite.width && w.y >= y && w.y < y + sprite.height) return o;
     }
     const byDepth = this.save.objects.filter((o) => o.on === undefined).sort((a, b) => footprintBottom(b) - footprintBottom(a));
-    for (const o of byDepth) {
+    const onFootprint = (o: PlacedObject) => {
       const [fw, fh] = footprint(o);
-      if (tx >= o.x && tx < o.x + fw && ty >= o.y && ty < o.y + fh) return o;
-    }
+      return tx >= o.x && tx < o.x + fw && ty >= o.y && ty < o.y + fh;
+    };
+    const standing = byDepth.find((o) => !placeable(o.type).flat && onFootprint(o));
+    if (standing) return standing;
     for (const o of byDepth) {
       const kind = placeable(o.type).kind;
       if (kind !== 'machine' && kind !== 'pen' && kind !== 'tree') continue;
@@ -1317,7 +1324,8 @@ export class FarmScene {
       const at = this.origin(o, sprite);
       if (w.x >= at.x + 2 && w.x < at.x + sprite.width - 2 && w.y >= at.y + 2 && w.y < at.y + sprite.height) return o;
     }
-    return null;
+    // A path lies under everything: a crown or a roof drawn over it is touched first.
+    return byDepth.find((o) => placeable(o.type).flat && onFootprint(o)) ?? null;
   }
 
   /** The order of a villager waiting under a screen point; none while arranging the farm. */
