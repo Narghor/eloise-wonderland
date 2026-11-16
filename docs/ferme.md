@@ -982,3 +982,17 @@ recette, chaque quête demande des choses qui existent à son niveau) et les rè
   Règle le goulot du lait.
 - **Éloisettes qui s'entassent** : à traiter après quelques semaines de tests, avec des décos ou de grosses
   améliorations **extrêmement chères** (idée de Flo).
+
+## 20. Batterie et anti-veille (16/11, demande de Flo, non commité)
+
+- **Anti-veille sur tout le site** (`src/wakeLock.ts`, branché dans le routeur de `main.ts`) : chaque écran de jeu (tout
+  sauf l'accueil) garde l'écran allumé (Screen Wake Lock) tant qu'on joue ; après **3 minutes sans toucher ni touche**
+  (`PLAYER_AWAY_MS`), le verrou est rendu et le téléphone se met en veille comme d'habitude ; le premier toucher le
+  reprend. Navigateur sans l'API : rien ne change. iPhone : Safari 16.4+ (en application installée, iOS 18.4+).
+- **Rythme d'images de la ferme** (`farmScene`) : 60 i/s pendant 3 s après un toucher (inchangé), 15 au calme (avant
+  20), 8 après 30 s (avant : après 1 min), **2 après 3 min** (le même seuil que l'anti-veille), **aucune** page cachée
+  (avant 1 par seconde) ; la minuterie de la ferme (`tick`) se met en pause quand la page est cachée.
+- **MESURE (ferme niv. 30, téléphone émulé)** : le calcul d'une image coûte ~0,6 ms sur PC, la vraie dépense est de
+  repeindre tout l'écran ; images par seconde avant → après : calme 16 → 13, après 30 s 16 → 8, après 3 min 8 → 2,
+  cachée 1 → 0. Sur 5 min sans toucher : ~35 % d'images en moins.
+- Les autres jeux du site (casino, aquarium…) n'ont pas été revus : seul l'anti-veille les concerne.

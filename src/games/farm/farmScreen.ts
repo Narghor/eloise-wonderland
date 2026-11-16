@@ -241,6 +241,8 @@ class FarmScreen implements FarmUi {
   }
 
   private tick(): void {
+    // Hidden: nothing to show; the next tick after coming back catches up (everything is computed from the clock).
+    if (document.hidden) return;
     const now = Date.now();
     // A pinch can cross from close to far: the menu says the other view.
     if (this.scene.isFar !== this.shownFar) {

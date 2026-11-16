@@ -1,4 +1,5 @@
 import { prefersReducedMotion } from '../casino/fx/effects';
+import { PLAYER_AWAY_MS } from '../../wakeLock';
 import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
 import { isTree, placeable } from './data/placeables';
 import { LOT2_CROP_COLOURS } from './farmArtItems';
@@ -190,14 +191,15 @@ const LONG_PRESS_MS = 450;
 const ZOOM_TILES = { near: 12, far: 22, closest: 7, farthest: 26 };
 const WALK_SPEED = 0.012;
 /**
- * Frame pacing, for the battery: full speed while the player touches the farm or something flies, 20 images a second
- * while the farm just lives (animals, butterflies), 8 after a minute without a touch, 1 when the page is hidden.
+ * Frame pacing, for the battery (each image repaints the whole screen): full speed while the player touches the farm or
+ * something flies, 15 images a second while the farm just lives (animals, butterflies), 8 after half a minute without
+ * a touch, 2 once the player is away (PLAYER_AWAY_MS, when the screen may sleep again), none while the page is hidden.
  */
 const BUSY_AFTER_INPUT_MS = 3000;
-const CALM_FRAME_MS = 50;
-const ASLEEP_AFTER_MS = 60_000;
+const CALM_FRAME_MS = 66;
+const ASLEEP_AFTER_MS = 30_000;
 const ASLEEP_FRAME_MS = 125;
-const HIDDEN_FRAME_MS = 1000;
+const AWAY_FRAME_MS = 500;
 /** After a pinch or the wheel, the zoom settles on the nearest scale where art pixels fall on whole screen pixels. */
 const SETTLE_AFTER_WHEEL_MS = 250;
 /** The ground past the map's edge, under the forest. */
@@ -276,10 +278,17 @@ export class FarmScene {
     this.resizer = new ResizeObserver(() => this.resize());
     this.resizer.observe(host);
     this.listen();
+    document.addEventListener('visibilitychange', this.onVisible);
     this.frameId = requestAnimationFrame((t) => this.frame(t));
   }
 
+  /** Back on the page: images again, at full speed for a moment. */
+  private readonly onVisible = (): void => {
+    if (!document.hidden) this.wake();
+  };
+
   dispose(): void {
+    document.removeEventListener('visibilitychange', this.onVisible);
     cancelAnimationFrame(this.frameId);
     window.clearTimeout(this.sleepTimer);
     window.clearTimeout(this.wheelTimer);
@@ -531,14 +540,19 @@ export class FarmScene {
 
   /** The next image: at once while busy, later when calm, the slower the longer nobody touches the farm. */
   private schedule(now: number): void {
+    // Hidden: no image at all until the page shows again (onVisible).
+    if (document.hidden) {
+      this.sleeping = true;
+      return;
+    }
     const busy = this.gesture !== null || this.zoomGoal !== null || this.panGoal !== null || this.particles.length > 0 || now - this.lastInput < BUSY_AFTER_INPUT_MS;
-    if (busy && !document.hidden) {
+    if (busy) {
       this.frameId = requestAnimationFrame((t) => this.frame(t));
       return;
     }
+    const idle = now - this.lastInput;
     // Someone walking the road keeps the calm rate, so they never stutter.
-    const asleep = now - this.lastInput > ASLEEP_AFTER_MS && !this.village.isMoving;
-    const delay = document.hidden ? HIDDEN_FRAME_MS : asleep ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
+    const delay = idle > PLAYER_AWAY_MS ? AWAY_FRAME_MS : idle > ASLEEP_AFTER_MS && !this.village.isMoving ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
     this.sleeping = true;
     this.sleepTimer = window.setTimeout(() => {
       this.sleeping = false;

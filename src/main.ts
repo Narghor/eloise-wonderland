@@ -1,5 +1,6 @@
 import './style.css';
 import { freeCanvas } from './dom';
+import { keepScreenOn } from './wakeLock';
 import { renderHome } from './home';
 import { renderPicross } from './games/picross/picrossScreen';
 import { renderColoring } from './games/coloring/coloringScreen';
@@ -79,6 +80,8 @@ function route(): void {
   freeCanvas(...root.querySelectorAll('canvas'));
   const [name, ...params] = location.hash.replace(/^#\/?/, '').split('/');
   const screen = routes[name] ?? renderHome;
+  // Every screen but the home page is a game: the screen stays on while the player plays (wakeLock.ts).
+  keepScreenOn(screen !== renderHome);
   root.replaceChildren();
   leaveScreen = screen(root, params);
   window.scrollTo(0, 0);
