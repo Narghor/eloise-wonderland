@@ -1031,35 +1031,61 @@ export class FarmScene {
       ctx.fillRect(x - 1, y, 3, 1);
       return;
     }
-    const ready = readyOn(o, clock);
-    let icon: Sprite | null = null;
-    let alpha = 1;
-    if (o.type === 'mailbox') icon = this.save.mail.waiting > 0 ? uiIcon('gift') : null;
-    else if (o.type === 'marketCart') {
-      // The cart's order: plain when it can be delivered, faded while goods are missing.
-      const order = this.save.cart.order;
-      icon = order ? uiIcon('orders') : null;
-      alpha = order && Object.entries(order.items).every(([id, n]) => have(this.save, id as ItemId) >= (n ?? 0)) ? 1 : 0.6;
-    } else if (ready === 'nuts') icon = uiIcon('nut');
-    else if (ready) icon = itemIcon(ready);
-    else if (placeable(o.type).kind === 'pen') {
-      const animal = penAnimal(o);
-      if (hungryAnimals(o) > 0 && have(this.save, animal.feed) > 0) {
-        icon = itemIcon(animal.feed);
-        alpha = 0.8;
-      }
-    }
-    if (!icon) return;
-    const sprite = this.spriteOf(o, now);
-    const at = this.origin(o, sprite);
+    const shown = this.readyIcon(o, clock);
+    if (!shown) return;
+    const { icon, alpha } = shown;
     const bubble = readyBubble();
+    const place = this.readyBubblePlace(o, now);
     const bob = this.reduced ? 0 : Math.round(Math.sin(now / 260 + o.x) * 1.5);
-    const bx = Math.round(at.x + sprite.width / 2 - bubble.width / 2);
-    const by = at.y - bubble.height + 4 + bob;
+    const bx = place.x;
+    const by = place.y + bob;
     ctx.globalAlpha = alpha;
     ctx.drawImage(bubble, bx, by);
     ctx.drawImage(icon, Math.round(bx + bubble.width / 2 - icon.width / 2), Math.round(by + (bubble.height - 2) / 2 - icon.height / 2));
     ctx.globalAlpha = 1;
+  }
+
+  /** The icon of the small bubble over an object (something to collect, a parcel, food to give), if it shows one. */
+  private readyIcon(o: PlacedObject, clock: number): { icon: Sprite; alpha: number } | null {
+    if (o.type === 'field') return null;
+    if (o.type === 'mailbox') return this.save.mail.waiting > 0 ? { icon: uiIcon('gift'), alpha: 1 } : null;
+    if (o.type === 'marketCart') {
+      // The cart's order: plain when it can be delivered, faded while goods are missing.
+      const order = this.save.cart.order;
+      if (!order) return null;
+      const complete = Object.entries(order.items).every(([id, n]) => have(this.save, id as ItemId) >= (n ?? 0));
+      return { icon: uiIcon('orders'), alpha: complete ? 1 : 0.6 };
+    }
+    const ready = readyOn(o, clock);
+    if (ready === 'nuts') return { icon: uiIcon('nut'), alpha: 1 };
+    if (ready) return { icon: itemIcon(ready), alpha: 1 };
+    if (placeable(o.type).kind === 'pen') {
+      const animal = penAnimal(o);
+      if (hungryAnimals(o) > 0 && have(this.save, animal.feed) > 0) return { icon: itemIcon(animal.feed), alpha: 0.8 };
+    }
+    return null;
+  }
+
+  /** Where an object's ready bubble is drawn: its top-left in the world, before it bobs. */
+  private readyBubblePlace(o: PlacedObject, now: number): { x: number; y: number } {
+    const sprite = this.spriteOf(o, now);
+    const at = this.origin(o, sprite);
+    const bubble = readyBubble();
+    return { x: Math.round(at.x + sprite.width / 2 - bubble.width / 2), y: at.y - bubble.height + 4 };
+  }
+
+  /** The object whose ready bubble is under a world point: the bubbles are drawn over everything, so they are touched first. */
+  private readyBubbleAt(w: { x: number; y: number }): PlacedObject | null {
+    if (this.editMode || this.ghost) return null;
+    const now = Date.now();
+    const bubble = readyBubble();
+    // Two pixels of margin all round cover the bob.
+    for (const o of this.save.objects) {
+      if (!this.readyIcon(o, now)) continue;
+      const place = this.readyBubblePlace(o, now);
+      if (w.x >= place.x - 2 && w.x < place.x + bubble.width + 2 && w.y >= place.y - 2 && w.y < place.y + bubble.height + 2) return o;
+    }
+    return null;
   }
 
   // -----------------------------------------------
@@ -1220,9 +1246,14 @@ export class FarmScene {
   // TOUCH: tap, drag to look around, swipe to harvest, drag the ghost, pinch to zoom
   // -----------------------------------------------
 
-  /** What stands under a screen point: an object (its footprint first, then its drawing), or a sign. */
+  /** What stands under a screen point: an object's ready bubble, an object (its footprint first, then its drawing), or a sign. */
   targetAtClient(clientX: number, clientY: number): PlacedObject | { parcel: number } | null {
     const w = this.toWorld(clientX, clientY);
+    return this.readyBubbleAt(w) ?? this.objectAtWorld(w);
+  }
+
+  /** The object or sign under a world point, ready bubbles left aside. */
+  private objectAtWorld(w: { x: number; y: number }): PlacedObject | { parcel: number } | null {
     const tx = Math.floor(w.x / TILE);
     const ty = Math.floor(w.y / TILE);
     const sign = this.signs.find((s) => s.x === tx && (s.y === ty || s.y - 1 === ty));
@@ -1255,8 +1286,9 @@ export class FarmScene {
     return this.village.hit(w.x, w.y);
   }
 
+  /** The field under a screen point; a bubble floating over it does not hide it from a sowing or harvesting swipe. */
   fieldAtClient(clientX: number, clientY: number): PlacedObject | null {
-    const target = this.targetAtClient(clientX, clientY);
+    const target = this.objectAtWorld(this.toWorld(clientX, clientY));
     return target && 'uid' in target && target.type === 'field' ? target : null;
   }
 

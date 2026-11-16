@@ -351,9 +351,6 @@ export function cartBubble(ui: FarmUi): Node[] {
     ),
   ];
 }
-export function decoBubble(object: PlacedObject): Node[] {
-  return [el('h3', { text: placeable(object.type).name }), el('p', { text: 'Pour la déplacer, la tourner ou la ranger : « Aménager », en bas.' })];
-}
 
 export function parcelBubble(ui: FarmUi, offer: ParcelOffer): Node[] {
   const tooLow = ui.save.level < offer.level;

@@ -70,7 +70,8 @@ export function seedSwipe(host: SeedSwipeHost, id: CropId, event: PointerEvent):
     window.removeEventListener('pointercancel', up);
     held.remove();
     const chosen = host.chosenField();
-    if (!swiping) {
+    // Cancelled: the browser took the finger to scroll the row, nothing was meant to be sown.
+    if (!swiping && e.type !== 'pointercancel') {
       if (chosen) sowOne(chosen);
       else feedback.toast('Fais glisser la graine sur un champ vide.');
     }

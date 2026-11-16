@@ -996,3 +996,16 @@ recette, chaque quête demande des choses qui existent à son niveau) et les rè
   repeindre tout l'écran ; images par seconde avant → après : calme 16 → 13, après 30 s 16 → 8, après 3 min 8 → 2,
   cachée 1 → 0. Sur 5 min sans toucher : ~35 % d'images en moins.
 - Les autres jeux du site (casino, aquarium…) n'ont pas été revus : seul l'anti-veille les concerne.
+## 21. Retours de test de Flo (16/11 au soir, non commité)
+
+- **Graines au-delà de l'écran (fraises…) impossibles à faire défiler** : chaque graine avait `touch-action: none` et
+  la rangée en est pleine, donc le doigt ne la faisait jamais défiler. Les graines passent en `pan-x` : un glissé de
+  côté fait défiler la rangée (le navigateur prend le doigt, `pointercancel` : rien n'est semé), un glissé vers le haut
+  emmène la graine sur les champs comme avant. À la souris, la molette fait défiler la rangée de côté.
+  Le défilement au doigt n'a pas pu être vérifié en headless (Chrome headless ne fait défiler aucune zone au doigt
+  simulé) : **à tester sur téléphone**.
+- **Toucher une déco n'ouvre plus de bulle** (elle disait seulement « Aménager ») ; `decoBubble` supprimée. On la
+  déplace toujours par Aménager ou un appui long.
+- **La petite bulle « prêt » se touche** (cadeau de la boîte aux lettres, produit d'un enclos ou d'une machine, cookies
+  à donner, commande de la charrette) : `readyBubbleAt` dans farmScene, testée avant l'objet lui-même ; le dessin et le
+  toucher partagent `readyIcon` / `readyBubblePlace`. Les glissés de semis et de récolte l'ignorent (`objectAtWorld`).

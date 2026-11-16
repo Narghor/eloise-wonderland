@@ -498,12 +498,6 @@
   flex-wrap: wrap;
 }
 
-.farm-seeds {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-
 .farm-seed {
   display: grid;
   justify-items: center;
@@ -514,7 +508,8 @@
   background: var(--card-bg);
   border: 2px solid var(--card-border);
   font: 500 11px/1.15 var(--ui-font);
-  touch-action: none;
+  /* A sideways drag scrolls the row; a drag up takes the seed to the fields. */
+  touch-action: pan-x;
 }
 
 .farm-seed small {

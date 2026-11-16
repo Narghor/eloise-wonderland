@@ -27,7 +27,6 @@ import { buyParcel, clearObstacle, ensureCart, ensureMailbox, newFarm, parcelOff
 import { FarmMusic, musicVolume } from './farmMusic';
 import { deliver, deliverCart, refillCart, refillOrders, refuse, sendCartAway } from './farmOrders';
 import {
-  decoBubble,
   fieldBubble,
   machineBubble,
   mailboxBubble,
@@ -358,6 +357,8 @@ class FarmScreen implements FarmUi {
     }
     if (kind === 'machine' && trayJobs(target, now) > 0 && this.bubble?.target !== target) return this.collect(target);
     if (kind === 'tree' && target.readyAt !== undefined && target.readyAt <= now) return this.collect(target);
+    // A decoration has nothing to do but be looked at: it is moved with Amenager (or a long press).
+    if (kind === 'deco') return this.closeBubble();
     this.openBubble(target);
   }
 
@@ -393,7 +394,7 @@ class FarmScreen implements FarmUi {
     if (kind === 'obstacle') return obstacleBubble(this, target);
     if (kind === 'mailbox') return mailboxBubble(this);
     if (kind === 'cart') return cartBubble(this);
-    return decoBubble(target);
+    return null;
   }
 
   /** The object's screen points a bubble hangs from: the top of its drawing and the bottom of its footprint. */
@@ -517,6 +518,13 @@ class FarmScreen implements FarmUi {
       this.seeds = { el: el('div', { class: 'farm-seedbar farm-box' }), chosen };
       this.seeds.el.addEventListener('pointerdown', (e) => e.stopPropagation());
       swipeToClose(this.seeds.el, null, () => this.closeSeeds());
+      // With a mouse, the wheel scrolls the row sideways (the seeds past the edge, like strawberries).
+      this.seeds.el.addEventListener('wheel', (e) => {
+        const row = this.seeds?.el.querySelector('.farm-seedbar-row');
+        if (!row || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+        e.preventDefault();
+        row.scrollLeft += e.deltaY;
+      }, { passive: false });
       this.overlay.append(this.seeds.el);
       this.root.classList.add('has-seeds');
     }
