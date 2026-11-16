@@ -1017,3 +1017,9 @@ recette, chaque quête demande des choses qui existent à son niveau) et les rè
   en profil, et sur la Filature de profil (`stoneStack` dans farmArt, `CHIMNEYS`). Toutes les machines fument
   maintenant en travaillant, le Moulin tourne ses ailes.
 - **Boutique, Bâtiments** : dans l'ordre du niveau qui les ouvre (tri stable : l'ordre des données entre égaux).
+- **Premiers niveaux trop rapides** (Flo niv. 8 en un jour, Eloise niv. 6 en une soirée : 2 à 3 fois plus vite que le
+  profil accro du simulateur, qui SOUS-ESTIME donc le rythme réel ; la durée du lot 2 annoncée est sans doute trop
+  optimiste) : XP des niveaux 5 à 10 DOUBLÉE (400, 1 100, 1 620, 2 280, 3 200 ; 1 à 4 inchangés = les premières
+  minutes ; 10 et plus inchangés). MESURE (graines 1 à 4, posée / régulière / accro) : niv. 8 j8 → j12-14 / j6 → j8-9 /
+  j3-4,5 → j4-6 ; niv. 10 j13 → j22 / j9,5 → j14,5 / j5 → j7,5 ; niv. 15 j43 → j52 / j27 → j32 / j13 → j15 ; niv. 30
+  j194 → j206 / j118 → j124 / j55 → j56. Une partie en cours garde son XP : la barre s'allonge.
