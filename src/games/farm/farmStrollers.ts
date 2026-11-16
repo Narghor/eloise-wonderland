@@ -7,7 +7,7 @@ import { TILE, heartSprite } from './farmArt';
 import { footprint, gateTile } from './farmMap';
 import { averageOrderNuts, canDeliver } from './farmOrders';
 import { WalkMap, isWalkable, type Tile } from './farmPaths';
-import { villagerSprite, type PersonView } from './farmPeopleArt';
+import { placedKey, villagerSprite, type PersonView, type Placed } from './farmPeopleArt';
 import { charm } from './farmProgress';
 import type { FarmSave, PlacedObject } from './farmSave';
 import type { VillagePainter } from './farmVillage';
@@ -26,8 +26,9 @@ const STEP_MS = 190;
 const ARRIVAL_MS = { min: 20_000, max: 40_000 };
 /** When nobody is free to come, look again this much later. */
 const RETRY_MS = 5_000;
-const STOP_MS = { min: 15_000, max: 25_000 };
-/** Decorations looked at in one visit: with the stops, a visit lasts about two minutes, so the charm step shows (MESURE in docs/ferme.md 22). */
+/** Long stops: a visit lasts about six minutes, so the tips stay a small share of the farm's income (MESURE in docs/ferme.md 22). */
+const STOP_MS = { min: 110_000, max: 140_000 };
+/** Decorations looked at in one visit. */
 const STOPS_PER_VISIT = 3;
 /** A heart rises over a stroller's head this long. */
 const HEART_MS = 1_400;
@@ -134,6 +135,16 @@ export class FarmStrollers {
     return this.strollers.some((s) => s.who === who);
   }
 
+  /** Someone is walking: the scene follows each of their steps (stepKey). */
+  get isMoving(): boolean {
+    return this.strollers.some((s) => s.route.length > 0);
+  }
+
+  /** Changes exactly when a stroller's image moves by a pixel or takes its next step. */
+  get stepKey(): string {
+    return this.strollers.map((s) => placedKey(placed(s))).join(';');
+  }
+
   /** `away`: the player has not touched anything for a while; nobody new comes, the others finish their visit. */
   update(dt: number, away: boolean): void {
     if (!this.started) {
@@ -198,11 +209,7 @@ export class FarmStrollers {
   /** The strollers among the scene's drawables, sorted with everything else by their feet. */
   queue(list: { base: number; draw: () => void }[], paint: VillagePainter): void {
     for (const s of this.strollers) {
-      const moving = s.route.length > 0;
-      const frame = (moving ? Math.floor(s.clock / STEP_MS) % 2 : 0) as 0 | 1;
-      const sprite = villagerSprite(s.who, s.view, frame);
-      const x = Math.round(s.x - sprite.width / 2);
-      const y = Math.round(s.y - sprite.height + 1);
+      const { sprite, x, y } = placed(s);
       list.push({
         base: s.y + 0.5,
         draw: () => {
@@ -384,6 +391,13 @@ export class FarmStrollers {
   private between(range: { min: number; max: number }): number {
     return range.min + this.random() * (range.max - range.min);
   }
+}
+
+/** A stroller's image this frame and where it is stamped, in whole pixels. */
+function placed(s: Stroller): Placed {
+  const frame = (s.route.length > 0 ? Math.floor(s.clock / STEP_MS) % 2 : 0) as 0 | 1;
+  const sprite = villagerSprite(s.who, s.view, frame);
+  return { sprite, x: Math.round(s.x - sprite.width / 2), y: Math.round(s.y - sprite.height + 1), pose: `${s.view}${frame}${s.face}` };
 }
 
 /**

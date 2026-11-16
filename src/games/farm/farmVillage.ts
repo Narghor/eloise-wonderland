@@ -3,7 +3,7 @@ import type { ItemId, PersonId } from './data/types';
 import { TILE, heartSprite, itemIcon, readyBubble, type Sprite } from './farmArt';
 import { gateTile } from './farmMap';
 import { canDeliver } from './farmOrders';
-import { basketSprite, bikeSprite, villagerSprite, type PersonView } from './farmPeopleArt';
+import { basketSprite, bikeSprite, placedKey, villagerSprite, type PersonView, type Placed } from './farmPeopleArt';
 import type { FarmSave, Order } from './farmSave';
 import { pathPoints, type Point } from './farmStrollers';
 
@@ -77,9 +77,14 @@ export class FarmVillage {
     return this.walkers.filter((w) => w.order !== null && w.state === 'waiting').map((w) => w.who);
   }
 
-  /** Someone is on the move: the scene keeps a steady frame rate meanwhile. */
+  /** Someone is on the move: the scene follows each of their steps (stepKey). */
   get isMoving(): boolean {
     return this.walkers.some((w) => w.route.length > 0 || w.state === 'dropping');
+  }
+
+  /** Changes exactly when a walker's image moves by a pixel or takes its next step. */
+  get stepKey(): string {
+    return this.walkers.map((w) => placedKey(placed(w))).join(';');
   }
 
   update(dt: number): void {
@@ -123,11 +128,7 @@ export class FarmVillage {
   /** The walkers among the scene's drawables, sorted with everything else by their feet. */
   queue(list: { base: number; draw: () => void }[], paint: VillagePainter): void {
     for (const w of this.walkers) {
-      const moving = w.route.length > 0;
-      const frame = (moving ? Math.floor(w.clock / (w.bike ? STEP_MS * 0.6 : STEP_MS)) % 2 : 0) as 0 | 1;
-      const sprite = w.bike ? bikeSprite(w.view, frame) : villagerSprite(w.who, w.view, frame);
-      const x = Math.round(w.x - sprite.width / 2);
-      const y = Math.round(w.y - sprite.height + 1);
+      const { sprite, x, y } = placed(w);
       const mirrored = w.view === 'side' && w.face < 0;
       list.push({
         base: w.y + 0.5,
@@ -262,4 +263,11 @@ export class FarmVillage {
     const [gx, gy] = gateTile(this.save);
     return { x: (gx + 0.5) * TILE, y: gy * TILE + 12 };
   }
+}
+
+/** A walker's image this frame and where it is stamped, in whole pixels. */
+function placed(w: Walker): Placed {
+  const frame = (w.route.length > 0 ? Math.floor(w.clock / (w.bike ? STEP_MS * 0.6 : STEP_MS)) % 2 : 0) as 0 | 1;
+  const sprite = w.bike ? bikeSprite(w.view, frame) : villagerSprite(w.who, w.view, frame);
+  return { sprite, x: Math.round(w.x - sprite.width / 2), y: Math.round(w.y - sprite.height + 1), pose: `${w.view}${frame}${w.face}${w.basket}` };
 }

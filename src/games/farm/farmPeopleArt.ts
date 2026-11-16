@@ -9,6 +9,19 @@ import { C, OUTLINE, SKIN, cached, sprite, type Sprite } from './farmArt';
 
 export type PersonView = 'side' | 'front' | 'back';
 type Frame = 0 | 1;
+
+/** A person's image this frame and where it is stamped, in whole art pixels; `pose` names the image (view, step, side). */
+export interface Placed {
+  sprite: Sprite;
+  x: number;
+  y: number;
+  pose: string;
+}
+
+/** Changes exactly when what the screen shows of this person changes: the scene redraws on it (FarmScene.stepKey). */
+export function placedKey(p: Placed): string {
+  return `${p.x},${p.y},${p.pose}`;
+}
 type Body = 'trousers' | 'dress' | 'child';
 
 interface Look {

@@ -1026,7 +1026,7 @@ recette, chaque quête demande des choses qui existent à son niveau) et les rè
   j3-4,5 → j4-6 ; niv. 10 j13 → j22 / j9,5 → j14,5 / j5 → j7,5 ; niv. 15 j43 → j52 / j27 → j32 / j13 → j15 ; niv. 30
   j194 → j206 / j118 → j124 / j55 → j56. Une partie en cours garde son XP : la barre s'allonge.
 
-## 22. Les promeneurs (idée de Flo du 16/11, VALIDÉE et CODÉE le 16/11, non commité, pas joué sur téléphone)
+## 22. Les promeneurs (idée de Flo du 16/11, publiée le 16/11 (39d65fd), correctif visites longues + marche fluide le 16/11 soir)
 
 Des villageois viennent visiter la ferme et s'y promènent, de préférence sur les chemins.
 
@@ -1048,7 +1048,9 @@ Des villageois viennent visiter la ferme et s'y promènent, de préférence sur 
 - **Arrêts** : 3 décos par visite (moins si la ferme en a moins ; pas les chemins, barrières, haies), tirées au sort
   selon leur Charme (la mare et les trésors plus souvent qu'un parterre), la plus proche d'abord ; jamais deux promeneurs
   devant la même. Il se place au sud, de dos, face à la déco (centré sous une déco de 2 cases si tout le côté est
-  libre) ; sinon à côté, de profil, tourné vers elle ; sinon derrière. **Arrêt de 15 à 25 s** ; un cœur monte au-dessus
+  libre) ; sinon à côté, de profil, tourné vers elle ; sinon derrière. **Arrêt de 110 à 140 s** (15-25 s jusqu'au
+  correctif du 16/11 soir : retour de Flo « ils arrivent en masse, c'est un farm de monnaie » ; il voulait des visites
+  de plusieurs minutes, « plutôt 6 que 5 ») ; un cœur monte au-dessus
   de sa tête avec la chance Charme ÷ (Charme + 10) du Charme de la déco (mare 60 %, trésor 86 %, parterre 11 %). Ferme
   sans déco : il va sur deux cases au hasard près de la cour (sur un chemin s'il y en a) et repart.
 - **Toucher un promeneur** : un cœur et un petit bruit ; la première fois, **3 % d'une commande moyenne de son
@@ -1057,9 +1059,21 @@ Des villageois viennent visiter la ferme et s'y promènent, de préférence sur 
   passent avant, puis les promeneurs, puis les objets.
 - **Option** (demande de Flo) : « Promeneurs » dans le menu ⋯ (case à cocher, cochée par défaut), gardée sur
   l'appareil comme le volume de la musique (`localStorage` `farm-strollers`). Décochée, ceux qui sont là rentrent.
-- **Batterie** : les promeneurs ne retiennent pas la carte à 15 i/s (les villageois des commandes, si) : ils marchent
-  à 8 i/s après 30 s sans toucher. Après 3 min sans toucher (`PLAYER_AWAY_MS`), personne de nouveau ; ceux qui sont là
-  finissent leur visite. « Réduire les animations » : ils apparaissent devant leur déco et disparaissent.
+- **Batterie et fluidité** (correctif du 16/11 soir, retour de Flo : « ils ne se déplacent pas assez smooth, comme
+  s'ils laggaient ») : à 15 i/s un pas de 20 px/s arrondi au pixel faisait 1, 1, 2 pixels, et à 8 i/s (après 30 s sans
+  toucher) des sauts de 2-3 pixels. Désormais, tant que quelqu'un marche (promeneur ou villageois des commandes) et
+  que le joueur est là, la scène regarde chaque rafraîchissement de l'écran mais ne dessine que quand un marcheur
+  change de pixel ou de pas (`stepKey`, `placed()` / `Placed` dans `farmPeopleArt`) : un pixel toutes les 50 ms,
+  régulier. Une pose nouvelle (assis…) doit entrer dans `pose`, sinon elle ne se redessine pas. Après 3 min sans
+  toucher (`PLAYER_AWAY_MS`), 2 i/s comme avant et personne de nouveau ; ceux qui sont là finissent leur visite.
+  « Réduire les animations » : ils apparaissent devant leur déco et disparaissent.
+- **MESURE (16/11 soir, correctif, trois heures de `FarmStrollers` sur la ferme de `farm-check`, 3 graines)** : arrêts
+  de 110 à 140 s → visite de **5,9 min** en moyenne (4,3 à 7,6), 20 visites par heure pour 2 places (au lieu d'environ
+  70) ; quelqu'un marche 18 % du temps. Simulateur (`STROLLER_VISIT_MINUTES` 5,9) : promeneurs **1 à 3 % des
+  Éloisettes** (au lieu de 6 à 10 %).
+- **MESURE images (16/11 soir, ferme de la maquette, sonde section 20 qui compte les images DESSINÉES)** : toucher
+  60/s, calme 13/s, après 30 s 8/s, après 3 min 2/s (inchangés quand personne ne marche) ; pendant une marche
+  23-24 images dessinées par seconde, écart médian 50 ms, calcul 12 ms/s au lieu de 7.
 - **MESURE (16/11, une heure de `FarmStrollers` sur la ferme de la maquette)** : avec des arrêts de 6 à 12 s et 2-3
   décos (la première version), une visite durait ~1 min et 3 ou 4 places donnaient le même nombre à l'écran (2,1 en
   moyenne) : le dernier palier ne se voyait pas. Avec 3 décos et 15-25 s : visite ~1 min 45, **1,0 / 2,0 / 2,9 / 3,3**

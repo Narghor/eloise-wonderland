@@ -197,12 +197,16 @@ const WALK_SPEED = 0.012;
  * Frame pacing, for the battery (each image repaints the whole screen): full speed while the player touches the farm or
  * something flies, 15 images a second while the farm just lives (animals, butterflies), 8 after half a minute without
  * a touch, 2 once the player is away (PLAYER_AWAY_MS, when the screen may sleep again), none while the page is hidden.
+ * While a villager walks (and the player is there), every screen refresh is looked at but an image is drawn only when
+ * a walker moves by a whole pixel: even steps, about 20 to 30 images a second instead of 8 to 15 uneven ones.
  */
 const BUSY_AFTER_INPUT_MS = 3000;
 const CALM_FRAME_MS = 66;
 const ASLEEP_AFTER_MS = 30_000;
 const ASLEEP_FRAME_MS = 125;
 const AWAY_FRAME_MS = 500;
+/** A rest image is due a little early rather than one screen refresh late. */
+const VSYNC_SLACK_MS = 8;
 /** After a pinch or the wheel, the zoom settles on the nearest scale where art pixels fall on whole screen pixels. */
 const SETTLE_AFTER_WHEEL_MS = 250;
 /** The ground past the map's edge, under the forest. */
@@ -260,6 +264,11 @@ export class FarmScene {
   private sleepTimer = 0;
   private sleeping = false;
   private lastInput = performance.now();
+  /** When the last image was drawn, and where the walkers stood in it (stepKey). */
+  private lastDraw = 0;
+  private drawnSteps = '';
+  /** The rest timer woke the farm: this image is drawn whatever the clock says (a frame's time can lag the timer). */
+  private restDue = false;
   private wheelTimer = 0;
   private last = performance.now();
   private readonly resizer: ResizeObserver;
@@ -539,32 +548,50 @@ export class FarmScene {
       this.glidePan(dt);
       this.flutter(dt);
       this.updateParticles(dt);
-      this.draw(now);
-      this.onFrame?.();
+      const steps = `${this.village.stepKey}|${this.strollers.stepKey}`;
+      if (this.restDue || this.isBusy(now) || steps !== this.drawnSteps || now - this.lastDraw >= this.restDelay(now) - VSYNC_SLACK_MS) {
+        this.draw(now);
+        this.onFrame?.();
+        this.lastDraw = now;
+        this.drawnSteps = steps;
+      }
+      this.restDue = false;
     }
     this.schedule(now);
   }
 
-  /** The next image: at once while busy, later when calm, the slower the longer nobody touches the farm. */
+  /** The next image: at once while busy or while someone walks, later when calm, the slower the longer nobody touches the farm. */
   private schedule(now: number): void {
     // Hidden: no image at all until the page shows again (onVisible).
     if (document.hidden) {
       this.sleeping = true;
       return;
     }
-    const busy = this.gesture !== null || this.zoomGoal !== null || this.panGoal !== null || this.particles.length > 0 || now - this.lastInput < BUSY_AFTER_INPUT_MS;
-    if (busy) {
+    if (this.isBusy(now) || this.followsSteps(now)) {
       this.frameId = requestAnimationFrame((t) => this.frame(t));
       return;
     }
-    const idle = now - this.lastInput;
-    // Someone walking the road keeps the calm rate, so they never stutter.
-    const delay = idle > PLAYER_AWAY_MS ? AWAY_FRAME_MS : idle > ASLEEP_AFTER_MS && !this.village.isMoving ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
     this.sleeping = true;
     this.sleepTimer = window.setTimeout(() => {
       this.sleeping = false;
+      this.restDue = true;
       this.frameId = requestAnimationFrame((t) => this.frame(t));
-    }, delay);
+    }, this.restDelay(now));
+  }
+
+  private isBusy(now: number): boolean {
+    return this.gesture !== null || this.zoomGoal !== null || this.panGoal !== null || this.particles.length > 0 || now - this.lastInput < BUSY_AFTER_INPUT_MS;
+  }
+
+  /** Someone walks while the player is there: every screen refresh is looked at, and an image drawn on each step. */
+  private followsSteps(now: number): boolean {
+    return now - this.lastInput <= PLAYER_AWAY_MS && (this.village.isMoving || this.strollers.isMoving);
+  }
+
+  /** How long the farm waits between two images when nothing walks. */
+  private restDelay(now: number): number {
+    const idle = now - this.lastInput;
+    return idle > PLAYER_AWAY_MS ? AWAY_FRAME_MS : idle > ASLEEP_AFTER_MS ? ASLEEP_FRAME_MS : CALM_FRAME_MS;
   }
 
   /** Something happened (a touch, an action, a new state): back to full speed at once. */

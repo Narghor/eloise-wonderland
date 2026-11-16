@@ -32,10 +32,11 @@ import { strollerTip } from '../src/games/farm/farmStrollers';
 
 /**
  * The strollers' tips (docs/ferme.md 22), at their most: she touches every stroller who comes while she plays.
- * MESURE of 16/11 (one hour of the real FarmStrollers): a visit lasts about 1.75 minute and one comes at most every
- * 30 seconds, so the strollers per minute are the charm step's places / 1.75, at most 2. STROLLER_TIPS=0 turns them off.
+ * MESURE of 16/11 evening (three hours of the real FarmStrollers, stops of 110-140 s): a visit lasts about 5.9 minutes
+ * and one comes at most every 30 seconds, so the strollers per minute are the charm step's places / 5.9, at most 2.
+ * STROLLER_TIPS=0 turns them off.
  */
-const STROLLER_VISIT_MINUTES = 1.75;
+const STROLLER_VISIT_MINUTES = 5.9;
 const STROLLER_ARRIVALS_PER_MINUTE = 2;
 const STROLLER_TIPS = process.env.STROLLER_TIPS !== '0';
 
