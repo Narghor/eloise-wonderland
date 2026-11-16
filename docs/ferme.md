@@ -1094,3 +1094,65 @@ Des villageois viennent visiter la ferme et s'y promènent, de préférence sur 
   une fois, reprise par le village, la moitié à l'ouverture et personne de nouveau quand elle est absente).
 - **Maquette et captures** : `drive.mjs` sur une ferme niv. 10 (chemin pavé, puits, mare, banc, parterres) ; vu en jeu :
   Pivoine devant la mare à l'ouverture, Léon devant le puits, le toucher (+5, cœur), l'option dans le menu.
+
+### Les promeneurs font quelque chose devant les décos (planche du 16/11 soir, TOUT validé par Flo, rien de codé)
+
+Planche : https://claude.ai/artifact/LvHHPHrtyCTxLy9gGY9fY3 (vrais sprites, poses neuves ; source dans le scratchpad,
+perdue à terme : republier depuis l'artifact). Flo : « trop mignon, je suis fan de tout ». Toutes les variantes sont
+gardées, donc **plusieurs animations par déco** :
+
+| déco | seul | à deux |
+|---|---|---|
+| Banc | pieds qui se balancent, lit le journal | papotent (bulle « … ») |
+| Bottes de foin | assis en haut (Jules surtout) | |
+| Table à thé | boit une tasse | trinquent |
+| Parterres | respire les fleurs (derrière le parterre, de face), papillon sur la tête, cueille une fleur et la sent | |
+| Nichoir | montre l'oiseau qui tourne, jette des graines (l'oiseau descend picorer) | |
+| Mare | pain aux canards (deux canards arrivent des roseaux, repartent), pêche (un poisson saute) | |
+| Fontaine | jette une pièce (vœu), assis sur le rebord | |
+| Puits | tourne la manivelle puis boit, se penche et chante (notes) | |
+| Balançoire | se balance (face ou profil selon la rotation de la déco) | un adulte pousse un enfant |
+
+Règles proposées (à confirmer avec le go du code) :
+- **Choix** : à chaque arrêt, une animation tirée au sort parmi celles de la déco qui vont avec la situation (seul ou
+  à deux) ; l'arrêt de 110-140 s peut en enchaîner **deux** (bascule vers la moitié : assis puis lit le journal).
+- **À deux** : la règle « jamais deux promeneurs devant la même déco » est levée pour le banc, la table à thé et la
+  balançoire (2 places) ; le second ne vient que si le premier y est déjà ; « pousser » seulement avec un enfant assis.
+- **Assis SUR la déco** (banc, foin, balançoire, rebord de fontaine) : la case d'arrivée est la déco elle-même,
+  exception à « jamais debout sur un objet » pour cette seule case ; ordre de dessin par les pieds, comme aujourd'hui.
+- **Batterie** : chaque pose et chaque image d'effet entre dans `pose` / `stepKey` (section 22) ; un geste lent
+  (une image toutes les 300-700 ms), rien de continu ; « Réduire les animations » : pose fixe, pas d'effet.
+- **Découpage** : (1) poses + banc, foin, thé, parterres ; (2) nichoir, mare, fontaine, puits (oiseau, canards,
+  ronds dans l'eau) ; (3) balançoire (siège qui bouge, dessin découpé en cadre + cordes + siège). farm-check à étendre
+  (une seule place sauf banc/thé/balançoire, assis seulement sur sa déco, rien de nouveau quand elle est absente).
+
+**Étape 1 CODÉE (16/11, go de Flo ; non commitée, pas jouée sur téléphone)** : règles ci-dessus appliquées telles
+quelles.
+- `farmPeopleArt` : `posedSprite(id, Posture)` (assis de face / de profil / jambes tendues, accroupi de face / de
+  profil, debout ; un bras vers un point, un objet tenu : tasse, journal, fleur), `lapRow`, `POSED_MIDDLE` (dessin de
+  15 px, le milieu du corps au même endroit, retourné ou non).
+- `farmStrollerActs.ts` (nouveau) : `spotsOf` = les places de chaque déco (banc : 2 sièges, de face ou de bout selon
+  la rotation ; foin : en haut ; table : à gauche et à droite ; parterre : derrière, à gauche, à droite), chacune avec
+  sa case d'approche (la meilleure accessible), son point (sur un siège : le bord bas de la déco, pour être dessiné
+  après elle, et `lift` jusqu'aux genoux), ses activités seul / à deux ; `doingPlaced` (le dessin selon le temps) ;
+  `drawEffects` (bulle, pétales, papillon, éclat du toast), au même niveau que les cœurs.
+- `farmStrollers` : la place est choisie au plan de la visite (2 places seulement si la déco a une activité à deux) ;
+  une déco dont aucune place n'est accessible garde l'arrêt debout d'avant ; on repart d'un siège par sa case
+  d'approche (`leave`) ; une déco déplacée ou rangée renvoie le promeneur (`stillThere`) ; le toucher et les cœurs
+  suivent la hauteur du siège ; `people` dit aussi `on` (les cases de déco permises), `at` et `doing`.
+- farm-check **75** : un promeneur peut être sur la case de sa déco et seulement elle ; deux seulement au banc ou à la
+  table, jamais trois ; on s'assoit, on boit le thé, on va aux fleurs ; à deux, ils papotent ou trinquent ; une déco
+  déplacée sous quelqu'un le renvoie.
+- Vu : planche de toutes les places (banc rot 0/1/3, foin rot 0/1/3, table, 3 parterres) et en jeu (deux voisines
+  trinquent à la table, 390 px). Scénarios de capture : scratchpad (perdus) ; modèle = importer
+  `farmStrollerActs`/`farmArt` dans `page.eval` et dessiner chaque place comme la scène.
+
+### Les visages des villageois (16/11 nuit, retour d'Eloise : « moche », il manquait un NEZ ; style C choisi sur planche)
+
+Planche : https://claude.ai/artifact/VTTk5B8356B7HWPr2B7fQ4 (0 aujourd'hui, 1 + nez, A grands yeux brillants,
+B joues roses, **C yeux allongés**). Appliqué (non commité) dans les têtes de `farmPeopleArt` (LOOKS, PLAIN_FRONT ;
+la marche, les poses des promeneurs et Gaston à vélo suivent) et dans les portraits `faceSprite` de `farmArt` (bulles
+de quête, commandes). Lettres de la palette commune (`SHARED`) : `e` haut de l'œil, `E` bas de l'œil (#2e2228),
+`p` joue (#f7a3b0) à côté de l'œil, `n` nez (#e0a07c, 2 px de face ; de profil 1 px de peau qui dépasse du bord du
+visage), `o` bouche (#b8545e) ; les anciennes joues `c` au bas du visage sont parties. Léon et Basile gardent
+moustache et barbe à la place de la bouche ; les joues de Capucine sont sous ses lunettes sur le portrait.

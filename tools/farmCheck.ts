@@ -517,7 +517,11 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
     if (people.filter((p) => !p.leaving).length > cap) tooMany++;
     if (new Set(people.map((p) => p.who)).size !== people.length) twice++;
     if (people.some((p) => p.who === 'gaston' || busy.has(p.who))) wrongPerson++;
-    for (const p of people) if (p.y < gy * 16 && !isWalkable(farm, Math.floor(p.x / 16), Math.floor(p.y / 16))) blocked++;
+    for (const p of people) {
+      // The tile under the feet; on a seat, the seat's own tile (its point is the decoration's bottom edge).
+      const [tx, ty] = [Math.floor(p.x / 16), Math.floor((p.y - 2) / 16)];
+      if (p.y < gy * 16 && !isWalkable(farm, tx, ty) && !p.on.includes(objectAt(farm, tx, ty)?.uid ?? -1)) blocked++;
+    }
   }
   check('never more strollers than the charm allows, and some come', tooMany === 0 && seen > 0, `places ${cap}, vus ${seen}`);
   check('a stroller is never someone already on the map, nor Gaston, nor twice', twice === 0 && wrongPerson === 0);
@@ -540,6 +544,50 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
     last = quiet.people.length;
   }
   check('half of them are there at opening; nobody new comes while the player is away', atOpening === Math.ceil(strollerCap(farm) / 2) && arrivedWhileAway === 0 && last === 0, `${atOpening} à l'ouverture, ${last} restants`);
+}
+// -----------------------------------------------
+// THE STROLLERS' ACTIVITIES: sitting, sipping, the flowers; two only where two do something together (docs/ferme.md 22)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.level = 12;
+  farm.nuts = 100000;
+  farm.objects = farm.objects.filter((o) => placeable(o.type).kind !== 'obstacle');
+  // The tea table and the hay are treasures: found in a parcel before they can be bought.
+  farm.album.push('teaTable', 'hayBales');
+  const placed = new Map<number, string>();
+  for (const id of ['bench', 'teaTable', 'flowersPink', 'hayBales', 'fountain', 'pond', 'well'] as const) {
+    const [w, h] = placeable(id).size;
+    // A free tile all around each one, so every spot can be reached.
+    const spot = freeSpotNear(farm, 13, 11, w + 2, h + 2);
+    const o = spot && buyAndPlace(farm, id, spot[0] + 1, spot[1] + 1, 0, now);
+    if (o) placed.set(o.uid, id);
+  }
+  const strollers = new FarmStrollers(farm, false, () => false, mulberry32(11));
+  const together = new Set(['bench', 'teaTable']);
+  let crowded = 0;
+  let pairs = 0;
+  const done = new Set<string>();
+  for (let t = 0; t < 90 * 60_000; t += 100) {
+    strollers.update(100, false);
+    const at = new Map<number, number>();
+    for (const p of strollers.people) {
+      if (p.at !== null) at.set(p.at, (at.get(p.at) ?? 0) + 1);
+      if (p.doing) done.add(p.doing);
+    }
+    for (const [uid, n] of at) {
+      if (n > 2 || (n === 2 && !together.has(placed.get(uid) ?? ''))) crowded++;
+      if (n === 2) pairs++;
+    }
+  }
+  check('two strollers share only a bench or a tea table, never more than two', crowded === 0, `${crowded} images`);
+  check('the strollers sit, sip tea and see to the flowers', (done.has('swingFeet') || done.has('readPaper')) && done.has('sipTea') && ['sniff', 'butterfly', 'pickFlower'].some((a) => done.has(a)), [...done].join(', '));
+  check('two at the same bench or table do something together', pairs > 0 && (done.has('chat') || done.has('cheers')), `${pairs} images à deux`);
+  const sitter = strollers.people.find((p) => p.at !== null && p.doing !== null) ?? null;
+  const seat = sitter && farm.objects.find((o) => o.uid === sitter.at);
+  if (seat) seat.x -= 1;
+  strollers.update(100, false);
+  check('a decoration moved under a stroller sends them on their way', !!sitter && strollers.people.every((p) => p.who !== sitter.who || p.at === null));
 }
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);
 if (failures > 0) process.exitCode = 1;

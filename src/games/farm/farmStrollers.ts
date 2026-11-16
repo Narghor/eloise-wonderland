@@ -8,6 +8,7 @@ import { footprint, gateTile } from './farmMap';
 import { averageOrderNuts, canDeliver } from './farmOrders';
 import { WalkMap, isWalkable, type Tile } from './farmPaths';
 import { placedKey, villagerSprite, type PersonView, type Placed } from './farmPeopleArt';
+import { doingPlaced, drawEffects, isMirrored, onGround, spotsOf, type Activity, type Doing, type Point, type Spot } from './farmStrollerActs';
 import { charm } from './farmProgress';
 import type { FarmSave, PlacedObject } from './farmSave';
 import type { VillagePainter } from './farmVillage';
@@ -16,7 +17,8 @@ import type { VillagePainter } from './farmVillage';
 // THE STROLLERS: villagers who visit the farm, stop before its decorations, and leave a tip when touched (docs/ferme.md 22)
 // -----------------------------------------------
 // How many at once follows the charm step (CharmStep.strollers). They come up the road, walk the farm tile by tile
-// (farmPaths: the paths first), stop before two or three decorations, and go home. Nothing here is saved.
+// (farmPaths: the paths first), stop at two or three decorations, and go home. Nothing here is saved. At a decoration
+// with activities (farmStrollerActs) they sit, sip or smell the flowers; at the others they stand and look.
 // A villager whose order can be served is never a stroller: the village takes them back (release) for the gate.
 
 /** A tip is this share of an average order of the farm's level, at least one Eloisette. */
@@ -40,10 +42,7 @@ const ROAD_END_Y = (MAP_SIZE + 6) * TILE;
 const NOT_LOOKED_AT = new Set(['fence', 'hedge']);
 const STORAGE_KEY = 'farm-strollers';
 
-export interface Point {
-  x: number;
-  y: number;
-}
+export type { Point };
 
 interface Stop {
   /** The decoration looked at; null on a farm without any, where the stroller just stands a moment. */
@@ -53,6 +52,12 @@ interface Stop {
   view: PersonView;
   face: 1 | -1;
   heart: boolean;
+  /** Where the decoration stood when the stop was planned: moved or put away, the stop is dropped. */
+  where: string | null;
+  /** A place of a decoration with activities; null: standing before it, looking. */
+  spot: Spot | null;
+  /** What is done there alone: one activity, or two one after the other. */
+  acts: Activity[];
 }
 
 interface Stroller {
@@ -63,9 +68,15 @@ interface Stroller {
   /** Where the current walk leads: a stop, or home. */
   heading: Stop | 'home';
   stops: Stop[];
-  /** Standing before this stop, for `pause` more milliseconds. */
+  /** Standing before this stop, for `pause` more milliseconds out of `stay`. */
   at: Stop | null;
   pause: number;
+  stay: number;
+  /** The activity under way at the stop, and since when (milliseconds). */
+  doing: Activity | null;
+  since: number;
+  /** The decoration just left, whose tile the first steps may still cross (stepping down from a seat). */
+  from: number | null;
   view: PersonView;
   face: 1 | -1;
   clock: number;
@@ -117,6 +128,8 @@ export class FarmStrollers {
   private strollers: Stroller[] = [];
   private arriveIn = 0;
   private started = false;
+  /** Milliseconds since the farm opened: two strollers at the same decoration keep time on it. */
+  private clock = 0;
   private enabled = strollersEnabled();
 
   constructor(save: FarmSave, reduced: boolean, isBusy: (who: PersonId) => boolean, random: () => number = Math.random) {
@@ -126,9 +139,17 @@ export class FarmStrollers {
     this.random = random;
   }
 
-  /** Who is on the farm and where (feet, world pixels); `leaving` once on the way home. */
-  get people(): { who: PersonId; x: number; y: number; leaving: boolean }[] {
-    return this.strollers.map((s) => ({ who: s.who, x: s.x, y: s.y, leaving: s.heading === 'home' }));
+/**
+   * Who is on the farm and where (feet, world pixels); `leaving` once on the way home; `on`: the decorations whose
+   * tiles they may stand on (the one they sit on or step onto, the one they step down from); `at`: the decoration
+   * they stopped at, `doing`: their activity there.
+   */
+  get people(): { who: PersonId; x: number; y: number; leaving: boolean; on: number[]; at: number | null; doing: Activity | null }[] {
+    return this.strollers.map((s) => {
+      const target = s.at ?? (s.heading === 'home' ? null : s.heading);
+      const on = [target?.spot ? target.uid : null, s.from].filter((uid): uid is number => uid !== null);
+      return { who: s.who, x: s.x, y: s.y, leaving: s.heading === 'home', on, at: s.at?.uid ?? null, doing: s.doing };
+    });
   }
 
   isStrolling(who: PersonId): boolean {
@@ -142,7 +163,7 @@ export class FarmStrollers {
 
   /** Changes exactly when a stroller's image moves by a pixel or takes its next step. */
   get stepKey(): string {
-    return this.strollers.map((s) => placedKey(placed(s))).join(';');
+    return this.strollers.map((s) => placedKey(this.placed(s))).join(';');
   }
 
   /** `away`: the player has not touched anything for a while; nobody new comes, the others finish their visit. */
@@ -153,6 +174,7 @@ export class FarmStrollers {
       if (this.enabled) for (let i = 0; i < Math.ceil(strollerCap(this.save) / 2); i++) this.arrive(true);
       this.arriveIn = this.between(ARRIVAL_MS);
     }
+    this.clock += dt;
     this.arriveIn -= dt;
     if (this.arriveIn <= 0) {
       const room = this.enabled && !away && this.strollers.filter((s) => s.heading !== 'home').length < strollerCap(this.save);
@@ -179,12 +201,16 @@ export class FarmStrollers {
     const s = this.strollers.find((v) => v.who === who);
     if (!s) return null;
     this.strollers = this.strollers.filter((v) => v !== s);
-    return { x: s.x, y: s.y };
+    // Off a seat or a flower bed first: the village walks them from a tile that can be walked.
+    return s.at?.spot ? tilePoint(s.at.spot.tile) : { x: s.x, y: s.y };
   }
 
   /** The stroller under a world point, if any. */
   private at(wx: number, wy: number): Stroller | null {
-    for (const s of this.strollers) if (Math.abs(wx - s.x) <= 7 && wy >= s.y - 32 && wy <= s.y + 2) return s;
+    for (const s of this.strollers) {
+      const lift = s.at?.spot?.lift ?? 0;
+      if (Math.abs(wx - s.x) <= 7 && wy >= s.y - lift - 32 && wy <= s.y - lift + 2) return s;
+    }
     return null;
   }
 
@@ -199,7 +225,7 @@ export class FarmStrollers {
     const first = !s.tipped;
     s.tipped = true;
     s.heart = HEART_MS;
-    return { first, head: { x: s.x, y: s.y - 30 } };
+    return { first, head: { x: s.x, y: s.y - (s.at?.spot?.lift ?? 0) - 30 } };
   }
 
   // -----------------------------------------------
@@ -209,28 +235,58 @@ export class FarmStrollers {
   /** The strollers among the scene's drawables, sorted with everything else by their feet. */
   queue(list: { base: number; draw: () => void }[], paint: VillagePainter): void {
     for (const s of this.strollers) {
-      const { sprite, x, y } = placed(s);
+      const { sprite, x, y } = this.placed(s);
+      const doing = this.doingOf(s);
       list.push({
         base: s.y + 0.5,
         draw: () => {
-          paint.shadow(x + 2, y + sprite.height - 2, sprite.width - 4);
-          paint.stamp(sprite, x, y, s.view === 'side' && s.face < 0);
+          if (!doing) paint.shadow(x + 2, y + sprite.height - 2, sprite.width - 4);
+          else if (onGround(doing)) paint.shadow(Math.round(s.x) - 4, y + sprite.height - 2, 8);
+          paint.stamp(sprite, x, y, doing ? isMirrored(doing) : s.view === 'side' && s.face < 0);
         },
       });
     }
   }
 
-  /** Hearts over the strollers who love a decoration or were just touched, rising and fading. */
+  /** Over everything: what goes with the activities (speech, petals, a butterfly), then the hearts, rising and fading. */
   drawHearts(ctx: CanvasRenderingContext2D): void {
+    for (const s of this.strollers) {
+      const doing = this.doingOf(s);
+      if (doing) drawEffects(ctx, doing, this.placed(s));
+    }
     const heart = heartSprite();
     for (const s of this.strollers) {
       if (s.heart <= 0) continue;
       const done = 1 - s.heart / HEART_MS;
-      const height = villagerSprite(s.who, 'front', 0).height;
+      const top = this.doingOf(s) ? this.placed(s).y + 1 : s.y - villagerSprite(s.who, 'front', 0).height;
       ctx.globalAlpha = Math.min(1, (1 - done) * 3);
-      ctx.drawImage(heart, Math.round(s.x - heart.width / 2), Math.round(s.y - height - heart.height - 1 - done * 6));
+      ctx.drawImage(heart, Math.round(s.x - heart.width / 2), Math.round(top - heart.height - 1 - done * 6));
     }
     ctx.globalAlpha = 1;
+  }
+
+  /** What a stroller is doing at a decoration with activities, or null (walking, or standing before a plain one). */
+  private doingOf(s: Stroller): Doing | null {
+    if (!s.at?.spot || !s.doing) return null;
+    return { who: s.who, spot: s.at.spot, activity: s.doing, since: s.since, clock: this.clock, reduced: this.reduced };
+  }
+
+  /** A stroller's image this frame and where it is stamped, in whole pixels. */
+  private placed(s: Stroller): Placed {
+    const doing = this.doingOf(s);
+    if (doing) return doingPlaced(doing, s.x, s.y);
+    const frame = (s.route.length > 0 ? Math.floor(s.clock / STEP_MS) % 2 : 0) as 0 | 1;
+    const sprite = villagerSprite(s.who, s.view, frame);
+    return { sprite, x: Math.round(s.x - sprite.width / 2), y: Math.round(s.y - sprite.height + 1), pose: `${s.view}${frame}${s.face}` };
+  }
+
+  /** The activity now: together when someone else is at the decoration's other spot, else their own. */
+  private activityOf(s: Stroller): Activity | null {
+    const stop = s.at;
+    if (!stop?.spot) return null;
+    const together = stop.spot.together;
+    if (together && this.strollers.some((o) => o !== s && o.at?.spot && o.at.uid === stop.uid)) return together;
+    return stop.acts.length > 1 && s.pause < s.stay / 2 ? stop.acts[1] : stop.acts[0];
   }
 
   // -----------------------------------------------
@@ -246,28 +302,43 @@ export class FarmStrollers {
     const stops = this.planStops(gate);
     if (stops.length === 0) return false;
     const start = tilePoint(gate);
-    const s: Stroller = { who, x: start.x, y: ROAD_END_Y, route: [start], heading: stops[0], stops, at: null, pause: 0, view: 'back', face: 1, clock: 0, tipped: false, heart: 0 };
+    const s: Stroller = { who, x: start.x, y: ROAD_END_Y, route: [start], heading: stops[0], stops, at: null, pause: 0, stay: 0, doing: null, since: 0, from: null, view: 'back', face: 1, clock: 0, tipped: false, heart: 0 };
     if (already || this.reduced) {
       s.route = [];
       s.x = stops[0].point.x;
       s.y = stops[0].point.y;
       this.standAt(s, stops.shift()!);
-      if (already) s.pause *= this.random();
+      if (already) s.pause = s.stay * this.random();
     }
     this.strollers.push(s);
     return true;
   }
 
-  /** Three decorations to look at (fewer on a farm that has fewer), the more charming the likelier, nearest first; or two spots to stand on. */
+  /**
+   * Three decorations to visit (fewer on a farm that has fewer), the more charming the likelier, nearest first; or two
+   * spots to stand on. A decoration is one stroller's, except the second spot of one where two do something together.
+   * At a decoration whose places cannot be reached, the stroller stands before it, as at a plain one.
+   */
   private planStops(from: Tile): Stop[] {
     const walk = new WalkMap(this.save, from);
-    const taken = new Set(this.strollers.flatMap((s) => [...s.stops, ...(s.at ? [s.at] : []), ...(s.heading !== 'home' ? [s.heading] : [])]).map((stop) => stop.uid));
+    const planned = this.strollers.flatMap((s) => [...s.stops, ...(s.at ? [s.at] : []), ...(s.heading !== 'home' ? [s.heading] : [])]);
+    const taken = new Set(planned.map((stop) => stop.uid));
+    const takenSpots = new Set(planned.filter((stop) => stop.spot).map((stop) => `${stop.uid}:${stop.spot!.index}`));
     const looks: { stop: Stop; weight: number }[] = [];
     for (const o of this.save.objects) {
       const p = placeable(o.type);
-      if (o.on !== undefined || p.kind !== 'deco' || p.flat || NOT_LOOKED_AT.has(p.joins ?? '') || taken.has(o.uid)) continue;
+      if (o.on !== undefined || p.kind !== 'deco' || p.flat || NOT_LOOKED_AT.has(p.joins ?? '')) continue;
+      const free = spotsOf(o, walk).filter((spot) => !taken.has(o.uid) || (spot.together !== null && !takenSpots.has(`${o.uid}:${spot.index}`)));
+      const heart = this.random() < charmOf(o.type) / (charmOf(o.type) + 10);
+      const weight = Math.max(0.5, charmOf(o.type));
+      if (free.length > 0) {
+        const spot = free[Math.floor(this.random() * free.length)];
+        looks.push({ stop: { uid: o.uid, tile: spot.tile, point: spot.point, view: spot.view, face: spot.face, heart, where: whereOf(o), spot, acts: this.pickActs(spot) }, weight });
+        continue;
+      }
+      if (taken.has(o.uid)) continue;
       const stop = standBefore(o, walk);
-      if (stop) looks.push({ stop: { ...stop, heart: this.random() < charmOf(o.type) / (charmOf(o.type) + 10) }, weight: Math.max(0.5, charmOf(o.type)) });
+      if (stop) looks.push({ stop: { ...stop, heart, where: whereOf(o), spot: null, acts: [] }, weight });
     }
     const chosen: Stop[] = [];
     const wanted = STOPS_PER_VISIT;
@@ -302,48 +373,90 @@ export class FarmStrollers {
     const stops: Stop[] = [];
     for (let i = 0; i < 2 && pool.length > 0; i++) {
       const tile = pool.splice(Math.floor(this.random() * pool.length), 1)[0];
-      stops.push({ uid: null, tile, point: tilePoint(tile), view: 'front', face: 1, heart: false });
+      stops.push({ uid: null, tile, point: tilePoint(tile), view: 'front', face: 1, heart: false, where: null, spot: null, acts: [] });
     }
     return stops;
+  }
+
+  /** One activity, or (half the time, when there are more) two different ones, one after the other. */
+  private pickActs(spot: Spot): Activity[] {
+    const pool = [...spot.alone];
+    const first = pool.splice(Math.floor(this.random() * pool.length), 1)[0];
+    if (pool.length === 0 || this.random() < 0.5) return [first];
+    return [first, pool[Math.floor(this.random() * pool.length)]];
   }
 
   private standAt(s: Stroller, stop: Stop): void {
     s.stops = s.stops.filter((other) => other !== stop);
     s.at = stop;
     s.heading = stop;
-    s.pause = this.between(STOP_MS);
+    s.stay = this.between(STOP_MS);
+    s.pause = s.stay;
+    s.doing = null;
     s.view = stop.view;
     s.face = stop.face;
     if (stop.heart) s.heart = HEART_MS;
   }
 
+  /** Where the way on starts: off a seat or a flower bed, from the tile walked to before stepping onto it. */
+  private leave(s: Stroller): { start: Tile; first: Point[] } {
+    const spot = s.at?.spot;
+    s.from = spot ? s.at!.uid : null;
+    s.at = null;
+    s.doing = null;
+    return spot ? { start: spot.tile, first: [tilePoint(spot.tile)] } : { start: tileOf(s), first: [] };
+  }
+
   /** On to the next stop that can still be reached, or home. */
   private walkOn(s: Stroller): void {
-    s.at = null;
+    const { start, first } = this.leave(s);
+    const walk = new WalkMap(this.save, start);
     while (s.stops.length > 0) {
       const stop = s.stops.shift()!;
-      const route = pathPoints(this.save, s, stop.tile);
-      if (route.length === 0 && !sameTile(tileOf(s), stop.tile)) continue;
-      s.route = [...route, stop.point];
+      if (!this.stillThere(stop)) continue;
+      const route = walk.routeTo(stop.tile).slice(1).map(tilePoint);
+      if (route.length === 0 && !sameTile(start, stop.tile)) continue;
+      s.route = [...first, ...route, stop.point];
       s.heading = stop;
       return;
     }
-    this.goHome(s);
+    this.goHome(s, start, first);
   }
 
-  private goHome(s: Stroller): void {
-    s.at = null;
+  private goHome(s: Stroller, start?: Tile, first: Point[] = []): void {
+    if (!start) ({ start, first } = this.leave(s));
     s.stops = [];
     s.heading = 'home';
     const gate = gateTile(this.save);
-    s.route = [...pathPoints(this.save, s, gate), tilePoint(gate), { x: tilePoint(gate).x, y: ROAD_END_Y }];
+    const route = new WalkMap(this.save, start).routeTo(gate).slice(1).map(tilePoint);
+    s.route = [...first, ...route, tilePoint(gate), { x: tilePoint(gate).x, y: ROAD_END_Y }];
+  }
+
+  /** The decoration of a stop is still where it was when the stop was planned. */
+  private stillThere(stop: Stop): boolean {
+    if (stop.uid === null) return true;
+    const o = this.save.objects.find((other) => other.uid === stop.uid);
+    return !!o && whereOf(o) === stop.where;
   }
 
   private move(s: Stroller, dt: number): void {
     if (s.heart > 0) s.heart -= dt;
     if (s.at) {
       s.pause -= dt;
-      if (s.pause <= 0) this.walkOn(s);
+      if (s.pause <= 0 || !this.stillThere(s.at)) {
+        this.walkOn(s);
+        return;
+      }
+      const now = this.activityOf(s);
+      if (now !== s.doing) {
+        s.doing = now;
+        s.since = 0;
+      } else s.since += dt;
+      return;
+    }
+    if (s.heading !== 'home' && !this.stillThere(s.heading)) {
+      // Its decoration was moved or put away on the way: on to the next one, from where they are.
+      this.walkOn(s);
       return;
     }
     if (this.reduced && s.route.length > 0) {
@@ -380,6 +493,7 @@ export class FarmStrollers {
     s.x = target.x;
     s.y = target.y;
     s.route.shift();
+    s.from = null;
     // Something was placed across the way meanwhile: find another way to the same stop.
     const next = s.route[0];
     if (next && s.heading !== 'home' && next !== s.heading.point && !isWalkable(this.save, ...tileOf(next))) {
@@ -393,18 +507,16 @@ export class FarmStrollers {
   }
 }
 
-/** A stroller's image this frame and where it is stamped, in whole pixels. */
-function placed(s: Stroller): Placed {
-  const frame = (s.route.length > 0 ? Math.floor(s.clock / STEP_MS) % 2 : 0) as 0 | 1;
-  const sprite = villagerSprite(s.who, s.view, frame);
-  return { sprite, x: Math.round(s.x - sprite.width / 2), y: Math.round(s.y - sprite.height + 1), pose: `${s.view}${frame}${s.face}` };
+/** Where an object stands and how it is turned, to notice it was moved. */
+function whereOf(o: PlacedObject): string {
+  return `${o.x},${o.y},${o.rot}`;
 }
 
 /**
  * Where to stand to look at a decoration: in front of it (south, our back to the camera) when that side can be
  * reached, centred under it when the whole side is free; else beside it, facing it; else behind it.
  */
-function standBefore(o: PlacedObject, walk: WalkMap): Omit<Stop, 'heart'> | null {
+function standBefore(o: PlacedObject, walk: WalkMap): Pick<Stop, 'uid' | 'tile' | 'point' | 'view' | 'face'> | null {
   const [w, h] = footprint(o);
   const south: Tile[] = Array.from({ length: w }, (_, i) => [o.x + i, o.y + h]);
   const free = south.filter((t) => walk.canReach(t));

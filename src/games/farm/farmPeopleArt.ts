@@ -33,10 +33,11 @@ interface Look {
   pal: Record<string, string>;
 }
 
-const SHARED = { s: SKIN, e: OUTLINE, c: '#f29aa6', l: SKIN };
+/** e/E: the eye, its top and its darker bottom; p: the blush beside it; n: the nose; o: the mouth (docs/ferme.md 22). */
+const SHARED = { s: SKIN, e: OUTLINE, E: '#2e2228', p: '#f7a3b0', n: '#e0a07c', o: '#b8545e', l: SKIN };
 
 /** Heads seen from the front and the back for the common hat-less, short-haired shape. */
-const PLAIN_FRONT = ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', '.hssssssh.', '.hsessesh.', '.hssssssh.', '..cssssc..', '...ssss...'];
+const PLAIN_FRONT = ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', '.hssssssh.', '.hsessesh.', '.hpEnnEph.', '..ssooss..', '...ssss...'];
 const PLAIN_BACK = ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', '.hhhhhhhh.', '.hhhhhhhh.', '.hhhhhhhh.', '..hhhhhh..', '...ssss...'];
 const LONG_BACK = ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', 'hhhhhhhhhh', 'hhhhhhhhhh', 'hhhhhhhhhh', 'hhhhhhhhhh', 'hhhhsshhhh'];
 /** A hat on top of a plain head: its three rows replace the head's first three. */
@@ -45,8 +46,8 @@ const hatted = (hat: readonly string[], head: readonly string[]) => [...hat, ...
 const LOOKS: Record<PersonId, Look> = {
   marthe: {
     heads: {
-      side: ['.hh.......', 'hhhhhhh...', '.hhhhhhh..', '.hhhsssss.', '.hhsssses.', '.hhssssss.', '..hsssscs.', '...ssss...'],
-      front: ['....hh....', '..hhhhhh..', '.hhhhhhhh.', '.hhsssshh.', '.hsessesh.', '.hssssssh.', '..cssssc..', '...ssss...'],
+      side: ['.hh.......', 'hhhhhhh...', '.hhhhhhh..', '.hhhsssss.', '.hhsssses.', '.hhsspsEss', '..hssssso.', '...ssss...'],
+      front: ['....hh....', '..hhhhhh..', '.hhhhhhhh.', '.hhsssshh.', '.hsessesh.', '.hpEnnEph.', '..ssooss..', '...ssss...'],
       back: ['....hh....', ...PLAIN_BACK.slice(1)],
     },
     body: 'dress',
@@ -55,8 +56,8 @@ const LOOKS: Record<PersonId, Look> = {
   },
   leon: {
     heads: {
-      side: ['...wwww...', '..wwwwwww.', '..hhhhhh..', '.hhssssss.', '.hhsssses.', '.hhssssss.', '..hssmmms.', '...ssss...'],
-      front: ['...wwww...', '..wwwwww..', '.hhhhhhhh.', '.hssssssh.', '.hsessesh.', '.hssssssh.', '..cmmmmc..', '...ssss...'],
+      side: ['...wwww...', '..wwwwwww.', '..hhhhhh..', '.hhssssss.', '.hhsssses.', '.hhsspsEss', '..hssmmms.', '...ssss...'],
+      front: ['...wwww...', '..wwwwww..', '.hhhhhhhh.', '.hssssssh.', '.hsessesh.', '.hpEnnEph.', '..smmmms..', '...ssss...'],
       back: hatted(['...wwww...', '..wwwwww..', '.hhhhhhhh.'], PLAIN_BACK),
     },
     body: 'trousers',
@@ -64,8 +65,8 @@ const LOOKS: Record<PersonId, Look> = {
   },
   rosalie: {
     heads: {
-      side: ['...hhhhy..', '..hhhhhyy.', '.hhhhhhhh.', '.hhhsssss.', 'hhhsssses.', 'hhhssssss.', 'hhhsssscs.', 'hh.ssss...'],
-      front: ['...hhhhy..', '..hhhhhhy.', '.hhhhhhhh.', 'hhsssssshh', 'hhsesseshh', 'hhsssssshh', 'hhcsssschh', 'hh.ssss.hh'],
+      side: ['...hhhhy..', '..hhhhhyy.', '.hhhhhhhh.', '.hhhsssss.', 'hhhsssses.', 'hhhsspsEss', 'hhhssssso.', 'hh.ssss...'],
+      front: ['...hhhhy..', '..hhhhhhy.', '.hhhhhhhh.', 'hhsssssshh', 'hhsesseshh', 'hhpEnnEphh', 'hhssoosshh', 'hh.ssss.hh'],
       back: ['...hhhhy..', '..hhhhhhy.', ...LONG_BACK.slice(2)],
     },
     body: 'dress',
@@ -74,8 +75,8 @@ const LOOKS: Record<PersonId, Look> = {
   },
   basile: {
     heads: {
-      side: ['..kkkk....', '.kkkkkk...', '.kkkkkkKKK', '.hhssssss.', '.hhsssses.', '.hhssssss.', '..hmmmmms.', '...mmmm...'],
-      front: ['..kkkkkk..', '.kkkkkkkk.', '.KKKKKKKK.', '.hssssssh.', '.hsessesh.', '.hssssssh.', '..mmmmmm..', '...mmmm...'],
+      side: ['..kkkk....', '.kkkkkk...', '.kkkkkkKKK', '.hhssssss.', '.hhsssses.', '.hhsspsEss', '..hmmmmms.', '...mmmm...'],
+      front: ['..kkkkkk..', '.kkkkkkkk.', '.KKKKKKKK.', '.hssssssh.', '.hsessesh.', '.hpEnnEph.', '..mmmmmm..', '...mmmm...'],
       back: hatted(['..kkkkkk..', '.kkkkkkkk.', '.kkkkkkkk.'], PLAIN_BACK),
     },
     body: 'trousers',
@@ -83,7 +84,7 @@ const LOOKS: Record<PersonId, Look> = {
   },
   jules: {
     heads: {
-      side: ['..h.h.h...', '..hhhhhh..', '.hhhhhhhh.', '.hhhsssss.', '.hhsssses.', '.hhssssss.', '..hsssscs.', '...ssss...'],
+      side: ['..h.h.h...', '..hhhhhh..', '.hhhhhhhh.', '.hhhsssss.', '.hhsssses.', '.hhsspsEss', '..hssssso.', '...ssss...'],
       front: ['..h.hh.h..', ...PLAIN_FRONT.slice(1)],
       back: ['..h.hh.h..', ...PLAIN_BACK.slice(1)],
     },
@@ -92,8 +93,8 @@ const LOOKS: Record<PersonId, Look> = {
   },
   capucine: {
     heads: {
-      side: ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', '.hhhhhhhh.', 'hhhsseggs.', 'hhhssssss.', 'hhhsssscs.', 'hh.ssss...'],
-      front: ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', 'hhhhhhhhhh', 'hhgesseghh', 'hhsssssshh', 'hhcsssschh', 'hh.ssss.hh'],
+      side: ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', '.hhhhhhhh.', 'hhhsseggs.', 'hhhpsEssss', 'hhhssssso.', 'hh.ssss...'],
+      front: ['...hhhh...', '..hhhhhh..', '.hhhhhhhh.', 'hhhhhhhhhh', 'hhgesseghh', 'hhpEnnEphh', 'hhssoosshh', 'hh.ssss.hh'],
       back: LONG_BACK,
     },
     body: 'dress',
@@ -102,7 +103,7 @@ const LOOKS: Record<PersonId, Look> = {
   },
   gaston: {
     heads: {
-      side: ['..kkkk....', '.kkkkkk...', '.yyyyyyKK.', '.hhssssss.', '.hhsssses.', '.hhssssss.', '..hsssscs.', '...ssss...'],
+      side: ['..kkkk....', '.kkkkkk...', '.yyyyyyKK.', '.hhssssss.', '.hhsssses.', '.hhsspsEss', '..hssssso.', '...ssss...'],
       front: hatted(['..kkkkkk..', '.kkkkkkkk.', '.yyyyyyyy.'], PLAIN_FRONT),
       back: hatted(['..kkkkkk..', '.kkkkkkkk.', '.yyyyyyyy.'], PLAIN_BACK),
     },
@@ -111,7 +112,7 @@ const LOOKS: Record<PersonId, Look> = {
   },
   pivoine: {
     heads: {
-      side: ['..ww.ww...', '.wwwwwww..', '..wwwww...', '.hhssssss.', '.hhsssses.', '.hhssssss.', '..hsssscs.', '...ssss...'],
+      side: ['..ww.ww...', '.wwwwwww..', '..wwwww...', '.hhssssss.', '.hhsssses.', '.hhsspsEss', '..hssssso.', '...ssss...'],
       front: hatted(['..ww..ww..', '.wwwwwwww.', '..wwwwww..'], PLAIN_FRONT),
       back: hatted(['..ww..ww..', '.wwwwwwww.', '..wwwwww..'], PLAIN_BACK),
     },
@@ -192,6 +193,149 @@ function dress(row: string, i: number, look: Look, view: PersonView): string {
   return r;
 }
 
+// -----------------------------------------------
+// POSTURES: sitting, crouching, an arm raised, something held (the strollers before the decorations, docs/ferme.md 22)
+// -----------------------------------------------
+// Same heads and colours as the walk. The drawing is wider than a walking one (POSED_WIDTH) so an arm or a held cup
+// fits; the body's middle column is always the drawing's middle (POSED_MIDDLE), mirrored or not.
+
+export type Pose = 'stand' | 'sitFront' | 'sitSide' | 'sitKick' | 'crouchFront' | 'crouchSide';
+export type Held = 'cup' | 'paper' | 'paperTurning' | 'flower';
+
+export interface Posture {
+  view: PersonView;
+  pose: Pose;
+  frame?: Frame;
+  /** The head moved by this many pixels: [1, 0] leans forward, [0, 1] bows. */
+  head?: readonly [number, number];
+  /** One arm reaching to this point of the drawing (posture pixels, the body's left edge at x = 2), the hand in skin. */
+  hand?: readonly [number, number];
+  held?: Held;
+}
+
+const POSED_WIDTH = 15;
+/** The body's middle column in a posed drawing, outline margin included. */
+export const POSED_MIDDLE = 8;
+const BODY_X = 2;
+const HEAD_ROWS = 8;
+const SHOULDER: readonly [number, number] = [BODY_X + 5, 9];
+
+/** Bodies of the postures, by body shape; two frames when the feet swing. Sitting: the lap row is LAP_ROW. */
+const POSED: Record<Exclude<Pose, 'stand'>, Record<Body, readonly (readonly string[])[]>> = {
+  sitFront: {
+    trousers: [
+      ['...tttt...', '..tttttt..', '.tttttttt.', '.stttttts.', '.bbbbbbbb.', '..bb..bb..', '..bb..bb..', '..ff..ff..'],
+      ['...tttt...', '..tttttt..', '.tttttttt.', '.stttttts.', '.bbbbbbbb.', '..bb..bb..', '..ff..bb..', '......ff..'],
+    ],
+    dress: [
+      ['...tttt...', '..tttttt..', '.tttttttt.', '.sbbbbbbs.', 'bbbbbbbbbb', '...l..l...', '...l..l...', '...f..f...'],
+      ['...tttt...', '..tttttt..', '.tttttttt.', '.sbbbbbbs.', 'bbbbbbbbbb', '...l..l...', '...f..l...', '......f...'],
+    ],
+    child: [
+      ['...tttt...', '.stttttts.', '.bbbbbbbb.', '...l..l...', '...f..f...'],
+      ['...tttt...', '.stttttts.', '.bbbbbbbb.', '...f..l...', '......f...'],
+    ],
+  },
+  sitSide: {
+    trousers: [['...tttt...', '..ttTttt..', '..ttTttt..', '..ttTttt..', '..bbbbbbb.', '.......bb.', '.......bb.', '.......fff']],
+    dress: [['...tttt...', '..ttTttt..', '..ttTttt..', '..bbbbbbb.', '..bbbbbbbb', '.......l..', '.......l..', '.......ff.']],
+    child: [['...tttt...', '..ttTttt..', '..bbbbbbb.', '.......l..', '.......ff.']],
+  },
+  sitKick: {
+    trousers: [['...tttt...', '..ttTttt..', '..ttTttt..', '..ttTttt..', '..bbbbbbbbbf', '...........f']],
+    dress: [['...tttt...', '..ttTttt..', '..ttTttt..', '..bbbbbbb.', '..bbbbbbbbllf', '............f']],
+    child: [['...tttt...', '..ttTttt..', '..bbbbbbbllf', '...........f']],
+  },
+  crouchFront: {
+    trousers: [['...tttt...', '..tttttt..', '.tttttttt.', '.sbbbbbbs.', '.bbbbbbbb.', '.ff....ff.']],
+    dress: [['...tttt...', '..tttttt..', '.tttttttt.', '.sbbbbbbs.', 'bbbbbbbbbb', '.f......f.']],
+    child: [['...tttt...', '.stttttts.', '.bbbbbbbb.', '.f......f.']],
+  },
+  crouchSide: {
+    trousers: [['...tttt...', '..ttTttt..', '..ttTttt..', '..bbbbbbb.', '..bb..bbb.', '..ff...ff.']],
+    dress: [['...tttt...', '..ttTttt..', '..ttTttt..', '.bbbbbbbbb', '.bbbbbbbbb', '..f....f..']],
+    child: [['...tttt...', '..ttTttt..', '..bbbbbbb.', '..f....f..']],
+  },
+};
+const LAP_ROW: Record<Body, number> = { trousers: 4, dress: 4, child: 2 };
+
+/** A villager in a posture; the feet (or the seat, for a sitting pose) on the drawing's last rows, see `lapRow`. */
+export function posedSprite(id: PersonId, p: Posture): Sprite {
+  const key = `posed-${id}-${p.view}-${p.pose}-${p.frame ?? 0}-${p.head ?? ''}-${p.hand ?? ''}-${p.held ?? ''}`;
+  return cached(key, () => {
+    const look = LOOKS[id];
+    const body = postureBody(look.body, p).map((row, i) => dress(row, i, look, p.view));
+    const extras = postureExtras(p);
+    const height = Math.max(HEAD_ROWS + body.length, ...extras.map(([, y]) => y + 1));
+    const pal: Record<string, string> = { ...SHARED, ...look.pal };
+    return sprite(POSED_WIDTH, height, (P) => {
+      P.map(BODY_X, HEAD_ROWS, body, pal);
+      P.map(BODY_X + (p.head?.[0] ?? 0), p.head?.[1] ?? 0, look.heads[p.view], pal);
+      for (const [x, y, colour] of extras) P.px(x, y, pal[colour] ?? colour);
+    });
+  });
+}
+
+/** The row of a posed drawing (outline margin included) that rests on the seat, for a sitting pose. */
+export function lapRow(id: PersonId): number {
+  return 1 + HEAD_ROWS + LAP_ROW[LOOKS[id].body];
+}
+
+function postureBody(body: Body, p: Posture): readonly string[] {
+  const frame = p.frame ?? 0;
+  if (p.pose === 'stand') {
+    const rows = BODIES[body][p.view][frame];
+    // Seen from the side, an arm doing something leaves the hip: the hand drawn there is painted over with the clothes.
+    return p.hand && p.view === 'side' ? rows.map((r) => r.replace('s', 'b')) : rows;
+  }
+  const frames = POSED[p.pose][body];
+  return frames[frame % frames.length];
+}
+
+/** The arm, from the shoulder to the hand, and what the hand holds; [x, y, palette letter or colour]. */
+function postureExtras(p: Posture): [number, number, string][] {
+  const out: [number, number, string][] = [];
+  if (p.hand) {
+    const [x1, y1] = p.hand;
+    let [x, y] = SHOULDER;
+    const dx = Math.abs(x1 - x);
+    const dy = -Math.abs(y1 - y);
+    const sx = x < x1 ? 1 : -1;
+    const sy = y < y1 ? 1 : -1;
+    let err = dx + dy;
+    for (;;) {
+      out.push([x, y, x === x1 && y === y1 ? 's' : 'T']);
+      if (x === x1 && y === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y += sy;
+      }
+    }
+  }
+  const [hx, hy] = p.hand ?? [0, 0];
+  if (p.held === 'cup') {
+    out.push([hx + 1, hy - 1, C.white], [hx + 2, hy - 1, C.white], [hx + 1, hy, '#e8e0d2'], [hx + 2, hy, '#e8e0d2'], [hx + 3, hy - 1, C.white], [hx + 1, hy - 2, '#b07a52'], [hx + 2, hy - 2, '#b07a52']);
+  } else if (p.held === 'flower') {
+    out.push([hx + 1, hy - 1, C.leaf], [hx + 1, hy - 2, '#f06a96'], [hx + 2, hy - 3, '#f06a96'], [hx + 1, hy - 3, C.gold], [hx, hy - 3, '#f06a96'], [hx + 1, hy - 4, '#f06a96']);
+  } else if (p.held === 'paper' || p.held === 'paperTurning') {
+    // A newspaper held open before the chest: from the front it spreads over the body, from the side it is a thin sheet.
+    const front = p.view === 'front';
+    const x0 = front ? (p.held === 'paperTurning' ? 7 : 3) : BODY_X + 7;
+    const x1 = front ? 12 : BODY_X + 9;
+    for (let y = 9; y <= 13; y++) for (let x = x0; x <= x1; x++) out.push([x, y, y === 10 || y === 12 ? '#9c958d' : '#ece3cf']);
+    if (front) {
+      out.push([x0 - 1, 11, 's'], [x1 + 1, 11, 's']);
+      if (p.held === 'paper') for (let y = 9; y <= 13; y++) out.push([7, y, '#cfc3b1']);
+    } else out.push([x0 - 1, 11, 's']);
+  }
+  return out;
+}
+
 /** Gaston on his yellow bicycle, a parcel on the front rack; `frame` turns the pedals. */
 export function bikeSprite(view: PersonView, frame: Frame): Sprite {
   return cached(`bike-${view}-${frame}`, () => (view === 'side' ? sideBike(frame) : view === 'front' ? frontBike(frame) : backBike(frame)));
@@ -203,7 +347,7 @@ const BIKE_PAL = { k: '#2f3f6b', y: C.gold, h: C.barkDark, t: '#3f5a8f', b: '#2f
 function frontBike(frame: Frame): Sprite {
   const feet = frame ? ['...f.oo.....', '.....oo.....', '.....oo.f...'] : ['.....oo.f...', '.....oo.....', '...f.oo.....'];
   const rows = [
-    '....kkkk....', '...kkkkkk...', '...yyyyyy...', '...ssssss...', '...sesses...', '...cssssc...', '....ssss....',
+    '....kkkk....', '...kkkkkk...', '...yyyyyy...', '...ssssss...', '...sesses...', '...pEnnEp...', '....soos....',
     '...tttttt...', '..tttttttt..', 'rrsttttttsrr', '...tttttt...', '....bbbb....', '...bb..bb...', '...bgppgb...',
     '....pPpp....', '....pppp....', ...feet, '.....oo.....',
   ];
@@ -272,7 +416,9 @@ function sideBike(frame: Frame): Sprite {
     P.px(6, 4, C.barkDark);
     P.px(6, 5, C.barkDark);
     P.px(9, 4, OUTLINE);
-    P.px(9, 5, '#f29aa6');
+    P.px(9, 5, '#2e2228');
+    P.px(8, 5, '#f7a3b0');
+    P.px(11, 5, SKIN);
     P.rect(6, 1, 4, 2, navy);
     P.rect(6, 2, 4, 1, C.gold);
     P.px(10, 2, '#1f2a4a');

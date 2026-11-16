@@ -2459,19 +2459,21 @@ export function faceSprite(id: PersonId): Sprite {
         P.px(6, 8, OUTLINE);
         P.px(7, 8, OUTLINE);
       }
-      P.px(4, 8, OUTLINE);
-      P.px(9, 8, OUTLINE);
-      const cheek = id === 'pivoine' ? '#f27a8a' : '#f29aa6';
-      P.px(3, 10, cheek);
-      P.px(10, 10, cheek);
-      if (id === 'pivoine') {
-        P.px(4, 10, cheek);
-        P.px(9, 10, cheek);
+      // Same face as on the map (farmPeopleArt): eyes two pixels tall, blush beside them, a nose, a little mouth.
+      for (const x of [4, 9]) {
+        P.px(x, 8, OUTLINE);
+        P.px(x, 9, '#2e2228');
       }
+      const cheek = id === 'pivoine' ? '#f27a8a' : '#f7a3b0';
+      // Capucine's glasses frame her eyes: her blush sits under them.
+      const cheekRow = id === 'capucine' ? 10 : 9;
+      P.px(3, cheekRow, cheek);
+      P.px(10, cheekRow, cheek);
+      P.px(6, 10, '#e0a07c');
+      P.px(7, 10, '#e0a07c');
       if (id === 'jules') {
-        P.px(4, 9, '#d9946a');
-        P.px(5, 10, '#d9946a');
-        P.px(9, 9, '#d9946a');
+        P.px(3, 10, '#d9946a');
+        P.px(10, 10, '#d9946a');
       }
       if (id === 'leon') {
         P.rect(5, 11, 5, 1, C.bark);

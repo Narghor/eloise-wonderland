@@ -18,6 +18,11 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-16-promeneurs-decos',
+    date: '16 novembre',
+    news: ['☕ Les promeneurs s’installent à la ferme : ils s’assoient sur les bancs, prennent le thé et respirent les fleurs. Et les villageois ont enfin un nez !'],
+  },
+  {
     id: '2026-11-16-promeneurs',
     date: '16 novembre',
     news: [
