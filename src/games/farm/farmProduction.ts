@@ -2,9 +2,9 @@ import { animalOfPen, animalPrice, type Animal } from './data/animals';
 import { crop } from './data/crops';
 import { item } from './data/items';
 import { MAX_QUEUE, RECIPES, queueSlotPrice, recipe, type Recipe } from './data/machines';
-import { HAZEL, placeable } from './data/placeables';
+import { TREE_YIELDS, isTree, placeable } from './data/placeables';
 import { breed } from './data/parcels';
-import type { BreedId, CropId, ItemId, MachineId, PenId } from './data/types';
+import type { BreedId, CropId, ItemId, MachineId, PenId, TreeId } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import { HUNGRY, type FarmSave, type PlacedObject } from './farmSave';
 import { penRoom } from './farmMap';
@@ -203,14 +203,25 @@ export function buySlot(save: FarmSave, machine: PlacedObject): boolean {
 // TREES
 // -----------------------------------------------
 
+/** What a tree gives when it is ready: Eloisettes for the hazel, fruit for the others. */
+export function treeGives(tree: PlacedObject): ItemId | 'nuts' {
+  const gives = TREE_YIELDS[tree.type as TreeId].gives;
+  return 'nuts' in gives ? 'nuts' : gives.item;
+}
+
 export function collectTree(save: FarmSave, tree: PlacedObject, now: number, random: () => number = Math.random): Gain | null {
   if (tree.readyAt === undefined || tree.readyAt > now) return null;
-  const nuts = HAZEL.nuts[0] + Math.floor(random() * (HAZEL.nuts[1] - HAZEL.nuts[0] + 1));
-  tree.readyAt = now + HAZEL.minutes * MINUTE_MS;
-  earn(save, nuts);
-  gainXp(save, HAZEL.xp);
-  emit(save, { type: 'collect', target: 'hazel', kind: 'tree', count: 1 });
-  return { item: 'nuts', count: nuts, xp: HAZEL.xp };
+  const y = TREE_YIELDS[tree.type as TreeId];
+  tree.readyAt = now + y.minutes * MINUTE_MS;
+  gainXp(save, y.xp);
+  emit(save, { type: 'collect', target: tree.type, kind: 'tree', count: 1 });
+  if ('nuts' in y.gives) {
+    const nuts = y.gives.nuts[0] + Math.floor(random() * (y.gives.nuts[1] - y.gives.nuts[0] + 1));
+    earn(save, nuts);
+    return { item: 'nuts', count: nuts, xp: y.xp };
+  }
+  addItem(save, y.gives.item, y.gives.count);
+  return { item: y.gives.item, count: y.gives.count, xp: y.xp };
 }
 
 // -----------------------------------------------
@@ -223,7 +234,7 @@ export function readyOn(object: PlacedObject, now: number): ItemId | 'nuts' | nu
   if (kind === 'field') return fieldState(object, now) === 'ripe' ? object.crop! : null;
   if (kind === 'pen') return readyAnimals(object, now) > 0 ? penAnimal(object).product : null;
   if (kind === 'machine') return object.queue!.find((j) => j.readyAt <= now)?.item ?? null;
-  if (kind === 'tree') return object.readyAt !== undefined && object.readyAt <= now ? 'nuts' : null;
+  if (kind === 'tree') return object.readyAt !== undefined && object.readyAt <= now ? treeGives(object) : null;
   return null;
 }
 
@@ -243,7 +254,7 @@ export function awayNews(save: FarmSave, since: number, now: number): AwayNews {
     if (o.type === 'field' && o.crop && within(o.readyAt)) news.fields++;
     if (o.animals) news.animals += o.animals.filter((t) => t !== HUNGRY && within(t)).length;
     if (o.queue) news.machines += o.queue.filter((j) => within(j.readyAt)).length;
-    if (o.type === 'hazel' && within(o.readyAt)) news.trees++;
+    if (isTree(o.type) && within(o.readyAt)) news.trees++;
   }
   return news;
 }

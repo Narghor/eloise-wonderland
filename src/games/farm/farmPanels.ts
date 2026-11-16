@@ -1,20 +1,20 @@
 import { el } from '../../dom';
 import { ANIMALS, PEN_CAPACITY, animal } from './data/animals';
-import { BREED_IDS, PITY, TREASURES, breed, rarityName } from './data/parcels';
+import { BREED_IDS, PITY, TREASURES, breed, rarityName, type TreasureId } from './data/parcels';
 import { placeableBreeds } from './farmParcels';
 import { BOOSTERS, booster } from './data/boosters';
 import { CROPS, crop } from './data/crops';
 import { DAILY_TASKS, dailyChestReward, dailyTaskReward } from './data/daily';
 import { ITEMS, item, itemCount } from './data/items';
 import { MEDALS, MEDAL_TIERS } from './data/medals';
-import { PLACEABLES, placeable, type Placeable } from './data/placeables';
+import { PLACEABLES, TREE_YIELDS, copyLevel, hasCopies, isTree, placeable, type Placeable } from './data/placeables';
 import { PROJECTS } from './data/projects';
 import { QUESTS } from './data/quests';
 import { obstacle } from './data/land';
 import { orderLine, person } from './data/people';
 import { charmOf, charmStep } from './data/charm';
-import type { BoosterId, BreedId, CropId, DecorId, ItemId, ObstacleId, PlaceableId, Reward } from './data/types';
-import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, hazelSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
+import type { BoosterId, BreedId, CropId, DecorId, ItemId, ObstacleId, PenId, PlaceableId, Reward, TreeId } from './data/types';
+import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, treeSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
 import type { SheetId } from './farmHud';
 import { buyRefusal, capOf, parcelOffers, priceOf, type ParcelOffer } from './farmMap';
 import { canDeliver } from './farmOrders';
@@ -70,6 +70,8 @@ export interface FarmUi {
   collect(object: PlacedObject): void;
   queue(machine: PlacedObject, itemId: ItemId): void;
   feed(pen: PlacedObject): void;
+  deliverCart(): void;
+  sendCartAway(): void;
   buyAnimal(pen: PlacedObject): void;
   clear(object: PlacedObject): void;
   buyParcel(parcel: number): void;
@@ -150,7 +152,7 @@ function face(id: Parameters<typeof faceSprite>[0]): HTMLElement {
 
 /** The drawing of a placeable for a shop card, scaled to fit its box. */
 export function placeableArt(id: PlaceableId): HTMLElement {
-  const sprite = id === 'field' ? fieldSprite('wheat', 'ripe') : id === 'hazel' ? hazelSprite(true) : objectSprite(id, 'face');
+  const sprite = id === 'field' ? fieldSprite('wheat', 'ripe') : isTree(id) ? treeSprite(id, true) : objectSprite(id, 'face');
   const scale = Math.max(1, Math.min(3, Math.floor(56 / sprite.height), Math.floor(84 / sprite.width)));
   return el('div', { class: 'farm-art' }, img(sprite, scale));
 }
@@ -230,9 +232,9 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
   const hungry = hungryAnimals(pen);
   const next = nextAnimalAt(pen, now);
   const feed = have(ui.save, a.feed);
-  const capacity = PEN_CAPACITY[pen.type as 'coop' | 'cowshed'];
+  const capacity = PEN_CAPACITY[pen.type as PenId];
   const lines: HTMLElement[] = [];
-  if (count === 0) lines.push(el('p', { text: `Pas encore de ${a.plural.toLowerCase()} ici : adoptes-en une !` }));
+  if (count === 0) lines.push(el('p', { text: `Pas encore de ${a.plural.toLowerCase()} ici : adoptes-en ${a.feminine ? 'une' : 'un'} !` }));
   if (ready > 0) lines.push(line(itemIcon(a.product), `${itemCount(a.product, ready)} à ramasser`, '', 'ok'));
   if (hungry > 0) lines.push(line(itemIcon(a.feed), `${hungry} ${hungry > 1 ? 'ont' : 'a'} faim`, `${feed} en grange`, feed > 0 ? 'ok' : 'missing'));
   if (next !== null) lines.push(line(itemIcon(a.product), item(a.product).name, timeLeft(next, now)));
@@ -243,7 +245,7 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
   if (hungry > 0) actions.append(button([img(itemIcon(a.feed)), 'Nourrir'], () => ui.feed(pen), { disabled: feed === 0 }));
   if (room > 0) actions.append(button([`+ 1 ${a.name.toLowerCase()} · ${animalPrice}`, nut(1)], () => ui.buyAnimal(pen), { ghost: true, disabled: ui.save.nuts < animalPrice }));
   if (canHurry(pen, now)) actions.append(button([img(boosterIcon('hourglass')), `Sablier (${ui.save.boosters.hourglass})`], () => ui.useBooster('hourglass', pen), { ghost: true, disabled: ui.save.boosters.hourglass === 0 }));
-  const recipe = feed === 0 && hungry > 0 ? el('p', { text: `L’${item(a.feed).name.toLowerCase()} se fabrique au Moulin.` }) : null;
+  const recipe = feed === 0 && hungry > 0 ? el('p', { text: `Les ${item(a.feed).plural.toLowerCase()} se font à la Cookiterie.` }) : null;
   return [
     el('h3', { text: `${placeable(pen.type).name} · ${count} / ${capacity} ${a.plural.toLowerCase()}` }),
     el('div', { class: 'farm-lines' }, ...lines),
@@ -252,26 +254,35 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
   ];
 }
 
+/** Beyond this many recipes, a machine's bubble shows them in two columns. */
+const COMPACT_RECIPES = 4;
+
 export function machineBubble(ui: FarmUi, machine: PlacedObject): Node[] {
   const now = ui.now();
   const pending = pendingJobs(machine, now);
   const slots = machine.slots ?? 0;
   const queue = machine.queue!.filter((j) => j.readyAt > now);
   const tray = trayJobs(machine, now);
-  const recipes = machineRecipes(machine.type as Parameters<typeof machineRecipes>[0]).map((r) => {
+  const list = machineRecipes(machine.type as Parameters<typeof machineRecipes>[0]);
+  // Many recipes (the Cookiterie, the Fournil late in the game) go in two columns, the time on the inputs' line,
+  // so the bubble stays whole on a phone.
+  const compact = list.length > COMPACT_RECIPES;
+  const recipes = list.map((r) => {
     const refusal = queueRefusal(ui.save, machine, r, now);
     const open = refusal !== 'locked';
     const inputs = Object.entries(r.inputs).map(([id, n]) => {
       const short = have(ui.save, id as ItemId) < (n ?? 0);
       return el('span', { class: short ? 'is-missing' : '' }, img(itemIcon(id as ItemId), 1), `${have(ui.save, id as ItemId)}/${n}`);
     });
+    const name = `${r.count > 1 ? `${r.count} × ` : ''}${item(r.item).name}`;
+    const time = el('span', { class: 'farm-recipe-time', text: duration(r.minutes) });
     return el(
       'div',
       { class: `farm-recipe${open ? '' : ' is-locked'}` },
       img(open ? itemIcon(r.item) : uiIcon('lock'), 2),
-      el('span', { class: 'farm-recipe-name', text: `${r.count > 1 ? `${r.count} × ` : ''}${item(r.item).name} · ${duration(r.minutes)}` }),
+      el('span', { class: 'farm-recipe-name', text: compact ? name : `${name} · ${duration(r.minutes)}` }),
       button(['+'], () => ui.queue(machine, r.item), { disabled: refusal !== null }),
-      el('div', { class: 'farm-recipe-inputs' }, ...(open ? inputs : [el('span', { text: `S’ouvre ${unlockText(r.unlock)}` })])),
+      el('div', { class: 'farm-recipe-inputs' }, ...(open ? [...(compact ? [time] : []), ...inputs] : [el('span', { text: `S’ouvre ${unlockText(r.unlock)}` })])),
     );
   });
   const slotPrice = nextSlotPrice(machine);
@@ -283,13 +294,19 @@ export function machineBubble(ui: FarmUi, machine: PlacedObject): Node[] {
     el('h3', { text: `${placeable(machine.type).name} · file ${pending} / ${slots}` }),
     ...(queue.length > 0 ? [el('div', { class: 'farm-lines' }, ...queue.map((j) => line(itemIcon(j.item), item(j.item).name, j.readyAt <= now ? 'prêt' : timeLeft(j.readyAt, now))))] : [el('p', { text: 'La file est vide : choisis une recette.' })]),
     ...(tray > 0 ? [el('p', { text: `${tray} fabrication${tray > 1 ? 's' : ''} terminée${tray > 1 ? 's' : ''}, sur le plateau.` })] : []),
-    ...recipes,
+    ...(compact ? [el('div', { class: 'farm-recipes is-grid' }, ...recipes)] : recipes),
     actions,
   ];
 }
 
 export function treeBubble(ui: FarmUi, tree: PlacedObject): Node[] {
-  return [el('h3', { text: 'Noisetier' }), el('p', {}, 'Il donne 5 à 10 Éloisettes toutes les 4 heures, tout seul. Prochaine cueillette ', timeLeft(tree.readyAt ?? 0, ui.now()), '.')];
+  const y = TREE_YIELDS[tree.type as TreeId];
+  const gives = 'nuts' in y.gives ? `${y.gives.nuts[0]} à ${y.gives.nuts[1]} Éloisettes` : itemCount(y.gives.item, y.gives.count);
+  const hours = y.minutes / 60;
+  return [
+    el('h3', { text: placeable(tree.type).name }),
+    el('p', {}, `Il donne ${gives} toutes les ${hours} heures, tout seul. Prochaine cueillette `, timeLeft(tree.readyAt ?? 0, ui.now()), '.'),
+  ];
 }
 
 export function obstacleBubble(ui: FarmUi, object: PlacedObject): Node[] {
@@ -313,6 +330,27 @@ export function mailboxBubble(ui: FarmUi): Node[] {
   ];
 }
 
+/** The market cart: its big order line by line, or when it comes back. */
+export function cartBubble(ui: FarmUi): Node[] {
+  const order = ui.save.cart.order;
+  const title = el('h3', { text: 'La charrette du marché' });
+  if (!order) return [title, el('p', {}, 'Elle est au marché. Elle revient ', timeLeft(ui.save.cart.nextAt, ui.now()), ' avec une grosse commande.')];
+  const wanted = Object.entries(order.items) as [ItemId, number][];
+  const lines = wanted.map(([id, n]) => line(itemIcon(id), itemCount(id, n), `${Math.min(have(ui.save, id), n)} / ${n}`, have(ui.save, id) >= n ? 'ok' : 'missing'));
+  const ready = wanted.every(([id, n]) => have(ui.save, id) >= n);
+  return [
+    title,
+    el('p', { text: 'Une grosse commande pour le marché du bourg, mieux payée que le tableau. Elle n’expire jamais.' }),
+    el('div', { class: 'farm-lines' }, ...lines),
+    el('p', { class: 'farm-note', text: `Paie ${order.nuts} Éloisettes et ${order.xp} XP${order.parcel ? ', plus un colis de Gaston' : ''}.` }),
+    el(
+      'div',
+      { class: 'farm-row' },
+      button(['Livrer'], () => ui.deliverCart(), { disabled: !ready }),
+      button(['Renvoyer'], () => ui.sendCartAway(), { ghost: true }),
+    ),
+  ];
+}
 export function decoBubble(object: PlacedObject): Node[] {
   return [el('h3', { text: placeable(object.type).name }), el('p', { text: 'Pour la déplacer, la tourner ou la ranger : « Aménager », en bas.' })];
 }
@@ -582,13 +620,22 @@ function shopCard(ui: FarmUi, p: Placeable, onBuy: () => void, extra?: string): 
   let foot: HTMLElement;
   if (stored > 0) foot = el('span', { class: 'farm-price', text: `${stored} rangée${stored > 1 ? 's' : ''}` });
   else if (refusal === 'locked') foot = el('span', { class: 'farm-price' }, img(uiIcon('lock'), 1), unlockText(p.unlock));
-  else if (refusal === 'max') foot = el('span', { class: 'farm-price', text: p.kind === 'field' ? `${capOf(ui.save, p)} max au niv. ${ui.save.level}` : 'déjà là' });
-  else foot = price(priceOf(ui.save, p), refusal === 'nuts');
+  // A machine's or a pen's next copy opens later (COPY_LEVELS): say when.
+  const own = ownCount(ui.save, p.id);
+  const nextCopy = hasCopies(p) ? copyLevel(p, own + 1) : null;
+  if (stored > 0) foot = el('span', { class: 'farm-price', text: `${stored} rangée${stored > 1 ? 's' : ''}` });
+  else if (refusal === 'locked') foot = el('span', { class: 'farm-price' }, img(uiIcon('lock'), 1), unlockText(p.unlock));
+  else if (refusal === 'max') {
+    const text = p.kind === 'field' ? `${capOf(ui.save, p)} max au niv. ${ui.save.level}` : nextCopy ? `${own + 1}e au niv. ${nextCopy}` : 'déjà là';
+    foot = el('span', { class: 'farm-price', text });
+  } else foot = price(priceOf(ui.save, p), refusal === 'nuts');
   const card = el('button', { class: `farm-item${refusal === 'locked' && stored === 0 ? ' is-locked' : ''}`, type: 'button' }, placeableArt(p.id), el('span', { text: p.name }), ...(extra ? [el('small', { class: 'farm-note', text: extra })] : []), foot);
   card.addEventListener('click', () => {
     if (stored > 0 || refusal === null) onBuy();
     else if (refusal === 'nuts') ui.toast(`Il te manque ${priceOf(ui.save, p) - ui.save.nuts} Éloisettes.`);
-    else if (refusal === 'max') ui.toast(p.kind === 'field' ? 'Plus de champs à ton niveau : il en vient en montant de niveau.' : `${p.name} est déjà sur ta ferme.`);
+    else if (refusal === 'max' && p.kind === 'field') ui.toast('Plus de champs à ton niveau : il en vient en montant de niveau.');
+    else if (refusal === 'max' && nextCopy) ui.toast(`Un ${own + 1}e exemplaire s’ouvre au niveau ${nextCopy}.`);
+    else if (refusal === 'max') ui.toast(`${p.name} est déjà sur ta ferme.`);
     else ui.toast(`${p.name} s’ouvre ${unlockText(p.unlock)}.`);
   });
   return card;
@@ -598,7 +645,7 @@ function buildingsShop(ui: FarmUi): Node[] {
   const list = PLACEABLES.filter((p) => p.kind === 'field' || p.kind === 'machine' || p.kind === 'pen' || p.kind === 'tree');
   const fields = ownCount(ui.save, 'field');
   return [
-    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), p.kind === 'field' ? `${fields} / ${capOf(ui.save, p)}` : p.kind === 'tree' ? `${ownCount(ui.save, p.id)} / ${p.maxCount}` : undefined))),
+    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), p.kind === 'field' ? `${fields} / ${capOf(ui.save, p)}` : p.kind === 'tree' ? `${ownCount(ui.save, p.id)} / ${p.maxCount}` : hasCopies(p) && ownCount(ui.save, p.id) > 0 ? `${ownCount(ui.save, p.id)} sur ta ferme` : undefined))),
     el('p', { class: 'farm-note', text: 'Les terrains autour de la ferme s’achètent sur leur panneau.' }),
   ];
 }
@@ -618,9 +665,10 @@ function animalsShop(ui: FarmUi): Node[] {
     const card = el(
       'button',
       { class: `farm-item${open ? '' : ' is-locked'}`, type: 'button' },
-      el('div', { class: 'farm-art' }, img(animalSprite(a.id, 0), 3)),
+      // A tiny animal (the bee) is drawn bigger, so every card shows its animal about the same size.
+      el('div', { class: 'farm-art' }, img(animalSprite(a.id, 0), Math.max(3, Math.floor(26 / animalSprite(a.id, 0).width)))),
       el('span', { text: a.name }),
-      el('small', { class: 'farm-note', text: `${ownCount(save, a.id)} · mange ${item(a.feed).name.toLowerCase()} · ${duration(a.minutes)}` }),
+      el('small', { class: 'farm-note', text: `${ownCount(save, a.id)} · mange des ${item(a.feed).plural.toLowerCase()} · ${duration(a.minutes)}` }),
       foot,
     );
     card.addEventListener('click', () => {
@@ -637,7 +685,7 @@ function animalsShop(ui: FarmUi): Node[] {
     return el(
       'div',
       { class: 'farm-card is-ready' },
-      el('div', { class: 'farm-who' }, img(breedSprite(id, 0), 3), el('span', {}, `${breed(id).name}${count > 1 ? ` × ${count}` : ''}`, el('small', { text: ready ? 'Elle t’attend : il y a de la place.' : `Il faut de la place : ${placeable(animal(breed(id).animal).pen).name}.` }))),
+      el('div', { class: 'farm-who' }, img(breedSprite(id, 0), 3), el('span', {}, `${breed(id).name}${count > 1 ? ` × ${count}` : ''}`, el('small', { text: ready ? `${animal(breed(id).animal).feminine ? 'Elle' : 'Il'} t’attend : il y a de la place.` : `Il faut de la place : ${placeable(animal(breed(id).animal).pen).name}.` }))),
       button(['L’installer'], () => ui.placeBreed(id), { disabled: !ready, wide: true }),
     );
   });
@@ -663,12 +711,12 @@ function charmAdded(save: FarmSave, id: PlaceableId): string {
 }
 
 function decorShop(ui: FarmUi): Node[] {
-  // Treasures show only while one is stored, ready to be placed again.
-  const list = PLACEABLES.filter((p) => p.kind === 'deco' && (!p.treasure || (ui.save.decorStore[p.id as DecorId] ?? 0) > 0));
+  // A treasure shows once a parcel has brought it: the album keeps the surprise.
+  const list = PLACEABLES.filter((p) => p.kind === 'deco' && !p.retired && (!p.treasure || ui.save.album.includes(p.id as TreasureId)));
   return [
     el('p', { class: 'farm-charm', text: charmLine(ui.save) }),
     el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), charmAdded(ui.save, p.id)))),
-    el('p', { class: 'farm-note', text: 'Chaque déco posée ajoute du charme (un trésor, une seule fois) : Gaston passe plus souvent et les commandes paient un peu mieux. Les décos se tournent et se rangent dans « Aménager ».' }),
+    el('p', { class: 'farm-note', text: 'Un trésor trouvé dans un colis s’achète ensuite autant de fois que tu veux. Chaque déco posée ajoute du charme (un trésor, une seule fois) : Gaston passe plus souvent et les commandes paient un peu mieux. Les décos se tournent et se rangent dans « Aménager ».' }),
   ];
 }
 

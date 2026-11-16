@@ -1,7 +1,18 @@
-import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity, SkinId } from './data/types';
+import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity, SkinId, TreeId } from './data/types';
 import { JOIN_CARRIES, JOIN_EAST, JOIN_NORTH, JOIN_NORTH_GATE, JOIN_SOUTH, JOIN_WEST, SKINS } from './data/skins';
 import { BRIDGE_TILES, MAP_SIZE, ROAD_COLUMN, isWater } from './data/land';
 import { mulberry32 } from '../../random';
+import {
+  TILE, OUTLINE, canvas, sprite, cached, mapSprite, C, ROOF_RED, ROOF_BLUE, ROOF_BROWN, ROOF_SLATE, DOOR, DOOR_BLUE, TIMBER, TIMBER_LIGHT,
+  WARM_STONE, GLINT, tiledRoof, eave, tiledGable, stones, framedWindow, plankDoor, yard, sideAndFrontFence, backFence, planks,
+  ROOF_PINK, COOKIE, cookieDisc, IRON, IRON_LIGHT, RIDGES,
+} from './farmPaint';
+import type { Sprite, View, FieldStage, Painter, PixelMap } from './farmPaint';
+import { LOT2_CROP_PAINT, LOT2_ITEM_MAPS, type Lot2Crop, type Lot2Item } from './farmArtItems';
+import { LOT2_CHIMNEYS, lot2Machine } from './farmArtMachines';
+import { LOT2_PEN_AREAS, lot2Animal, lot2Breed, lot2Pen, type Lot2Pen } from './farmArtAnimals';
+export { TILE, OUTLINE, sprite, cached, C } from './farmPaint';
+export type { Sprite, View, FieldStage, Painter } from './farmPaint';
 
 // -----------------------------------------------
 // THE FARM'S PIXEL ART
@@ -11,144 +22,11 @@ import { mulberry32 } from '../../random';
 // A sprite canvas has a 1 px margin around its drawing for the outline, except the full-tile pieces
 // (fence, hedge, paths) which are exactly one tile wide so that neighbours join.
 
-export const TILE = 16;
-export const OUTLINE = '#4a3135';
-export type Sprite = HTMLCanvasElement;
-export type View = 'face' | 'profile';
-export type FieldStage = 'empty' | 'sprout' | 'growing' | 'ripe';
 export type UiIcon =
   | 'nut' | 'star' | 'chest' | 'barn' | 'orders' | 'quests' | 'shop' | 'build' | 'sack' | 'lock' | 'sickle' | 'medal'
   | 'parcel' | 'gift' | 'bridge' | 'zoomIn' | 'zoomOut' | 'back' | 'rotate' | 'store' | 'check' | 'cross' | 'seed' | 'brush';
 
-type ObjectId = Exclude<PlaceableId, 'field' | 'hazel'>;
-
-// -----------------------------------------------
-// SPRITE ENGINE
-// -----------------------------------------------
-
-export interface Painter {
-  px(x: number, y: number, col: string): void;
-  rect(x: number, y: number, w: number, h: number, col: string): void;
-  ellipse(cx: number, cy: number, rx: number, ry: number, col: string): void;
-  disc(cx: number, cy: number, r: number, col: string): void;
-  line(x0: number, y0: number, x1: number, y1: number, col: string): void;
-  map(x: number, y: number, rows: readonly string[], pal: Record<string, string>): void;
-  /** Crops only: the row the next plant stands on (the wind leans what is high above it). */
-  foot?(y: number): void;
-}
-
-function canvas(w: number, h: number): HTMLCanvasElement {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  return c;
-}
-
-/**
- * A drawing of w x h pixels; `margin` pixels are added around it for the outline. `glaze` paints after the outline,
- * for what must stay light and thin (water jets): it gets no outline.
- */
-export function sprite(w: number, h: number, paint: (P: Painter) => void, outline = true, margin = 1, glaze?: (P: Painter) => void): Sprite {
-  const c = canvas(w + 2 * margin, h + 2 * margin);
-  paint(painterOn(c, margin));
-  if (outline) addOutline(c);
-  if (glaze) glaze(painterOn(c, margin));
-  return c;
-}
-
-function painterOn(c: HTMLCanvasElement, margin: number): Painter {
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  const fill = (x: number, y: number, ww: number, hh: number, col: string) => {
-    g.fillStyle = col;
-    g.fillRect(x + margin, y + margin, ww, hh);
-  };
-  const P: Painter = {
-    px: (x, y, col) => fill(Math.round(x), Math.round(y), 1, 1, col),
-    rect: (x, y, ww, hh, col) => fill(Math.round(x), Math.round(y), ww, hh, col),
-    ellipse(cx, cy, rx, ry, col) {
-      for (let y = -ry; y <= ry; y++) {
-        for (let x = -rx; x <= rx; x++) {
-          if ((x * x) / ((rx + 0.45) * (rx + 0.45)) + (y * y) / ((ry + 0.45) * (ry + 0.45)) <= 1) fill(cx + x, cy + y, 1, 1, col);
-        }
-      }
-    },
-    disc: (cx, cy, r, col) => P.ellipse(cx, cy, r, r, col),
-    line(x0, y0, x1, y1, col) {
-      const dx = Math.abs(x1 - x0);
-      const dy = -Math.abs(y1 - y0);
-      const sx = x0 < x1 ? 1 : -1;
-      const sy = y0 < y1 ? 1 : -1;
-      let err = dx + dy;
-      for (;;) {
-        P.px(x0, y0, col);
-        if (x0 === x1 && y0 === y1) break;
-        const e2 = 2 * err;
-        if (e2 >= dy) {
-          err += dy;
-          x0 += sx;
-        }
-        if (e2 <= dx) {
-          err += dx;
-          y0 += sy;
-        }
-      }
-    },
-    map(x, y, rows, pal) {
-      rows.forEach((row, j) => [...row].forEach((ch, i) => {
-        if (ch !== '.' && pal[ch]) P.px(x + i, y + j, pal[ch]);
-      }));
-    },
-  };
-  return P;
-}
-
-function addOutline(c: HTMLCanvasElement): void {
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  const { width: w, height: h } = c;
-  const d = g.getImageData(0, 0, w, h).data;
-  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0;
-  g.fillStyle = OUTLINE;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) g.fillRect(x, y, 1, 1);
-    }
-  }
-}
-
-const cache = new Map<string, Sprite>();
-export function cached(key: string, make: () => Sprite): Sprite {
-  let s = cache.get(key);
-  if (!s) {
-    s = make();
-    cache.set(key, s);
-  }
-  return s;
-}
-
-/** A pixel map drawing: each row a string, '.' transparent, other letters looked up in the palette. */
-function mapSprite(rows: readonly string[], pal: Record<string, string>): Sprite {
-  const w = Math.max(...rows.map((r) => r.length));
-  return sprite(w, rows.length, (P) => P.map(0, 0, rows, pal));
-}
-
-// -----------------------------------------------
-// PALETTE
-// -----------------------------------------------
-
-export const C = {
-  soil: '#b07a52', soilDark: '#8f5e3e', soilLight: '#c99466',
-  wood: '#c38a55', woodDark: '#9a6639', woodLight: '#dcaa72',
-  roof: '#d9606a', roofDark: '#b4474f', roofLight: '#ee8b90',
-  straw: '#ead69d', strawDark: '#d6bd78', strawLight: '#f5e7bf',
-  leaf: '#5aa54a', leafDark: '#468a3b', leafLight: '#7cc456', leafPale: '#a6dc7f',
-  gold: '#f2c94c', goldDark: '#d9a339', goldLight: '#fbe38a',
-  stone: '#e8e0d2', stoneDark: '#cfc3b1', grey: '#bdb6ae', greyDark: '#9c958d', greyLight: '#dad5ce',
-  cream: '#f6e5c8', brick: '#c96a4e', brickDark: '#a9533b', glow: '#ffd479', white: '#fffaf2',
-  door: '#6b4a3a', bark: '#8a5a3b', barkDark: '#6f4630',
-  water: '#5c9fd6', waterDark: '#4a86bd', waterLight: '#a8d6f5',
-  blue: '#5b86b8', blueDark: '#45699a', blueLight: '#86acd6',
-  red: '#e0475b', orange: '#f08a2b', orangeDark: '#d46a1f',
-};
+type ObjectId = Exclude<PlaceableId, 'field' | TreeId>;
 
 // -----------------------------------------------
 // FIELDS
@@ -158,7 +36,6 @@ export const C = {
 const FIELD_W = 14;
 const FIELD_H = 24;
 const SOIL_TOP = 10;
-const RIDGES = [12, 16, 20];
 
 export function fieldSprite(crop: CropId | null, stage: FieldStage): Sprite {
   const shown = crop && stage !== 'empty' ? stage : 'empty';
@@ -255,7 +132,7 @@ function leaning(P: Painter, dx: number, wind: boolean): Painter {
   return L;
 }
 
-const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
+const CROP_PAINT_LOT1: Record<Exclude<CropId, Lot2Crop>, (P: Painter, ripe: boolean) => void> = {
   wheat(P, ripe) {
     for (const yc of RIDGES) for (const xc of [2, 6, 10]) {
       P.foot?.(yc);
@@ -397,115 +274,7 @@ const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = {
   },
 };
 
-// -----------------------------------------------
-// BUILDING KIT: one light from the top left, three or four tones per material (docs/ferme.md 16, step 3)
-// -----------------------------------------------
-
-/** Light, base, dark, deep. */
-type Tones = readonly [string, string, string, string];
-
-const ROOF_RED: Tones = ['#f6a98a', '#de7a5c', '#bb5a42', '#9c4634'];
-const ROOF_BLUE: Tones = ['#a4c8ee', '#6a98cc', '#4f78ab', '#3d5f8c'];
-const ROOF_BROWN: Tones = ['#c39064', '#9a6644', '#7a4c31', '#5e3824'];
-const ROOF_SLATE: Tones = ['#a08b8b', '#7a6666', '#5e4d4d', '#463939'];
-const DOOR: Tones = ['#c08657', '#a46c46', '#8d5a3c', '#6b4430'];
-const DOOR_BLUE: Tones = ['#a4c8ee', '#5b86b8', '#45699a', '#2f4f78'];
-const TIMBER = '#7a4b33';
-const TIMBER_LIGHT = '#9a6542';
-const WARM_STONE = ['#efe1c8', '#d9c4a2', '#b49a76'] as const;
-const GLINT = '#ffffff';
-
-/** A front roof in scalloped tiles, narrowing towards its ridge; its right end in shade. */
-function tiledRoof(P: Painter, top: number, rows: number, width: number, t: Tones): void {
-  const inset = (row: number) => Math.max(0, 6 - Math.floor(row * 0.5));
-  for (let i = 0; i < rows; i++) P.rect(inset(i), top + i, width - 2 * inset(i), 1, i === 0 ? t[0] : t[1]);
-  for (let i = 2; i < rows; i += 3) {
-    const shift = Math.floor(i / 3) % 2 ? 2 : 0;
-    const right = width - inset(i);
-    for (let x = inset(i) + shift; x < right; x += 4) {
-      P.rect(x, top + i, Math.min(3, right - x), 1, t[2]);
-      if (x + 3 < width - inset(i - 1) - 3) P.px(x + 3, top + i - 1, t[2]);
-      if (x + 1 < width - inset(i - 2) - 3) P.px(x + 1, top + i - 2, t[0]);
-    }
-  }
-  for (let i = 0; i < rows; i++) P.rect(width - inset(i) - 3, top + i, 3, 1, i % 3 === 2 ? t[3] : t[2]);
-}
-
-/** The thick front edge of a roof, and the shade it casts on the wall under it. */
-function eave(P: Painter, x: number, y: number, w: number, t: Tones, wallShade: string): void {
-  P.rect(x, y, w, 2, t[3]);
-  P.rect(x, y, w, 1, t[2]);
-  P.rect(x + 1, y + 2, w - 2, 1, wallShade);
-}
-
-/** A gable end: a triangle of wall between two barge boards, light on the left, dark on the right. */
-function tiledGable(P: Painter, cx: number, top: number, rows: number, slope: number, t: Tones, wall: string): void {
-  for (let i = 0; i < rows; i++) {
-    const half = Math.round(i * slope) + 1;
-    P.rect(cx - half - 1, top + i, 2 * half + 3, 1, i < 2 ? t[0] : t[1]);
-    if (half > 2) P.rect(cx - half + 2, top + i, 2 * half - 3, 1, wall);
-    P.px(cx - half - 1, top + i, t[0]);
-    P.px(cx + half + 1, top + i, t[3]);
-    if (half > 1) P.px(cx + half, top + i, t[2]);
-  }
-}
-
-/** Cut stones: dark joints, light tops; clipped to the band. */
-function stones(P: Painter, x0: number, y0: number, w: number, h: number, [light, base, dark]: readonly [string, string, string]): void {
-  P.rect(x0, y0, w, h, base);
-  const clip = (x: number, y: number, ww: number, hh: number, col: string) => {
-    const r = Math.min(x + ww, x0 + w);
-    const b = Math.min(y + hh, y0 + h);
-    if (r > x && b > y) P.rect(x, y, r - x, b - y, col);
-  };
-  for (let y = y0; y < y0 + h; y += 3) {
-    clip(x0, y, w, 1, dark);
-    const odd = Math.floor((y - y0) / 3) % 2 === 1;
-    for (let x = x0 + (odd ? 2 : 5); x < x0 + w; x += 6) clip(x, y + 1, 1, 2, dark);
-    for (let x = x0 + (odd ? 3 : 0); x < x0 + w; x += 6) clip(x, y + 1, 2, 1, light);
-  }
-}
-
-interface WindowLook {
-  /** A box of flowers under the sill. */
-  flowers?: boolean;
-  frame?: string;
-  glass?: string;
-}
-
-/** A window set into the wall: frame, glass shaded on its top and left, cross bars, a glint. */
-function framedWindow(P: Painter, x: number, y: number, w: number, h: number, look: WindowLook = {}): void {
-  const glass = look.glass ?? C.glow;
-  const inner = look.glass ? '#a9c9de' : '#e8b54a';
-  P.rect(x - 1, y - 1, w + 2, h + 2, look.frame ?? C.woodDark);
-  P.rect(x, y, w, h, glass);
-  P.rect(x, y, w, 1, inner);
-  P.rect(x, y, 1, h, inner);
-  if (w > 3) P.rect(x + Math.floor(w / 2), y, 1, h, look.frame ?? C.woodDark);
-  if (h > 4) P.rect(x, y + Math.floor(h / 2), w, 1, look.frame ?? C.woodDark);
-  P.px(x + 1, y + 1, GLINT);
-  if (w > 3 && h > 3) P.px(x + 2, y + 2, '#fff3c4');
-  if (look.flowers) {
-    P.rect(x - 1, y + h + 1, w + 2, 1, C.woodLight);
-    P.rect(x - 1, y + h + 2, w + 2, 1, C.wood);
-    for (let i = 0; i < w; i += 2) {
-      P.px(x + i, y + h + 1, i % 4 === 0 ? '#ff8fb8' : C.gold);
-      if (i + 1 < w) P.px(x + i + 1, y + h + 1, C.leaf);
-    }
-  }
-}
-
-/** A plank door set into the wall, its top rounded; the knob on the right. */
-function plankDoor(P: Painter, x: number, y: number, w: number, h: number, t: Tones = DOOR): void {
-  P.rect(x - 1, y + 1, w + 2, h - 1, t[3]);
-  P.rect(x, y, w, 1, t[3]);
-  P.rect(x, y + 2, w, h - 2, t[1]);
-  P.rect(x + 1, y + 1, w - 2, 1, t[1]);
-  P.rect(x, y + 2, 1, h - 2, t[2]);
-  for (let px = x + 2; px < x + w - 1; px += 2) P.rect(px, y + 3, 1, h - 3, t[2]);
-  P.rect(x + 1, y + 2, 1, 1, t[0]);
-  P.px(x + w - 2, y + Math.floor(h / 2) + 1, C.gold);
-}
+const CROP_PAINT: Record<CropId, (P: Painter, ripe: boolean) => void> = { ...CROP_PAINT_LOT1, ...LOT2_CROP_PAINT };
 
 // -----------------------------------------------
 // MACHINES (2 x 2)
@@ -807,71 +576,81 @@ function spinning(view: View): Sprite {
   });
 }
 
+function cookiery(view: View): Sprite {
+  const wall = '#fbeee0';
+  const wallShade = '#f0dcc8';
+  const trim = '#8a5236';
+  return sprite(30, 44, (P) => {
+    if (view === 'face') {
+      // The oven's chimney on the left.
+      P.rect(4, 0, 5, 12, C.brick);
+      for (const y of [3, 7, 10]) P.rect(4, y, 5, 1, C.brickDark);
+      P.rect(4, 1, 1, 11, '#e08a6a');
+      P.rect(3, 0, 7, 2, C.brickDark);
+      tiledRoof(P, 4, 13, 30, ROOF_PINK);
+      // The shop's big cookie, set in the roof.
+      cookieDisc(P, 15, 10, 5);
+      P.rect(1, 18, 28, 21, wall);
+      P.rect(22, 20, 6, 19, wallShade);
+      P.rect(1, 18, 2, 21, trim);
+      P.rect(27, 18, 2, 21, trim);
+      eave(P, 0, 17, 30, ROOF_PINK, '#e6cdb6');
+      // Two windows under pink and white awnings, a tray of cookies behind the right one.
+      for (const left of [3, 20]) {
+        for (let x = left; x < left + 7; x += 2) P.rect(x, 20, 2, 3, (x - left) % 4 === 0 ? ROOF_PINK[1] : C.white);
+        for (let x = left; x < left + 7; x += 2) P.px(x + 1, 23, (x - left) % 4 === 0 ? ROOF_PINK[1] : C.white);
+        framedWindow(P, left + 1, 26, 5, 5, { flowers: true, frame: trim });
+      }
+      P.rect(22, 29, 3, 1, COOKIE.dark);
+      P.px(22, 28, COOKIE.base);
+      P.px(24, 28, COOKIE.base);
+      plankDoor(P, 12, 24, 6, 14, DOOR);
+      stones(P, 1, 39, 28, 5, WARM_STONE);
+      P.rect(10, 39, 10, 2, '#cdb48d');
+      P.rect(10, 39, 10, 1, '#e8d8bb');
+    } else {
+      P.rect(21, 0, 4, 14, C.brick);
+      P.rect(21, 4, 4, 1, C.brickDark);
+      P.rect(21, 9, 4, 1, C.brickDark);
+      P.rect(21, 1, 1, 13, '#e08a6a');
+      P.rect(20, 0, 6, 2, C.brickDark);
+      P.rect(4, 20, 22, 19, wall);
+      P.rect(20, 21, 5, 18, wallShade);
+      P.rect(4, 20, 2, 19, trim);
+      P.rect(24, 20, 2, 19, trim);
+      tiledGable(P, 15, 4, 16, 0.75, ROOF_PINK, wall);
+      cookieDisc(P, 15, 13, 3);
+      eave(P, 3, 19, 24, ROOF_PINK, '#e6cdb6');
+      // A window between pink shutters.
+      P.rect(7, 25, 2, 7, ROOF_PINK[2]);
+      P.rect(19, 25, 2, 7, ROOF_PINK[2]);
+      P.px(7, 27, ROOF_PINK[3]);
+      P.px(20, 29, ROOF_PINK[3]);
+      framedWindow(P, 10, 26, 8, 5, { flowers: true, frame: trim });
+      stones(P, 4, 39, 22, 5, WARM_STONE);
+      // The shop sign: a cookie hanging from an iron arm at the corner.
+      P.rect(23, 23, 6, 1, IRON);
+      P.px(23, 24, IRON);
+      P.px(26, 24, IRON_LIGHT);
+      cookieDisc(P, 26, 28, 3);
+    }
+  });
+}
+
 /** Top of each chimney, in sprite pixels (margin included): where the scene lets smoke rise. */
 const CHIMNEYS: Partial<Record<PlaceableId, Partial<Record<View, { x: number; y: number }>>>> = {
   bakery: { face: { x: 23, y: 0 }, profile: { x: 24, y: 0 } },
+  cookiery: { face: { x: 7, y: 0 }, profile: { x: 24, y: 0 } },
   spinning: { face: { x: 6, y: 1 } },
 };
 
 export function chimneyOf(id: PlaceableId, view: View): { x: number; y: number } | null {
-  return CHIMNEYS[id]?.[view] ?? null;
+  return (CHIMNEYS[id] ?? LOT2_CHIMNEYS[id as keyof typeof LOT2_CHIMNEYS])?.[view] ?? null;
 }
 
 // -----------------------------------------------
 // PENS (3 x 3)
 // -----------------------------------------------
-
-function yard(P: Painter, top: number, base: string, dark: string, light: string, seed: number): void {
-  const r = mulberry32(seed);
-  P.rect(0, top, 46, 58 - top + (top > 12 ? 2 : 0), base);
-  for (let i = 0; i < 90; i++) P.px(Math.floor(r() * 46), top + 2 + Math.floor(r() * (56 - top)), r() < 0.5 ? dark : light);
-}
-
-/** A ranch rail from x to x + w: light top, dark underside, like the ranch fences. */
-function rail(P: Painter, x: number, y: number, w: number): void {
-  P.rect(x, y, w, 2, C.wood);
-  P.rect(x, y, w, 1, C.woodLight);
-  P.rect(x, y + 1, w, 1, C.woodDark);
-}
-
-/** A ranch post: light face, shaded right edge, a straw-light cap. */
-function post(P: Painter, x: number, y: number, h: number): void {
-  P.rect(x, y, 2, h, C.woodLight);
-  P.px(x + 1, y + 1, C.wood);
-  P.rect(x + 1, y + 2, 1, h - 2, C.wood);
-  P.px(x, y, C.strawLight);
-}
-
-/** The pen's sides and front, in the ranch fence's style. */
-function sideAndFrontFence(P: Painter, from: number, bottom: number): void {
-  for (let y = from; y < bottom; y += 6) {
-    P.rect(0, y, 2, 4, C.wood);
-    P.rect(44, y, 2, 4, C.wood);
-    P.px(0, y, C.woodLight);
-  }
-  P.rect(0, from, 1, bottom - from, C.woodDark);
-  P.rect(45, from, 1, bottom - from, C.woodDark);
-  rail(P, 0, bottom - 8, 46);
-  rail(P, 0, bottom - 4, 46);
-  for (let x = 0; x < 46; x += 7) post(P, x, bottom - 10, 10);
-  post(P, 44, bottom - 10, 10);
-}
-
-/** The fence at the back of a pen. */
-function backFence(P: Painter, top: number): void {
-  rail(P, 0, top + 3, 46);
-  rail(P, 0, top + 6, 46);
-  for (let x = 0; x < 46; x += 7) post(P, x, top, 9);
-}
-
-/** Wooden planks: a dark line every few columns, the right end in shade. */
-function planks(P: Painter, x: number, y: number, w: number, h: number): void {
-  P.rect(x, y, w, h, C.wood);
-  P.rect(x + w - 4, y, 4, h, '#ad7645');
-  for (let px = x + 2; px < x + w; px += 4) P.rect(px, y, 1, h, C.woodDark);
-  P.rect(x, y, 1, h, C.woodLight);
-  P.rect(x, y + h - 1, w, 1, C.woodDark);
-}
 
 function coop(view: View): Sprite {
   return sprite(46, 58, (P) => {
@@ -1042,8 +821,15 @@ function roundTree(P: Painter, fruit: string | null, fruitLight: string, seed: n
   }
 }
 
-export function hazelSprite(ready: boolean): Sprite {
-  return cached(`hazel-${ready}`, () => sprite(30, 42, (P) => roundTree(P, ready ? '#b5763f' : null, '#e0a46a', 9)));
+/** A tree that gives: hazelnuts, apples, cherries, shown on its branches when ready. */
+export function treeSprite(id: TreeId, ready: boolean): Sprite {
+  return cached(`tree-${id}-${ready}`, () =>
+    sprite(30, 42, (P) => {
+      if (id === 'hazel') roundTree(P, ready ? '#b5763f' : null, '#e0a46a', 9);
+      else if (id === 'apple') roundTree(P, ready ? C.red : null, '#ff8a96', 21);
+      else roundTree(P, ready ? '#a3203a' : null, '#e8506a', 33, ['#3f7d3a', '#4f9a44', '#6fb85a']);
+    }),
+  );
 }
 
 export function wildTreeSprite(seed: number): Sprite {
@@ -1444,8 +1230,61 @@ function flowerBed(id: keyof typeof FLOWER_COLORS): Sprite {
   });
 }
 
-const IRON = '#5b4a48';
-const IRON_LIGHT = '#7d6b68';
+/** The market cart (2 x 1): a plank cart under a green and white canopy, crates of produce, one big wheel. */
+function marketCart(view: View): Sprite {
+  const produce = (P: Painter, x: number, y: number) => {
+    // Three crates: apples, carrots, cabbages.
+    for (const [dx, a, b] of [[0, C.red, '#ff8a96'], [6, C.orange, '#ffb27c'], [12, C.leaf, C.leafLight]] as const) {
+      P.rect(x + dx, y + 2, 5, 3, C.woodLight);
+      P.rect(x + dx, y + 4, 5, 1, C.woodDark);
+      for (let i = 0; i < 5; i += 2) P.px(x + dx + i, y + 1, a);
+      P.px(x + dx + 1, y + 1, b);
+      P.rect(x + dx, y, 5, 1, a);
+      P.px(x + dx + 3, y, b);
+    }
+  };
+  const canopy = (P: Painter, x: number, w: number) => {
+    for (let i = 0; i < w; i += 2) {
+      const col = i % 4 === 0 ? '#5aa54a' : C.white;
+      P.rect(x + i, 0, Math.min(2, w - i), 3, col);
+      P.px(x + i + 1, 3, col);
+    }
+    P.rect(x, 0, w, 1, '#7cc456');
+  };
+  if (view === 'face') {
+    return sprite(30, 22, (P) => {
+      canopy(P, 3, 22);
+      P.rect(4, 4, 1, 8, C.woodDark);
+      P.rect(23, 4, 1, 8, C.woodDark);
+      produce(P, 6, 7);
+      // The cart's bed and its shafts to the left.
+      planks(P, 3, 12, 22, 4);
+      P.line(0, 15, 3, 13, C.woodDark);
+      P.line(0, 16, 3, 14, C.wood);
+      // The big wheel, spokes and iron rim.
+      P.disc(19, 17, 4, IRON);
+      P.disc(19, 17, 3, C.woodDark);
+      P.disc(19, 17, 2, C.wood);
+      P.line(16, 17, 22, 17, C.woodDark);
+      P.line(19, 14, 19, 20, C.woodDark);
+      P.px(19, 17, IRON_LIGHT);
+      P.rect(6, 16, 2, 4, C.woodDark);
+    });
+  }
+  return sprite(14, 28, (P) => {
+    canopy(P, 1, 12);
+    P.rect(2, 4, 1, 12, C.woodDark);
+    P.rect(11, 4, 1, 12, C.woodDark);
+    // Seen from its end: crates one behind the other, two wheels showing on each side.
+    produce(P, 1, 8);
+    produce(P, 1, 13);
+    planks(P, 1, 18, 12, 5);
+    for (const x of [0, 12]) {
+      P.rect(x, 20, 2, 7, IRON);
+      P.rect(x, 21, 2, 5, C.woodDark);
+    }
+  });
+}
 
 function bench(view: View): Sprite {
   if (view === 'face') {
@@ -2321,6 +2160,21 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'bakery': return bakery(v);
       case 'dairy': return dairy(v);
       case 'spinning': return spinning(v);
+      case 'cookiery': return cookiery(v);
+      case 'refinery':
+      case 'press':
+      case 'jamKitchen':
+      case 'candyShop':
+      case 'sewing':
+      case 'iceCream':
+      case 'soapWorks':
+      case 'creperie': return lot2Machine(id, v);
+      case 'sheepfold':
+      case 'pigsty':
+      case 'hive':
+      case 'goatShed':
+      case 'duckPond':
+      case 'hutch': return lot2Pen(id, v);
       case 'coop': return coop(v);
       case 'cowshed': return cowshed(v);
       case 'fence': return fenceSprite('fenceRanch', ACROSS, false);
@@ -2352,6 +2206,7 @@ export function objectSprite(id: ObjectId, view: View): Sprite {
       case 'swing': return swing(v);
       case 'fountain': return fountain();
       case 'mailbox': return mailbox(v, false);
+      case 'marketCart': return marketCart(v);
       default: {
         const unknown: never = id;
         throw new Error(`no drawing for ${String(unknown)}`);
@@ -2370,8 +2225,16 @@ const SYMMETRIC = new Set<ObjectId>([
 // ANIMALS
 // -----------------------------------------------
 
+/**
+ * Where a pen's animals stand, when the drawing says so (a pond for the ducks, the air above the hives): the
+ * range of an animal sprite's top-left corner, in the pen sprite's pixels. Null: the scene uses the lower half.
+ */
+export function penAreaOf(id: PlaceableId, view: View): { x0: number; y0: number; x1: number; y1: number } | null {
+  return LOT2_PEN_AREAS[id as Lot2Pen]?.[view] ?? null;
+}
+
 export function animalSprite(id: AnimalId, frame: 0 | 1): Sprite {
-  return cached(`animal-${id}-${frame}`, () => (id === 'chicken' ? hen(frame, C.white, '#efe3d2', false) : cow(frame, '#4a3a3a')));
+  return cached(`animal-${id}-${frame}`, () => (id === 'chicken' ? hen(frame, C.white, '#efe3d2', false) : id === 'cow' ? cow(frame, '#4a3a3a') : lot2Animal(id, frame)));
 }
 
 /** A rare animal, same canvas size and pose/frames as animalSprite of its kind (redHen and goldenHen like the hen, pinkCow like the cow). redHen: russet hen; goldenHen: golden hen with a tiny sparkle; pinkCow: cow with pink spots. */
@@ -2379,7 +2242,8 @@ export function breedSprite(breed: BreedId, frame: 0 | 1): Sprite {
   return cached(`breed-${breed}-${frame}`, () => {
     if (breed === 'redHen') return hen(frame, '#c8693a', '#a4532c', false);
     if (breed === 'goldenHen') return hen(frame, C.gold, C.goldDark, true);
-    return cow(frame, '#f48fb1');
+    if (breed === 'pinkCow') return cow(frame, '#f48fb1');
+    return lot2Breed(breed, frame);
   });
 }
 
@@ -2431,12 +2295,12 @@ function cow(frame: 0 | 1, spot: string): Sprite {
 // ICONS
 // -----------------------------------------------
 
-type PixelMap = { rows: string[]; pal: Record<string, string> };
 
-const FEED_ROWS = ['.a....a.', '..aaaa..', '.bbbbbb.', 'bbcbcbbb', 'bbbbbbbb', 'bcbbbcbb', 'bbbbbbbb', '.bbbbbb.'];
+/** A round cookie with its animal's head iced on it (docs/ferme.md 17). */
+const COOKIE_PAL = { a: COOKIE.dark, b: COOKIE.base, c: COOKIE.chip, w: '#ffffff', k: OUTLINE };
 const PIE_ROWS = ['..aaaaa...', '.abbbbba..', 'abcbbbcba.', 'aaaaaaaaa.', '.ddddddd..'];
 
-const ITEM_MAPS: Record<ItemId, PixelMap> = {
+const ITEM_MAPS_LOT1: Record<Exclude<ItemId, Lot2Item>, PixelMap> = {
   wheat: { rows: ['....b....', '...bab...', '..b.a.b..', '..bab.b..', '...aba...', '..b.a.b..', '...bab...', '....a....', '....a....', '...a.a...', '..a...a..'], pal: { a: '#d9a339', b: '#f2c94c' } },
   corn: { rows: ['...bb...', '..bccb..', '..bccb..', '.abccb..', 'a.bccb.a', '.abccba.', '..abba..', '..a..a..', '.a....a.'], pal: { a: '#5aa54a', b: '#e9b93f', c: '#fbe38a' } },
   carrot: { rows: ['..a.a..', '...a...', '..aaa..', '.bbbb..', '.bcbbb.', '..bbbb.', '..bbb..', '...bb..', '...b...'], pal: { a: '#5aa54a', b: '#f08a4b', c: '#ffb27c' } },
@@ -2447,8 +2311,14 @@ const ITEM_MAPS: Record<ItemId, PixelMap> = {
   cotton: { rows: ['.aa..aa.', 'abbaabba', 'abbbbbba', '.abbbba.', 'abbbbbba', '.aabbaa.', '...cc...', '...cc...'], pal: { a: '#e3dccd', b: '#ffffff', c: '#9a6639' } },
   egg: { rows: ['..aaa..', '.aaaaa.', '.abaaa.', 'abbaaaa', 'abaaaaa', 'aaaaaac', 'aaaaaac', '.aaaac.', '..ccc..'], pal: { a: '#fff4e2', b: '#ffffff', c: '#e2cfb5' } },
   milk: { rows: ['..aa..', '..bb..', '.bccb.', 'bccccb', 'bdddcb', 'bdddcb', 'bccccb', '.bbbb.'], pal: { a: '#6a9fd8', b: '#c9d6e3', c: '#ffffff', d: '#8ab8e6' } },
-  chickenFeed: { rows: FEED_ROWS, pal: { a: '#9a6639', b: '#d9b97a', c: '#f2c94c' } },
-  cowFeed: { rows: FEED_ROWS, pal: { a: '#9a6639', b: '#a9c97a', c: '#f08a4b' } },
+  chickenFeed: {
+    rows: ['..aaaaa..', '.abbrbba.', 'abbwwwbba', 'abwkwwoba', 'abbwwwbba', 'abcbbbcba', 'abbbcbbba', '.abbbbba.', '..aaaaa..'],
+    pal: { ...COOKIE_PAL, r: '#e0475b', o: '#f2a33a' },
+  },
+  cowFeed: {
+    rows: ['..aaaaa..', '.ahbbbha.', 'abwwwwwba', 'abwkwkwba', 'abwswwwba', 'abpppppba', 'abbcbbcba', '.abbbbba.', '..aaaaa..'],
+    pal: { ...COOKIE_PAL, h: '#e8e0d2', s: '#4a3a3a', p: '#f5b3b8' },
+  },
   flour: { rows: ['..aaaa..', '.a....a.', 'bbbbbbbb', 'bbccbbbb', 'bcbbbbbb', 'bbbbbbbb', 'bbbbbbbd', '.bbbbbd.'], pal: { a: '#c38a55', b: '#f4ece0', c: '#ffffff', d: '#d8ccbb' } },
   bread: { rows: ['..aaaaa...', '.abbbbba..', 'abcbcbcba.', 'abbbbbbbad', 'aabbbbbaad', '.aaaaaaad.', '..dddddd..'], pal: { a: '#c9813f', b: '#e6a85a', c: '#f6d08c', d: '#9a5f2c' } },
   carrotPie: { rows: PIE_ROWS, pal: { a: '#d9944f', b: '#f08a4b', c: '#ffb27c', d: '#9a5f2c' } },
@@ -2460,6 +2330,8 @@ const ITEM_MAPS: Record<ItemId, PixelMap> = {
   thread: { rows: ['aaaaaaaa', '.bbbbbb.', '.cdcdcd.', '.dcdcdc.', '.cdcdcd.', '.dcdcdc.', '.cdcdcd.', '.dcdcdc.', '.bbbbbb.', 'aaaaaaaa'], pal: { a: '#9a6639', b: '#c38a55', c: '#e8789e', d: '#f7a1c4' } },
   fabric: { rows: ['.bbbbbbbbb', 'bcbcbcbcbc', 'cccccccccc', '.ddddddddd', 'dedededede', 'eeeeeeeeee', '.fffffffff', 'fgfgfgfgfg', 'gggggggggg'], pal: { b: '#ffc3da', c: '#e8789e', d: '#d4dff0', e: '#8ab8e6', f: '#fff1b8', g: '#e9c45a' } },
 };
+
+const ITEM_MAPS: Record<ItemId, PixelMap> = { ...ITEM_MAPS_LOT1, ...LOT2_ITEM_MAPS };
 
 export function itemIcon(id: ItemId): Sprite {
   return cached(`item-${id}`, () => mapSprite(ITEM_MAPS[id].rows, ITEM_MAPS[id].pal));
@@ -2685,7 +2557,8 @@ export function fernSprite(seed: number): Sprite {
   );
 }
 
-const BUTTERFLY_COLORS: [string, string][] = [['#ff9ec4', '#ffd3e4'], ['#ffd84a', '#fff1a8'], ['#8fbfff', '#d3e6ff']];
+// No yellow butterfly: it would pass for a bee out of its hive (lot 2).
+const BUTTERFLY_COLORS: [string, string][] = [['#ff9ec4', '#ffd3e4'], ['#f4f1ea', '#ffffff'], ['#8fbfff', '#d3e6ff']];
 
 /** A tiny butterfly; frame 0 wings open, 1 wings closed. */
 export function butterflySprite(colour: 0 | 1 | 2, frame: 0 | 1): Sprite {
@@ -3017,7 +2890,7 @@ export function spriteImage(s: Sprite, scale: number, alt = ''): HTMLImageElemen
 
 const BOARD_CROPS: CropId[] = ['wheat', 'corn', 'carrot', 'tomato', 'strawberry', 'sunflower', 'pumpkin', 'cotton'];
 const BOARD_OBJECTS: ObjectId[] = [
-  'mill', 'bakery', 'dairy', 'spinning', 'coop', 'cowshed',
+  'cookiery', 'mill', 'bakery', 'dairy', 'spinning', 'coop', 'cowshed',
   'fence', 'pathDirt', 'hedge', 'flowersPink', 'pathStone', 'flowersYellow', 'scarecrow', 'flowersWhite', 'bench', 'well',
   'logPile', 'wheelbarrow', 'appleTree', 'lantern', 'birdhouse', 'pond', 'bush', 'stump', 'rock', 'bigRock',
 ];
@@ -3097,7 +2970,7 @@ export function artBoard(): HTMLElement {
   section('Barrières : un enclos par style (angles, T, bouts, poteau seul, portillons)', SKINS.map((s): [Sprite, string] => [fenceYard(s.id), s.name]), 3);
   section('Objets (face / profil)', BOARD_OBJECTS.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
   section('Arbres, ailes, animaux', [
-    [hazelSprite(false), 'noisetier'], [hazelSprite(true), 'noisetier prêt'],
+    [treeSprite('hazel', false), 'noisetier'], [treeSprite('hazel', true), 'noisetier prêt'], [treeSprite('apple', true), 'pommier prêt'], [treeSprite('cherry', true), 'cerisier prêt'],
     [wildTreeSprite(0), 'sauvage 0'], [wildTreeSprite(1), 'sauvage 1'], [wildTreeSprite(2), 'sauvage 2'],
     [millSails('face', 0), 'ailes 0'], [millSails('face', 1), 'ailes 1'], [millSails('profile', 0), 'ailes profil 0'], [millSails('profile', 1), 'ailes profil 1'],
     [animalSprite('chicken', 0), 'poule'], [animalSprite('chicken', 1), 'poule picore'], [animalSprite('cow', 0), 'vache'], [animalSprite('cow', 1), 'vache broute'],

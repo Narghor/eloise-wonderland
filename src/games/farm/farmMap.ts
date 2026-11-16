@@ -2,7 +2,8 @@ import { mulberry32 } from '../../random';
 import { PEN_CAPACITY } from './data/animals';
 import { STARTING_FIELDS, fieldPrice, maxFields } from './data/crops';
 import { STARTING_QUEUE } from './data/machines';
-import { HAZEL, placeable, type Placeable } from './data/placeables';
+import { COPY_LEVELS, TREE_YIELDS, copyLevel, hasCopies, placeable, type Placeable } from './data/placeables';
+import type { TreasureId } from './data/parcels';
 import {
   MAP_SIZE,
   OBSTACLES,
@@ -20,7 +21,7 @@ import {
   obstacle,
 } from './data/land';
 import { STARTING_NUTS } from './data/levels';
-import type { BoosterId, DecorId, ObstacleId, PlaceableId } from './data/types';
+import type { BoosterId, DecorId, ObstacleId, PenId, PlaceableId, TreeId } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import { FARM_VERSION, newMail, type FarmSave, type PlacedObject, type Rotation } from './farmSave';
 import { earn, emit, gainXp, isUnlocked, noBoosters, ownCount, spend } from './farmProgress';
@@ -90,17 +91,24 @@ export type BuyRefusal = 'locked' | 'max' | 'nuts' | null;
 
 /** What a new one of this placeable costs now (fields get dearer one by one). */
 export function priceOf(save: FarmSave, p: Placeable): number {
-  return p.kind === 'field' ? fieldPrice(Math.max(0, ownCount(save, 'field') - STARTING_FIELDS)) : p.price;
+  if (p.kind === 'field') return fieldPrice(Math.max(0, ownCount(save, 'field') - STARTING_FIELDS));
+  if (hasCopies(p)) return p.price * (ownCount(save, p.id) + 1);
+  return p.price;
 }
 
 /** How many may stand on the map now; Infinity when no cap. */
 export function capOf(save: FarmSave, p: Placeable): number {
-  return p.kind === 'field' ? maxFields(save.level) : p.maxCount ?? Infinity;
+  if (p.kind === 'field') return maxFields(save.level);
+  if (hasCopies(p)) return COPY_LEVELS.filter((_, i) => (copyLevel(p, i + 1) ?? Infinity) <= save.level).length;
+  return p.maxCount ?? Infinity;
 }
 
-/** Why a placeable cannot be bought now, or null when it can. A stored decoration is always free to place. */
+/**
+ * Why a placeable cannot be bought now, or null when it can. A stored decoration is always free to place; a
+ * treasure is bought only once a parcel has brought the first one.
+ */
 export function buyRefusal(save: FarmSave, p: Placeable): BuyRefusal {
-  if (!isUnlocked(save, p.unlock)) return 'locked';
+  if (p.treasure ? !save.album.includes(p.id as TreasureId) : !isUnlocked(save, p.unlock)) return 'locked';
   if (ownCount(save, p.id) >= capOf(save, p)) return 'max';
   if (save.nuts < priceOf(save, p)) return 'nuts';
   return null;
@@ -143,7 +151,7 @@ function newObject(save: FarmSave, id: PlaceableId, x: number, y: number, rot: R
     object.queue = [];
     object.slots = STARTING_QUEUE;
   }
-  if (p.kind === 'tree') object.readyAt = now + HAZEL.minutes * MINUTE_MS;
+  if (p.kind === 'tree') object.readyAt = now + TREE_YIELDS[id as TreeId].minutes * MINUTE_MS;
   save.objects.push(object);
   return object;
 }
@@ -368,6 +376,7 @@ export function newFarm(now: number): FarmSave {
     album: [],
     waitingBreeds: [],
     lastSkins: {},
+    cart: { order: null, nextAt: 0 },
   };
   const fieldsAt: [number, number][] = [[10, 10], [11, 10], [12, 10], [10, 11], [11, 11], [12, 11]];
   for (const [x, y] of fieldsAt) {
@@ -408,22 +417,40 @@ export function ensureMailbox(save: FarmSave): void {
   if (spot) newObject(save, 'mailbox', spot[0], spot[1], 0, 0);
 }
 
+/** From its level, the market cart parks inside the farm near the gate, or just outside it when the farm is full. */
+export function ensureCart(save: FarmSave, now: number): void {
+  if (!isUnlocked(save, placeable('marketCart').unlock) || save.objects.some((o) => o.type === 'marketCart')) return;
+  const [gx, gy] = gateTile(save);
+  const spot = freeSpotNear(save, gx + 1, gy - 2, 2, 1) ?? gateSpot(save, 2, 1);
+  if (spot) newObject(save, 'marketCart', spot[0], spot[1], 0, now);
+}
+
 /**
- * A farm with no free tile left still gets its mailbox: at the gate, on the first free dry tile just outside its
- * land, so the parcels can always be opened. It can be moved in once there is room.
+ * A farm with no free tile left still gets its mailbox or its cart: on the free dry tiles just outside its land
+ * nearest the gate, so they can always be used. They can be moved in once there is room.
  */
-function gateSpot(save: FarmSave): [number, number] | null {
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      if (isOwned(save, x, y) || isWater(x, y) || isRoad(save, x, y) || objectAt(save, x, y)) continue;
-      const nextToFarm = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isOwned(save, x + dx, y + dy));
-      if (nextToFarm) return [x, y];
+function gateSpot(save: FarmSave, w = 1, h = 1): [number, number] | null {
+  const [gx, gy] = gateTile(save);
+  const free = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE && !isOwned(save, x, y) && !isWater(x, y) && !isRoad(save, x, y) && !objectAt(save, x, y);
+  let best: [number, number] | null = null;
+  for (let y = 0; y + h <= MAP_SIZE; y++) {
+    for (let x = 0; x + w <= MAP_SIZE; x++) {
+      let fits = true;
+      let nextToFarm = false;
+      for (let j = 0; j < h && fits; j++) {
+        for (let i = 0; i < w && fits; i++) {
+          fits = free(x + i, y + j);
+          nextToFarm ||= [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isOwned(save, x + i + dx, y + j + dy));
+        }
+      }
+      if (fits && nextToFarm && (!best || Math.hypot(x - gx, y - gy) < Math.hypot(best[0] - gx, best[1] - gy))) best = [x, y];
     }
   }
-  return null;
+  return best;
 }
 
 /** Room left in a pen. */
 export function penRoom(object: PlacedObject): number {
-  return object.type === 'coop' || object.type === 'cowshed' ? PEN_CAPACITY[object.type] - (object.animals?.length ?? 0) : 0;
+  return placeable(object.type).kind === 'pen' ? PEN_CAPACITY[object.type as PenId] - (object.animals?.length ?? 0) : 0;
 }

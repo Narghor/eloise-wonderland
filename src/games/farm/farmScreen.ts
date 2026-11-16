@@ -1,9 +1,11 @@
 import './farm.css';
 import { el } from '../../dom';
 import { markHelpSeen } from '../../help';
-import { armSoundUnlock, playClack, playCluck, playCoinLand, playFanfare, playMoo, playPluck, playPop, playRustle, playSeed, playThunk } from '../casino/fx/sound';
+import { armSoundUnlock, playClack, playCoinLand, playFanfare, playPluck, playPop, playRustle, playSeed, playThunk } from '../casino/fx/sound';
+import { CRIES } from './farmCries';
 import { CASINO_TEST_BUTTONS } from '../casino/fx/testMode'; // TEST-BUTTONS
 import { todayKey } from '../../daily/daily';
+import { animal } from './data/animals';
 import { booster } from './data/boosters';
 import { crop } from './data/crops';
 import { item, itemCount } from './data/items';
@@ -21,14 +23,15 @@ import { FarmFeedback } from './farmFeedback';
 import { FarmGateCall, type Band } from './farmGateCall';
 import { FARM_HELP } from './farmHelp';
 import { FarmHud, type SheetId } from './farmHud';
-import { buyParcel, clearObstacle, ensureMailbox, newFarm, parcelOffers } from './farmMap';
+import { buyParcel, clearObstacle, ensureCart, ensureMailbox, newFarm, parcelOffers } from './farmMap';
 import { FarmMusic, musicVolume } from './farmMusic';
-import { deliver, refillOrders, refuse } from './farmOrders';
+import { deliver, deliverCart, refillCart, refillOrders, refuse, sendCartAway } from './farmOrders';
 import {
   decoBubble,
   fieldBubble,
   machineBubble,
   mailboxBubble,
+  cartBubble,
   obstacleBubble,
   offerOf,
   parcelBubble,
@@ -88,10 +91,12 @@ export function renderFarm(root: HTMLElement): () => void {
   const saved = loadFarm();
   const save = saved ?? newFarm(now);
   ensureMailbox(save);
+  ensureCart(save, now);
   const away = saved && now - saved.lastVisit > WELCOME_AFTER_MS;
   const news = away ? awayNews(save, saved.lastVisit, now) : null;
   const parcels = deliverMail(save, now);
   const orders = refillOrders(save, now);
+  refillCart(save, now);
   const newDay = !!saved?.daily && saved.daily.day !== todayKey(new Date(now));
   const screen = new FarmScreen(root, save);
   // The first time, the help comes first, in the farm's own look; Marthe's first quest follows it.
@@ -213,6 +218,9 @@ class FarmScreen implements FarmUi {
     const now = Date.now();
     refillOrders(this.save, now);
     const notices = settle(this.save, now);
+    // A level just reached may bring the market cart.
+    ensureCart(this.save, now);
+    refillCart(this.save, now);
     this.save.lastVisit = now;
     saveFarm(this.save);
     const land = `${this.save.parcels.join(',')}|${this.save.projectsDone.join(',')}|${this.save.parcelsBought}|${this.save.level}`;
@@ -247,6 +255,10 @@ class FarmScreen implements FarmUi {
     if (refillOrders(this.save, now) > 0) {
       saveFarm(this.save);
       if (this.sheet?.id === 'orders') this.renderSheet();
+    }
+    if (refillCart(this.save, now)) {
+      saveFarm(this.save);
+      this.toast('La charrette du marché est de retour, avec une grosse commande !');
     }
     this.hud.refresh(this.save);
     const target = this.bubble?.target;
@@ -378,6 +390,7 @@ class FarmScreen implements FarmUi {
     if (kind === 'tree') return treeBubble(this, target);
     if (kind === 'obstacle') return obstacleBubble(this, target);
     if (kind === 'mailbox') return mailboxBubble(this);
+    if (kind === 'cart') return cartBubble(this);
     return decoBubble(target);
   }
 
@@ -571,7 +584,7 @@ class FarmScreen implements FarmUi {
     if (kind === 'pen') {
       const g = collectPen(this.save, object, now);
       if (g) gains = [g];
-      if (g) (object.type === 'cowshed' ? playMoo : playCluck)();
+      if (g) CRIES[penAnimal(object).id]();
     } else if (kind === 'machine') gains = collectMachine(this.save, object, now);
     else if (kind === 'tree') {
       const g = collectTree(this.save, object, now);
@@ -587,18 +600,19 @@ class FarmScreen implements FarmUi {
     const a = penAnimal(pen);
     const fed = feedPen(this.save, pen, Date.now());
     if (fed === 0) {
-      this.toast(`Plus d’${item(a.feed).name.toLowerCase()} : il se fabrique au Moulin.`);
+      this.toast(`Plus de ${item(a.feed).plural.toLowerCase()} : ils se font à la Cookiterie.`);
       return;
     }
-    (pen.type === 'cowshed' ? playMoo : playCluck)();
+    CRIES[a.id]();
     this.feedback.float(this.feedback.screenOf(pen), `−${fed}`, itemIcon(a.feed));
     this.commit();
   }
 
   buyAnimal(pen: PlacedObject): void {
     if (!buyAnimal(this.save, pen)) return this.toast('Pas assez d’Éloisettes.');
-    (pen.type === 'cowshed' ? playMoo : playCluck)();
-    this.toast(`Bienvenue à ta nouvelle ${penAnimal(pen).name.toLowerCase()} ! Elle a faim.`);
+    const a = penAnimal(pen);
+    CRIES[a.id]();
+    this.toast(a.feminine ? `Bienvenue à ta nouvelle ${a.name.toLowerCase()} ! Elle a faim.` : `Bienvenue à ton nouveau ${a.name.toLowerCase()} ! Il a faim.`);
     this.commit();
   }
 
@@ -670,6 +684,25 @@ class FarmScreen implements FarmUi {
     ]);
   }
 
+  deliverCart(): void {
+    const order = deliverCart(this.save, Date.now());
+    if (!order) return;
+    playCoinLand('small');
+    this.closeBubble();
+    this.feedback.rainNuts(Math.min(12, 4 + Math.floor(order.nuts / 30)));
+    this.toast(`La charrette repart au marché : +${order.nuts} Éloisettes, +${order.xp} XP${order.parcel ? ', et un colis !' : ''}`);
+    this.commit();
+  }
+
+  sendCartAway(): void {
+    this.dialogs.choose('Renvoyer la charrette ?', 'Elle repart sans rien et revient dans une heure avec une autre commande.', [
+      { label: 'La renvoyer', act: () => this.act(() => {
+        sendCartAway(this.save, Date.now());
+        this.closeBubble();
+      }) },
+      { label: 'Garder', act: () => {}, ghost: true },
+    ]);
+  }
   claimQuest(id: string): void {
     const q = claimQuest(this.save, id);
     if (!q) return;
@@ -721,8 +754,9 @@ class FarmScreen implements FarmUi {
 
   /** A rare animal waiting for room goes into its pen. */
   placeBreed(id: BreedId): void {
-    if (!placeWaitingBreed(this.save, id)) return this.toast('Pas encore de place pour elle.');
-    playCluck();
+    const kind = animal(breed(id).animal);
+    if (!placeWaitingBreed(this.save, id)) return this.toast(kind.feminine ? 'Pas encore de place pour elle.' : 'Pas encore de place pour lui.');
+    CRIES[kind.id]();
     this.toast(`${breed(id).name} s’installe dans son enclos !`);
     this.commit();
   }

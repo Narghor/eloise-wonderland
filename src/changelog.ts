@@ -18,6 +18,11 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-16-ferme',
+    date: '16 novembre',
+    news: ['🌻 Refonte et lot de contenu pour la ferme'],
+  },
+  {
     id: '2026-11-15-ferme',
     date: '15 novembre',
     news: [

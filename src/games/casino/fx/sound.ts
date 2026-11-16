@@ -470,6 +470,42 @@ export function playMoo(): void {
   tone(300, 0, 0.7, 'triangle', 0.04, 230);
 }
 
+/** A sheep: a short wavering baa. */
+export function playBaa(): void {
+  [0, 0.07, 0.14, 0.21].forEach((at, i) => tone(i % 2 ? 300 : 330, at, 0.09, 'sawtooth', 0.045, i % 2 ? 290 : 310));
+}
+
+/** A pig: two little grunts. */
+export function playOink(): void {
+  [0, 0.16].forEach((at) => {
+    tone(190, at, 0.09, 'square', 0.05, 120);
+    noise(at, 0.07, 0.04, 500);
+  });
+}
+
+/** Bees: a soft hum, two voices beating together. */
+export function playBuzz(): void {
+  tone(220, 0, 0.45, 'sawtooth', 0.02, 235);
+  tone(227, 0, 0.45, 'sawtooth', 0.02, 240);
+}
+
+/** A goat: a quick, quavering bleat, higher than the sheep. */
+export function playBleat(): void {
+  [0, 0.06, 0.12].forEach((at, i) => tone(540 - i * 20, at, 0.07, 'sawtooth', 0.04, 500 - i * 20));
+}
+
+/** A duck: two quacks. */
+export function playQuack(): void {
+  [0, 0.15].forEach((at) => tone(620, at, 0.1, 'square', 0.045, 360));
+}
+
+/** A rabbit: barely a sound, a sniff and a tiny squeak. */
+export function playSniff(): void {
+  noise(0, 0.04, 0.03, 3200);
+  noise(0.07, 0.04, 0.03, 3200);
+  tone(1300, 0.13, 0.05, 'sine', 0.04, 1500);
+}
+
 /** A machine starting a recipe: a small mechanical click-clack. */
 export function playClack(): void {
   noise(0, 0.03, 0.12, 1400);

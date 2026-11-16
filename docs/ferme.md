@@ -569,8 +569,12 @@ de niveau et sur les colis épiques/légendaires, un cœur quand on touche un en
 - Contenu : commun = Éloisettes (20 + 10 × niveau) ou petits boosters ; rare = arrosoir, lot de boosters, ou une déco
   rare (nain de jardin, bottes de foin, table à thé) ; épique = arche fleurie, balançoire, poule rousse, vache à
   taches roses ; légendaire = fontaine dorée, poule dorée.
-- **Les trésors** (décos et animaux rares) ne s'achètent nulle part : ils remplissent l'**album** (onglet des Quêtes),
-  qui montre en silhouette ce qui manque. Un animal rare va dans l'enclos de son espèce s'il y a de la place, sinon
+- **Les trésors** (décos et animaux rares) se trouvent d'abord dans un colis : ils remplissent l'**album** (onglet des
+  Quêtes), qui montre en silhouette ce qui manque. **Une déco-trésor trouvée s'achète ensuite** dans la Boutique,
+  autant de fois qu'on veut, en Éloisettes (demande de Flo, 16/11 : la déco est faite pour être posée en plusieurs
+  exemplaires) : rare 60, épique 150, légendaire 400 (`data/placeables.ts`) ; les copies ne rapportent pas de charme
+  (règle du premier exemplaire). Avant, un trésor posé laissait un « Acheter » à 0 🌰 sur le fantôme suivant (copies
+  gratuites à l'infini). Les animaux rares restent introuvables ailleurs que dans les colis. Un animal rare va dans l'enclos de son espèce s'il y a de la place, sinon
   il attend dans la Boutique (onglet Animaux) ; il donne parfois un produit de plus (30 %, 50 % pour la poule dorée).
 - **Les colis ne s'achètent pas** avec les pièces du site : la ferme ne doit pas s'acheter.
 - MESURE (simulateur, graines 1 à 4, colis ouverts à chaque visite) : la durée ne bouge presque pas (niveau 15 à
@@ -760,3 +764,221 @@ de Flo : « la fontaine ultra légendaire est un peu moche », puis « à appliq
   la haie (touffes, fleurs blanches), les obstacles sauvages (volume, mousse, champignon).
 - **Gardés** : les trésors (dessinés avec soin dans une passe précédente), les arbres, la boîte aux lettres.
 - Planches de choix : fontaines, puis fournil et moulin avant / après (validés à l'œil par Flo).
+
+---
+
+## 17. Le Moulin débordé : les aliments partent dans leur propre machine (GO de Flo le 16/11, à coder)
+
+Retour de Flo et Eloise (16/11) : le Moulin est presque le seul goulot, il fait trop de choses et trop lentement.
+Eloise ne veut rien de précis, « juste du contenu » : de la production, des machines, des animaux, des trucs à cliquer.
+
+**Le calcul du 16/11** (vers le niveau 7, tout en continu) : 6 poules = 30 min de Moulin par heure, 5 vaches = 17,
+le Fournil = 20 à 40 ; **70 à 90 min de travail pour 60**, avec une file de 2 places. Chaque animal du lot 2 ajouterait
+son aliment au même Moulin.
+
+**Décidé** :
+- une **nouvelle machine des aliments, la Cookiterie** (nom choisi par Flo le 16/11) au **niveau 2**, avec les
+  poules : **Cookie pour poules**, puis **Cookie pour vaches** (niv. 6), puis un cookie pour chaque animal à venir.
+  Seuls les noms affichés et les icônes changent (un cookie rond avec la tête de l'animal dessus, simple : idée de Flo du 16/11) ; les ids `chickenFeed` / `cowFeed`
+  restent (sauvegardes). La quête de Léon le meunier passe au Moulin (niv. 4) : qui présente la Cookiterie est à
+  décider en codant ;
+- le **Moulin passe au niveau 4** avec le Fournil et ne fait plus que la **farine** (plus tard : d'autres ingrédients) ;
+- la quête « Le moulin de Léon » est à revoir (elle demande le Moulin puis 3 aliments pour poules) ;
+- les vieilles sauvegardes gardent leur Moulin ; un aliment en cours dans le Moulin se termine ; la nouvelle machine
+  s'achète ;
+- **ne pas accélérer le jeu** : simulateur avant / après ; si le niveau 15 arrive nettement plus tôt (> ~10 %),
+  compenser sur la table d'XP, jamais en remettant de l'attente ;
+- ensuite, le **lot 2 refait autour de la production** (animaux, machines, arbres fruitiers, 2e et 3e exemplaires des
+  machines, production glissée dans les niveaux 7 à 15, niveaux jusqu'à 30) : la rive passe après.
+
+**CODÉ le 16/11 (non commité, vu en capture, pas joué sur téléphone)** :
+- `cookiery` (id neuf en fin de `MachineId`), « Cookiterie », niv. 2, 40 🌰 ; Moulin niv. 4, 60 🌰, farine seule.
+- Fournées de la section 18 : Cookie pour poules 4 blés + 2 maïs → 6 en 10 min ; Cookie pour vaches 3 maïs + 2 carottes
+  → 5 en 15 min (1 XP la fournée). Icônes : un cookie rond, la tête de l'animal glacée dessus.
+- Dessin : maisonnette au toit rose, grand cookie dans le toit, cheminée du four à gauche (fumée quand elle cuit) ; de
+  profil, une enseigne-cookie pendue à une potence (sinon jumelle du Fournil).
+- Quêtes : **Marthe présente la Cookiterie** (quête `cookiery`, niv. 2, après la 1re commande : la construire, faire 6
+  cookies pour poules, 40 🌰 / 8 XP) ; « Des poules ! » vient après elle. **Léon arrive au niv. 4** : la quête `mill`
+  (id gardé) = construire le Moulin + 2 farines (60 🌰 / 12 XP), elle absorbe l'ancienne quête « De la farine »
+  (`flour`, supprimée : une sauvegarde qui l'avait l'oublie sans dommage) ; « Le fournil » vient après `mill`.
+- Vieilles sauvegardes : leur Moulin reste ; un aliment en cours dedans se termine (il rend la fournée au nouveau
+  compte) ; la quête de Marthe s'ouvre et les guide vers la Cookiterie, sa récompense rembourse l'achat. Cas laissé :
+  une partie arrêtée au milieu de l'ancienne quête du Moulin (niv. 2-3) la voit devenir « Moulin + 2 farines » et
+  attend le niv. 4.
+- Tâche du jour « Fabriquer N produits » : demande la Cookiterie (plus le Moulin). Textes « se fabrique au Moulin »
+  (enclos, toast, aide) → « se font à la Cookiterie ».
+- **Rythme (MESURE du 16/11, graines 1 à 4, moyenne du niv. 15)** : avant posée j43,4 / régulière j29,0 / accro j15,4 ;
+  Cookiterie seule j40,0 / j26,3 / j14,1 (8 à 10 % plus tôt) ; **+10 % d'XP du niv. 6 au 15** (`350 530 750 1050 1760
+  3190 4070 4950 5830`) → j44,1 / j28,1 / j15,0. Écrit dans `levels.ts`. farm-check : 40.
+
+---
+
+## 18. Le lot 2 « production », chiffré (16/11, proposé à Flo, rien de codé)
+
+Demande d'Eloise : « juste du contenu », de la production. MESURE du 16/11 : simulateur sur une COPIE du jeu
+(toutes les tables, entrées des recettes comprises : [ferme-lot2-tables.mjs](ferme-lot2-tables.mjs), un script qui les écrit dans le `data/` d'une COPIE, jamais du jeu), graines 1 à 4, 200 jours.
+
+### Ce qui arrive, niveau par niveau (le lot 1 en gris dans le jeu reste tel quel)
+
+| niv. | nouveau |
+|---|---|
+| 2 | **Cookiterie** (40 🌰) : Cookie pour poules (4 blés + 2 maïs → 6, 10 min) |
+| 4 | Moulin (60 🌰), farine seule |
+| 6 | Cookie pour vaches (3 maïs + 2 carottes → 5, 15 min) |
+| 8 | **Betterave** (20 min) · **Mouton** (Bergerie 350, 5 places, 2 h → laine) · cookie mouton |
+| 9 | **Sucrerie** (250) : sucre (2 betteraves, 20 min) |
+| 10 | **Cochon** (Porcherie 450, 3 h → truffe) · **Pressoir** (300) : jus de carotte, jus de tomate |
+| 11 | **Confiturerie** (350) : confiture de fraises |
+| 12 | **Abeilles** (Rucher 400, 4 colonies, 3 h → miel ; cookie abeille = 1 tournesol + 3 blés) |
+| 13 | Filature avancée du 14 au 13 : pelote de laine (2 laines) |
+| 14 | **Confiserie** (450) : bonbons au miel |
+| 15 | sucette à la fraise, jus de fraise |
+| 16 | **Chèvre** (Chèvrerie 600, 1 h 30 → lait de chèvre) · fromage de chèvre (Laiterie) |
+| 17 | **Myrtille** (1 h 30) · confiture de myrtilles · tarte aux myrtilles |
+| 18 | **Atelier de couture** (600) : écharpe |
+| 19 | **Canard** (Mare aux canards 700, 6 places, 2 h 30 → plume) · coussin (tissu + 3 plumes) |
+| 20 | **Glacier** (700) : glace à la fraise · pull |
+| 21 | **Lavande** (6 h) · glace au miel |
+| 22 | **Savonnerie** (800) : savon à la lavande · glace à la myrtille |
+| 23 | **Lapin** (Clapier 850, 6 places, 4 h → laine angora) |
+| 24 | pelote angora · nougat · bougie au miel |
+| 25 | **Crêperie** (900) : crêpes |
+| 26-30 | doudou lapin, crêpes à la confiture, crêpes au miel, pizza, galette aux truffes, gâteau à étages, panier gourmand |
+
+En tout : **+6 animaux (8), +9 machines (13), +3 cultures (11), +36 recettes (48), niveaux jusqu'à 30.** Chaque
+animal mange SON cookie (cookie rond à sa tête) ; **une fournée de cookies nourrit un enclos entier** (une fournée par
+enclos et par visite). Valeurs : un produit vaut ses entrées + 30 % environ (`ferme-lot2-tables.mjs`).
+
+### Le rythme (table d'XP proposée : niveaux 6 à 15 × 1,4, puis 7 500 + 250 par niveau)
+
+`15 30 50 80 200 450 670 950 1330 2240 4060 5180 6300 7420 7500 7750 … 11000`
+
+| profil | niv. 15 avant | niv. 15 après | niv. 20 | niv. 25 | niv. 30 |
+|---|---|---|---|---|---|
+| Posée (2 visites) | j43 | **j44** | j76 | j106 | **j144** |
+| Régulière (4 visites) | j29 | **j27,5** | j46,5 | j65 | **j91** |
+| Accro (11 visites) | j15 | **j13** | j23,5 | j33 | **j43** |
+
+- Sans toucher à l'XP, le lot 2 accélérait le niveau 15 de 20 à 25 % (plus de choses à vendre) : la table le compense
+  (l'accro reste 13 % plus rapide, la posée et la régulière au rythme d'aujourd'hui).
+- **Aucune machine ne sature** (régulière et accro, 100 jours) : Cookiterie 23-24 % du temps avec les 8 animaux,
+  Filature 31-35 %, Fournil 25-34 % ; Confiserie, Glacier, Savonnerie, Crêperie peu utilisées par le joueur modèle
+  (2-6 %) : à surveiller.
+- La Cookiterie SEULE (sans le reste du lot 2) accélérait le niveau 15 de 7 à 11 % ; + 10 % d'XP du niveau 6 au 15
+  la ramenait au rythme d'aujourd'hui.
+
+### Ce qui coûte (les dessins)
+
+6 animaux (et leurs vues), 6 enclos, 9 machines de face et de profil, 3 cultures (étapes de pousse), ~45 icônes
+d'objets dont 8 cookies. **Découpage proposé** : lot 2a = niveaux 2 à 15 (Cookiterie, mouton, cochon, abeilles,
+betterave, Sucrerie, Pressoir, Confiturerie, Confiserie), lot 2b = niveaux 16 à 30.
+
+### VALIDÉ par Flo le 16/11 : les lots 2a et 2b, plus quatre ajouts (à chiffrer en codant)
+
+Le simulateur ne sait jouer ni les arbres fruitiers, ni les exemplaires multiples, ni la charrette : il faut lui
+apprendre (dans `tools/farmSim.ts`) en même temps que le jeu, puis mesurer. Chiffres ci-dessous = point de départ.
+
+1. **Arbres fruitiers productifs.** Le **Pommier déco disparaît** de la boutique (décision de Flo) : le Pommier devient
+   un arbre qui produit, comme le Noisetier (on touche, on ramasse, jamais replanté, quelques exemplaires).
+   Proposé : Pommier niv. 9 (pommes → jus de pomme au Pressoir, tarte aux pommes au Fournil, compote), Cerisier
+   niv. 18 (confiture de cerises, glace à la cerise). Les pommiers déco déjà posés (id `appleTree` gardé, jamais
+   réutilisé) : à trancher en codant, proposé = changés en vrais pommiers, offerts.
+2. **2e et 3e exemplaire des machines**, ouverts avec les niveaux (proposé : 2e = niveau de la machine + 6, 3e = + 12,
+   prix × 2 puis × 3). C'est ce qui accélère le plus : mesurer et compenser comme au 8bis.
+3. **La charrette du marché** : une grosse commande de 6 à 9 produits (3 sortes), renouvelée toutes les quelques
+   heures, mieux payée qu'une commande (Éloisettes, XP, parfois un colis). Niveau d'ouverture et paie à mesurer.
+4. **Races rares pour chaque nouvel animal** (mouton noir, cochon tacheté, etc.) dans les colis de Gaston, avec le
+   bonus de produit des races existantes. Attention : chaque prix ajouté dans une rareté dilue les autres (l'album se
+   remplit moins vite) : remesurer les chances de chaque trésor.
+5. **Plus tard** (Flo) : des skins de machines.
+
+---
+
+## 19. Le lot 2 CODÉ (16/11, non commité, pas joué sur téléphone)
+
+Go de Flo le 16/11 (« go lot 2 »), avec les 2a + 2b + les quatre ajouts de la fin de section 18. Entrée Nouveautés
+choisie par Flo : « Refonte et lot de contenu pour la ferme ».
+
+**Contenu** (`data/`, chiffres de `ferme-lot2-tables.mjs`) : 3 cultures (betterave 8, myrtille 17, lavande 21),
+6 animaux et leurs enclos (mouton/Bergerie 8, cochon/Porcherie 10, abeilles/Rucher 12, chèvre/Chèvrerie 16,
+canard/Mare 19, lapin/Clapier 23), 8 machines (Sucrerie 9, Pressoir 10, Confiturerie 11, Confiserie 14, Atelier de
+couture 18, Glacier 20, Savonnerie 22, Crêperie 25), la Filature au 13 (pelote de laine), 37 recettes de la table +
+les fruits (jus de pomme, tarte aux pommes, confiture de cerises, glace à la cerise), niveaux jusqu'à 30.
+**24 quêtes** à la suite de l'histoire, en chaînes parallèles : Marthe (animaux), Mme Pivoine (première fois
+conteuse : sucre, confitures, confiserie, glacier, crêperie, gâteau à étages), Basile (pommier, pressoir, pelotes,
+couture), Rosalie (rucher, myrtilles, cerisier, lavande, savonnerie), Jules (le doudou), Capucine (le panier gourmand,
+la finale du niv. 30). Tâches du jour : laine, truffes, miel, cueillir des arbres.
+
+**Les quatre ajouts** :
+1. **Arbres fruitiers** : `TREE_YIELDS` (data/placeables) remplace `HAZEL` ; Pommier niv. 9 (120 🌰, 4 au plus, 4 pommes
+   toutes les 3 h), Cerisier niv. 18 (300 🌰, 4 cerises toutes les 5 h). Le Pommier déco (`appleTree`) est `retired` :
+   plus en boutique ; au chargement, un posé devient un vrai pommier mûr (offert), un rangé est remboursé 90 🌰.
+2. **Exemplaires des machines** : `MACHINE_COPY_LEVELS` = [0, 6, 12] après le niveau de la machine, prix × rang ;
+   la Boutique dit « 2e au niv. X » et « N sur ta ferme ».
+3. **La charrette du marché** (niv. 7) : objet offert près de l'entrée (comme la boîte aux lettres, `kind: 'cart'`),
+   une commande de 6 à 9 objets en 3 sortes au plus, payée 2,2 × la valeur (le tableau : 1,6), 0,45 en XP, un colis
+   une fois sur trois environ ; revient 3 h après, 1 h si on la renvoie ; n'expire jamais (`farmOrders.ts`).
+4. **Races rares** : mouton noir, cochon tacheté, chèvre des neiges, canard mandarin, lapin bélier (épiques), reine
+   des abeilles (légendaire). **Une race n'est tirée qu'une fois son animal débloqué** (`isPrizeOpen`).
+
+**Code** : le kit de dessin sort de farmArt dans `farmPaint.ts` (moteur, palette, kit de bâtiment et d'enclos) ; les
+dessins du lot 2 vivent dans `farmArtItems.ts`, `farmArtMachines.ts`, `farmArtAnimals.ts`. Plus aucun `coop` /
+`cowshed` écrit en dur : un enclos se reconnaît à `kind === 'pen'` ; chaque animal a son cri (`CRIES`, farmScreen),
+son allure (`GAIT`, farmScene) et son genre (`feminine`, pour « ton nouveau mouton »).
+
+**Rythme (MESURE du 16/11, simulateur qui joue maintenant arbres fruitiers, exemplaires — achetés seulement quand
+toutes les files du type sont pleines — et charrette ; graines 1 à 4)** : table d'XP niv. 6-15 = lot 1 × 1,6, puis
+10 300 + 350 par niveau. Niveau 15 : posée j45 / régulière j27 / accro j13 (lot 1 : j43 / j29 / j15) ; niveau 20 :
+j84 / j51 / j24 ; niveau 30 : j148 / j88 / j44 (cible section 18 : j144 / j91 / j43). Sans compensation, la charrette
+et les exemplaires avançaient le niveau 30 de 8 à 16 %.
+
+**Vérifications** : farm-check = 55, dont la cohérence du contenu (chaque ingrédient disponible au niveau de sa
+recette, chaque quête demande des choses qui existent à son niveau) et les règles du lot 2.
+
+### Autocritique du lot 2, tout corrigé avant publication (16/11, demande de Flo)
+- **Vieilles sauvegardes** : `FARM_VERSION` 2 ; une sauvegarde version 1 garde la même PART de sa barre d'XP avec la
+  nouvelle table (`readXp`, farmSave : 900 / 950 au niv. 9 → 1 440 / 1 520).
+- **Toute l'histoire se joue** : farm-check enchaîne les 50 quêtes du niv. 1 au niv. 30 sans blocage.
+- **Abeilles qui volent** (battement d'ailes, flottement, au-dessus des ruches) et **canards sur la mare** (agrandie pour 6) :
+  `LOT2_PEN_AREAS` (farmArtAnimals) lu par `farmScene.yard` via `penAreaOf` ; `GAIT.flies`.
+- **Fumée** : les 8 machines du lot 2 ont une cheminée. Enseigne de la Savonnerie refaite (savonnette emballée) ;
+  écharpe et truffe redessinées.
+- **Charrette** : si la ferme est pleine, elle se gare juste dehors, au plus près de l'entrée (`gateSpot(w, h)`, la boîte
+  aux lettres en profite).
+- **Bug du lot 1 trouvé en capture** : la vignette de quête restait affichée vide (et en Aménager) car son
+  `display: flex` écrasait `hidden` → `.farm-quest-pill[hidden]`.
+- **Sons** : `farmCries.ts` (les cris, partagés) ; bouton « Cris des animaux » dans la barre TEST ; **banc d'écoute**
+  `tools/sound-bench.html` (servi par le serveur de dev seulement : http://localhost:5199/tools/sound-bench.html),
+  qui joue les vrais sons du site, avec Bien / À revoir / note et « Copier mes retours ».
+- farm-check = 58.
+
+### Check UI, bugs et progression (16/11, demande de Flo)
+- **UI (captures téléphone, ferme niv. 30)** : une machine à plus de 4 recettes (Cookiterie : 8, Fournil : 8 au niv. 29)
+  les montre en **grille de deux colonnes** (`COMPACT_RECIPES`, farmPanels ; bouton « + » sur la ligne des
+  ingrédients) : la bulle reste entière même avec deux fournées en cours. Boutique Animaux : « mange des cookies pour
+  … » (l'article manquait), l'abeille agrandie. Papillons jaunes → blancs (pris pour des abeilles échappées).
+  Vus corrects : Fournil, Commandes, Album (15 trésors), Graines (11), Déco (plus de Pommier déco), charrette.
+- **Bugs** : l'annonce de niveau rangeait la charrette dans les « Bâtiments » → « Offerte : … » ; elle annonce aussi
+  les 2e / 3e exemplaires. **Quête `cart`** (Marthe, niv. 7, après la Laiterie) : servir la charrette une fois.
+  **Pommes et cerises n'étaient jamais commandées** : `orderable` ajoute le fruit des arbres possédés (jeu et simulateur).
+- **Progression (MESURE du 16/11, simulateur à demande récursive : il prépare toute la chaîne d'ingrédients ; colis,
+  album et races alignés sur le jeu ; graines 1 à 4)** : niv. 15 j44 / j27 / j13, niv. 30 j142 / j86 / j45 (posée /
+  régulière / accro) : pas de nouvelle table d'XP. Album complet (médiane, 20 graines) : posée j120, régulière j74, accro
+  j48 ; c'est le niveau du lapin (23) qui fixe la fin, pas la dilution ; poids uniformes gardés.
+- **Ouvert, à trancher par Flo** :
+  1. **Les Éloisettes s'entassent** (déjà vrai au lot 1, amplifié) : ~78 000 au niv. 15, ~710 000 au niv. 30 ; plus rien
+     d'important à acheter après le niv. 12 environ.
+  2. **Le lait est le goulot** (première cause de commandes refusées) : une seule Étable de 5 vaches pour crème, beurre,
+     fromage et 3 crêpes.
+  3. Les machines du lot 2 tournent peu (Crêperie 3 %, Confiserie 5-9 %) : les 2e / 3e exemplaires ne servent qu'aux
+     joueuses qui produisent beaucoup.
+
+### Décisions de Flo (16/11, après le check)
+- **Plus long** : le lot 2 doit durer plus. Table d'XP refaite : niv. 6-15 = lot 1 × 1,68, niv. 16-30 = 16 300 + 550 par
+  niveau. MESURE (graines 1 à 4) : niv. 15 j44 / j27 / j13 (inchangé), niv. 20 j102 / j62 / j29, **niv. 30 j196 /
+  j119 / j54** (posée / régulière / accro). Après le niv. 15 : environ un niveau par semaine pour la régulière.
+- **Enclos en plus** (validé, « avec limite ») : les enclos suivent la règle des machines (`COPY_LEVELS` [0, 6, 12],
+  `hasCopies`, `copyLevel` ; ex-`MACHINE_COPY_LEVELS`) : Étable 2e au niv. 12, 3e au niv. 18, prix × rang, 3 au plus.
+  Règle le goulot du lait.
+- **Éloisettes qui s'entassent** : à traiter après quelques semaines de tests, avec des décos ou de grosses
+  améliorations **extrêmement chères** (idée de Flo).

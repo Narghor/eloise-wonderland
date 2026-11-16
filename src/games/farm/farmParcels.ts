@@ -48,7 +48,7 @@ export function openParcel(save: FarmSave, random: () => number = Math.random): 
   mail.opened++;
   const rarity = rollRarity(mail.sinceRare >= PITY - 1, random);
   mail.sinceRare = rarity === 'common' ? mail.sinceRare + 1 : 0;
-  const prizes = PRIZES[rarity];
+  const prizes = PRIZES[rarity].filter((p) => isPrizeOpen(save, p));
   const prize = prizes[Math.floor(random() * prizes.length)];
   const opened: Opened = { rarity, prize, nuts: 0, isNew: false, waiting: false };
   if (prize.kind === 'nuts') {
@@ -64,6 +64,11 @@ export function openParcel(save: FarmSave, random: () => number = Math.random): 
   }
   emit(save, { type: 'collect', target: 'parcel', kind: rarity, count: 1 });
   return opened;
+}
+
+/** A rare animal only comes once its kind is unlocked: a duck at level 3 would wait for months. */
+export function isPrizeOpen(save: FarmSave, prize: Prize): boolean {
+  return prize.kind !== 'breed' || isUnlocked(save, animal(breed(prize.breed).animal).unlock);
 }
 
 function rollRarity(atLeastRare: boolean, random: () => number): Rarity {

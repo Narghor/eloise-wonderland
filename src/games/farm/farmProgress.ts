@@ -8,7 +8,7 @@ import { item } from './data/items';
 import { RECIPES } from './data/machines';
 import { MEDALS, medalReward } from './data/medals';
 import { totalCharm } from './data/charm';
-import { PLACEABLES, placeable } from './data/placeables';
+import { COPY_LEVELS, PLACEABLES, copyLevel, hasCopies, placeable } from './data/placeables';
 import { PROJECTS, project } from './data/projects';
 import { FAMILY_NAMES, SKINS } from './data/skins';
 import { MAX_OPEN_QUESTS, QUESTS, quest, type Quest } from './data/quests';
@@ -295,10 +295,15 @@ export function unlocksAt(level: number): string[] {
   const at = (u: Unlock) => 'level' in u && u.level === level;
   return [
     ...CROPS.filter((c) => at(c.unlock)).map((c) => `Culture : ${item(c.id).name}`),
-    ...PLACEABLES.filter((p) => p.kind !== 'deco' && p.kind !== 'obstacle' && p.kind !== 'field' && at(p.unlock)).map((p) => `Bâtiment : ${p.name}`),
+    ...PLACEABLES.filter((p) => ['machine', 'pen', 'tree'].includes(p.kind) && at(p.unlock)).map((p) => `Bâtiment : ${p.name}`),
+    // The cart is given, not bought: it says so.
+    ...PLACEABLES.filter((p) => p.kind === 'cart' && at(p.unlock)).map((p) => `Offerte : ${p.name}, avec de grosses commandes`),
+    ...PLACEABLES.filter(hasCopies).flatMap((p) =>
+      COPY_LEVELS.slice(1).flatMap((_, i) => (copyLevel(p, i + 2) === level ? [`${i + 2}e exemplaire : ${p.name}`] : [])),
+    ),
     ...ANIMALS.filter((a) => at(a.unlock)).map((a) => `Animal : ${a.name}`),
     ...RECIPES.filter((r) => at(r.unlock) && !PLACEABLES.some((p) => p.id === r.machine && at(p.unlock))).map((r) => `Recette : ${item(r.item).name}`),
-    ...PLACEABLES.filter((p) => p.kind === 'deco' && !p.treasure && at(p.unlock)).map((p) => `Déco : ${p.name}`),
+    ...PLACEABLES.filter((p) => p.kind === 'deco' && !p.treasure && !p.retired && at(p.unlock)).map((p) => `Déco : ${p.name}`),
     ...SKINS.filter((s) => at(s.unlock)).map((s) => `Style de ${FAMILY_NAMES[s.family]} : ${s.name}`),
     ...PROJECTS.filter((p) => at(p.unlock)).map((p) => `Grand projet : ${p.name}`),
   ];

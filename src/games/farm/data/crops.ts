@@ -26,6 +26,9 @@ export const CROPS: readonly Crop[] = [
   { id: 'sunflower', unlock: atLevel(9), minutes: 120, seed: 10, yield: 2, xp: 2 },
   { id: 'pumpkin', unlock: atLevel(11), minutes: 240, seed: 15, yield: 2, xp: 3 },
   { id: 'cotton', unlock: atLevel(13), minutes: 480, seed: 20, yield: 2, xp: 4 },
+  { id: 'beet', unlock: atLevel(8), minutes: 20, seed: 4, yield: 2, xp: 1 },
+  { id: 'blueberry', unlock: atLevel(17), minutes: 90, seed: 9, yield: 2, xp: 2 },
+  { id: 'lavender', unlock: atLevel(21), minutes: 360, seed: 18, yield: 2, xp: 3 },
 ];
 
 export const CROP_IDS = CROPS.map((c) => c.id);

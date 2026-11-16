@@ -3,7 +3,7 @@ import type { PersonId } from './types';
 // -----------------------------------------------
 // THE VILLAGE (docs/ferme.md 7.7)
 // -----------------------------------------------
-// The four of the story tell the quests; everyone may place an order, with a word of their own.
+// Everyone may tell a quest and place an order, with a word of their own.
 
 export interface Person {
   id: PersonId;

@@ -22,12 +22,16 @@ export const DAILY_TEMPLATES: readonly DailyTemplate[] = [
   { id: 'harvest', key: 'harvest', level: 1, count: (l) => 10 + 2 * l, text: (n) => `Récolter ${n} cultures` },
   { id: 'sow', key: 'sow', level: 1, count: (l) => 8 + 2 * l, text: (n) => `Semer ${n} champs` },
   { id: 'orders', key: 'order', level: 2, count: (l) => 2 + Math.floor(l / 5), text: (n) => `Servir ${n} commandes` },
-  { id: 'produce', key: 'produce', level: 2, needs: 'mill', count: (l) => 3 + Math.floor(l / 3), text: (n) => `Fabriquer ${n} produits` },
+  { id: 'produce', key: 'produce', level: 2, needs: 'cookiery', count: (l) => 3 + Math.floor(l / 3), text: (n) => `Fabriquer ${n} produits` },
   { id: 'eggs', key: 'collect:egg', level: 2, needs: 'coop', count: () => 6, text: (n) => `Ramasser ${n} œufs` },
   { id: 'feed', key: 'feed', level: 2, needs: 'coop', count: () => 6, text: (n) => `Nourrir ${n} animaux` },
   { id: 'clear', key: 'clear', level: 2, needsObstacles: 2, count: () => 2, text: (n) => `Dégager ${n} obstacles` },
   { id: 'bread', key: 'produce:bread', level: 4, needs: 'bakery', count: () => 2, text: (n) => `Cuire ${n} pains` },
   { id: 'milk', key: 'collect:milk', level: 6, needs: 'cowshed', count: () => 4, text: (n) => `Ramasser ${n} laits` },
+  { id: 'wool', key: 'collect:wool', level: 8, needs: 'sheepfold', count: () => 3, text: (n) => `Ramasser ${n} laines` },
+  { id: 'truffles', key: 'collect:truffle', level: 10, needs: 'pigsty', count: () => 2, text: (n) => `Trouver ${n} truffes` },
+  { id: 'honey', key: 'collect:honey', level: 12, needs: 'hive', count: () => 2, text: (n) => `Récolter ${n} pots de miel` },
+  { id: 'trees', key: 'collect:tree', level: 5, needs: 'hazel', count: () => 2, text: (n) => `Cueillir ${n} arbres` },
 ];
 
 export const DAILY_TASKS = 3;

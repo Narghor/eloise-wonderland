@@ -1,4 +1,5 @@
 import { readGame, writeGame } from '../../save';
+import { xpToNext } from './data/levels';
 import { CROP_IDS } from './data/crops';
 import { ITEM_IDS } from './data/items';
 import { PLACEABLE_IDS, placeable } from './data/placeables';
@@ -18,7 +19,10 @@ import type { BoosterId, BreedId, CropId, DecorId, ItemId, JoinFamily, PersonId,
 // of shape, with its migration in `loadFarm`.
 
 const GAME_ID = 'farm';
-export const FARM_VERSION = 1;
+export const FARM_VERSION = 2;
+
+/** Version 1 played with lot 1's XP table: its progress in the level is kept as a share of the new one. */
+const LOT1_XP_TABLE = [15, 30, 50, 80, 200, 320, 480, 680, 950, 1600, 2900, 3700, 4500, 5300];
 
 export type Rotation = 0 | 1 | 2 | 3;
 
@@ -118,6 +122,16 @@ export interface FarmSave {
   waitingBreeds: BreedId[];
   /** The skin last chosen per family: what the next piece bought wears. */
   lastSkins: Partial<Record<JoinFamily, SkinId>>;
+  /** The market cart's big order (none while it is away), and when it comes back. */
+  cart: { order: CartOrder | null; nextAt: number };
+}
+
+/** A big order of several kinds: pays better than the board, sometimes holds a parcel. */
+export interface CartOrder {
+  items: Partial<Record<ItemId, number>>;
+  nuts: number;
+  xp: number;
+  parcel: boolean;
 }
 
 export interface Mail {
@@ -148,7 +162,7 @@ export function loadFarm(): FarmSave | null {
   const save: FarmSave = {
     version: FARM_VERSION,
     nuts: count(data.nuts),
-    xp: count(data.xp),
+    xp: readXp(data),
     level: Math.max(1, count(data.level)),
     levelSeen: Math.max(1, count(data.levelSeen)),
     stock: counts(data.stock, ITEM_IDS),
@@ -184,7 +198,9 @@ export function loadFarm(): FarmSave | null {
     lastSkins: Object.fromEntries(
       Object.entries(asRecord(data.lastSkins)).filter(([family, id]) => SKINS.some((s) => s.id === id && s.family === family)),
     ) as FarmSave['lastSkins'],
+    cart: readCart(data.cart),
   };
+  retireDecorAppleTrees(save);
   settlePerches(save);
   // Two objects must never share a uid: the newest uid is always above every one in use.
   save.nextUid = Math.max(save.nextUid, ...save.objects.map((o) => o.uid + 1));
@@ -223,6 +239,31 @@ function readObject(value: unknown): PlacedObject[] {
   return [object];
 }
 
+/** XP gained inside the current level; a version 1 save keeps the same share of the bar with the lot 2 table. */
+function readXp(data: Record<string, unknown>): number {
+  const xp = count(data.xp);
+  const level = Math.max(1, count(data.level));
+  const before = LOT1_XP_TABLE[level - 1];
+  const now = xpToNext(level);
+  if (count(data.version) >= 2 || before === undefined || now === null) return xp;
+  return Math.min(now - 1, Math.round((xp / before) * now));
+}
+
+/** Lot 2: a decorative apple tree on the map becomes a fruit tree, ripe at once; one put away is paid back. */
+function retireDecorAppleTrees(save: FarmSave): void {
+  for (const o of save.objects) {
+    if (o.type !== 'appleTree') continue;
+    o.type = 'apple';
+    o.rot = 0;
+    o.readyAt = 0;
+  }
+  const stored = save.decorStore.appleTree ?? 0;
+  if (stored > 0) {
+    save.nuts += stored * placeable('appleTree').price;
+    delete save.decorStore.appleTree;
+  }
+}
+
 /**
  * A perched decoration keeps its support's tile; one whose support is gone, cannot carry, or already carries
  * another goes back to the store.
@@ -249,6 +290,14 @@ function readMail(value: unknown): Mail {
   const m = asRecord(value);
   if (!isCount(m.waiting) || typeof m.nextAt !== 'number') return newMail(Date.now());
   return { waiting: m.waiting, nextAt: m.nextAt, opened: count(m.opened), sinceRare: count(m.sinceRare) };
+}
+
+function readCart(value: unknown): FarmSave['cart'] {
+  const c = asRecord(value);
+  const o = asRecord(c.order);
+  const items = counts(o.items, ITEM_IDS);
+  const order = Object.keys(items).length > 0 && isCount(o.nuts) && isCount(o.xp) ? { items, nuts: o.nuts, xp: o.xp, parcel: o.parcel === true } : null;
+  return { order, nextAt: typeof c.nextAt === 'number' ? c.nextAt : 0 };
 }
 
 function readOrder(value: unknown): Order[] {

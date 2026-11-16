@@ -9,20 +9,35 @@ export type ItemId =
   | 'chickenFeed' | 'cowFeed' | 'flour'
   | 'bread' | 'carrotPie' | 'strawberryCake' | 'pumpkinPie'
   | 'cream' | 'butter' | 'cheese'
-  | 'thread' | 'fabric';
+  | 'thread' | 'fabric'
+  // Lot 2 (docs/ferme.md 18).
+  | 'beet' | 'blueberry' | 'lavender'
+  | 'sheepFeed' | 'pigFeed' | 'beeFeed' | 'goatFeed' | 'duckFeed' | 'rabbitFeed'
+  | 'wool' | 'truffle' | 'honey' | 'goatMilk' | 'feather' | 'angora'
+  | 'sugar' | 'carrotJuice' | 'tomatoJuice' | 'strawberryJuice' | 'strawberryJam' | 'blueberryJam'
+  | 'yarn' | 'angoraYarn' | 'honeyCandy' | 'lollipop' | 'nougat' | 'giftBasket'
+  | 'goatCheese' | 'blueberryPie' | 'pizza' | 'layerCake'
+  | 'scarf' | 'cushion' | 'sweater' | 'plushie'
+  | 'strawberryIce' | 'honeyIce' | 'blueberryIce' | 'lavenderSoap' | 'honeyCandle'
+  | 'crepe' | 'jamCrepe' | 'honeyCrepe' | 'truffleGalette'
+  // Fruit trees.
+  | 'apple' | 'cherry' | 'appleJuice' | 'applePie' | 'cherryJam' | 'cherryIce';
 
-export type CropId = 'wheat' | 'corn' | 'carrot' | 'tomato' | 'strawberry' | 'sunflower' | 'pumpkin' | 'cotton';
+export type CropId = 'wheat' | 'corn' | 'carrot' | 'tomato' | 'strawberry' | 'sunflower' | 'pumpkin' | 'cotton' | 'beet' | 'blueberry' | 'lavender';
 
-export type AnimalId = 'chicken' | 'cow';
+export type AnimalId = 'chicken' | 'cow' | 'sheep' | 'pig' | 'bee' | 'goat' | 'duck' | 'rabbit';
 
-export type MachineId = 'mill' | 'bakery' | 'dairy' | 'spinning';
-export type PenId = 'coop' | 'cowshed';
-export type TreeId = 'hazel';
+export type MachineId =
+  | 'mill' | 'bakery' | 'dairy' | 'spinning' | 'cookiery'
+  | 'refinery' | 'press' | 'jamKitchen' | 'candyShop' | 'sewing' | 'iceCream' | 'soapWorks' | 'creperie';
+export type PenId = 'coop' | 'cowshed' | 'sheepfold' | 'pigsty' | 'hive' | 'goatShed' | 'duckPond' | 'hutch';
+/** `appleTree` is the old decorative apple tree's id (a DecorId): the fruit tree is `apple`. */
+export type TreeId = 'hazel' | 'apple' | 'cherry';
 export type DecorId =
   | 'fence' | 'hedge' | 'flowersPink' | 'flowersYellow' | 'flowersWhite' | 'pathStone' | 'pathDirt'
   | 'bench' | 'well' | 'scarecrow' | 'lantern' | 'wheelbarrow' | 'appleTree' | 'logPile' | 'birdhouse' | 'pond'
   | 'fenceGate' | 'flowerPot'
-  // Treasures: found only in Gaston's parcels, never sold.
+  // Treasures: found first in Gaston's parcels, then bought in the shop.
   | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
 
 /** Pieces that join their neighbours of the same family: a fence and its gate, a hedge, each kind of path. */
@@ -33,10 +48,12 @@ export type SkinId = 'fenceRanch' | 'fencePicket' | 'fenceWattle';
 export type ObstacleId = 'bush' | 'stump' | 'rock' | 'bigRock';
 
 /** Everything that stands on the map. The mailbox is Gaston's: one per farm, given, moved like the rest. */
-export type PlaceableId = 'field' | MachineId | PenId | TreeId | DecorId | ObstacleId | 'mailbox';
+export type PlaceableId = 'field' | MachineId | PenId | TreeId | DecorId | ObstacleId | 'mailbox' | 'marketCart';
 
 /** Rare animals, found in parcels: they live in their kind's pen and sometimes give one product more. */
-export type BreedId = 'redHen' | 'goldenHen' | 'pinkCow';
+export type BreedId =
+  | 'redHen' | 'goldenHen' | 'pinkCow'
+  | 'blackSheep' | 'spottedPig' | 'queenBee' | 'snowGoat' | 'mandarinDuck' | 'lopRabbit';
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 

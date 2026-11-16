@@ -50,10 +50,17 @@ export const PRIZES: Record<Rarity, readonly Prize[]> = {
     { kind: 'decor', decor: 'swing' },
     { kind: 'breed', breed: 'redHen' },
     { kind: 'breed', breed: 'pinkCow' },
+    // Lot 2: each comes once its kind is unlocked (farmParcels.isPrizeOpen).
+    { kind: 'breed', breed: 'blackSheep' },
+    { kind: 'breed', breed: 'spottedPig' },
+    { kind: 'breed', breed: 'snowGoat' },
+    { kind: 'breed', breed: 'mandarinDuck' },
+    { kind: 'breed', breed: 'lopRabbit' },
   ],
   legendary: [
     { kind: 'decor', decor: 'fountain' },
     { kind: 'breed', breed: 'goldenHen' },
+    { kind: 'breed', breed: 'queenBee' },
   ],
 };
 
@@ -74,6 +81,12 @@ export const BREEDS: readonly Breed[] = [
   { id: 'redHen', name: 'Poule rousse', animal: 'chicken', rarity: 'epic', bonusChance: 0.3 },
   { id: 'pinkCow', name: 'Vache à taches roses', animal: 'cow', rarity: 'epic', bonusChance: 0.3 },
   { id: 'goldenHen', name: 'Poule dorée', animal: 'chicken', rarity: 'legendary', bonusChance: 0.5 },
+  { id: 'blackSheep', name: 'Mouton noir', animal: 'sheep', rarity: 'epic', bonusChance: 0.3 },
+  { id: 'spottedPig', name: 'Cochon tacheté', animal: 'pig', rarity: 'epic', bonusChance: 0.3 },
+  { id: 'queenBee', name: 'Reine des abeilles', animal: 'bee', rarity: 'legendary', bonusChance: 0.5 },
+  { id: 'snowGoat', name: 'Chèvre des neiges', animal: 'goat', rarity: 'epic', bonusChance: 0.3 },
+  { id: 'mandarinDuck', name: 'Canard mandarin', animal: 'duck', rarity: 'epic', bonusChance: 0.3 },
+  { id: 'lopRabbit', name: 'Lapin bélier', animal: 'rabbit', rarity: 'epic', bonusChance: 0.3 },
 ];
 
 export const BREED_IDS = BREEDS.map((b) => b.id);

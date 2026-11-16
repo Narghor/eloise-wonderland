@@ -2,6 +2,9 @@
 // FARM SIM: how long the farm takes to play, per player profile
 // -----------------------------------------------
 // node tools/farm-sim.mjs [days] [seed]
+// Options (environment): ALL_LEVELS=1, FARM_DETAIL=1 (sources, orders, machines, items asked), XP_TABLE="...",
+// PROFILE="Reguliere (,Posee (", ALBUM=1 (plays on until the album is complete, first find of each treasure),
+// ALBUM_LOT1 / PRIZE_WEIGHTS / RARITY_WEIGHTS (other parcel draws, see below), DEMAND_ONE_LEVEL=1 (the old demand).
 // Model player of docs/ferme.md 8bis on the game's real content tables (src/games/farm/data) and order prices.
 // The player is greedy but sensible: collects, serves orders, feeds, queues machines, plants for the next visit,
 // buys buildings and fields as soon as they open, then clears land. One action round per game minute of a visit.
@@ -16,12 +19,14 @@ import { item } from '../src/games/farm/data/items';
 import { OBSTACLES as DATA_OBSTACLES, OBSTACLES_PER_PARCEL, PARCEL_STEPS, STARTING_OBSTACLES } from '../src/games/farm/data/land';
 import { XP_TABLE as DATA_XP_TABLE, levelReward as dataLevelReward, orderSlots } from '../src/games/farm/data/levels';
 import { FEEDS, RECIPES as DATA_RECIPES, queueSlotPrice } from '../src/games/farm/data/machines';
-import { DECOR, HAZEL as DATA_HAZEL, PLACEABLES, placeable, type Placeable } from '../src/games/farm/data/placeables';
+import { DECOR, COPY_LEVELS, PLACEABLES, TREE_YIELDS, copyLevel, placeable, type Placeable } from '../src/games/farm/data/placeables';
 import { CHARM_STEPS, charmOf, charmStep, totalCharm } from '../src/games/farm/data/charm';
 import { project } from '../src/games/farm/data/projects';
-import type { ItemId, PlaceableId, Unlock } from '../src/games/farm/data/types';
-import { ORDER_NUTS, ORDER_XP, SPECIAL_CHANCE, SPECIAL_LEVEL } from '../src/games/farm/farmOrders';
-import { MAILBOX_SIZE, PITY, PRIZES, RARITIES } from '../src/games/farm/data/parcels';
+import type { BreedId, ItemId, PlaceableId, Rarity, TreeId, Unlock } from '../src/games/farm/data/types';
+import {
+  CART_BACK_MINUTES, CART_NUTS, CART_PARCEL_CHANCE, CART_SENT_AWAY_MINUTES, CART_XP, ORDER_NUTS, ORDER_XP, SPECIAL_CHANCE, SPECIAL_LEVEL,
+} from '../src/games/farm/farmOrders';
+import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, TREASURES, breed, type Prize } from '../src/games/farm/data/parcels';
 import { MERCHANT_SHARE as DATA_MERCHANT_SHARE } from '../src/games/farm/farmProduction';
 
 const DAYS = Number(process.argv[2] ?? 90);
@@ -39,16 +44,21 @@ interface Crop { id: string; level: number; minutes: number; seed: number; yield
 
 const CROPS: Crop[] = DATA_CROPS.map((c) => ({ id: c.id, level: levelOf(c.unlock), minutes: c.minutes, seed: c.seed, yield: c.yield, value: valueOf(c.id), xp: c.xp }));
 
-interface Animal { id: string; level: number; pen: string; penPrice: number; capacity: number; price: number; feed: string; minutes: number; product: string; value: number; xp: number }
+/** `capacity` is one pen's; `penLevels`: from which level the 1st, 2nd and 3rd pen may be built (copy n costs n times). */
+interface Animal { id: string; level: number; pen: string; penPrice: number; capacity: number; penLevels: number[]; price: number; feed: string; minutes: number; product: string; value: number; xp: number }
 
 const ANIMALS: Animal[] = DATA_ANIMALS.map((a) => ({
   id: a.id, level: levelOf(a.unlock), pen: a.pen, penPrice: placeable(a.pen).price, capacity: PEN_CAPACITY[a.pen],
+  penLevels: COPY_LEVELS.map((_, i) => copyLevel(placeable(a.pen), i + 1)!),
   price: a.price, feed: a.feed, minutes: a.minutes, product: a.product, value: valueOf(a.product), xp: a.xp,
 }));
 
-interface Machine { id: string; level: number; price: number }
+/** copyLevels: from which level the 1st, 2nd and 3rd copies may be built (each costs its rank times the price). */
+interface Machine { id: string; level: number; price: number; copyLevels: number[] }
 
-const MACHINES: Machine[] = PLACEABLES.filter((p) => p.kind === 'machine').map((p) => ({ id: p.id, level: levelOf(p.unlock), price: p.price }));
+const MACHINES: Machine[] = PLACEABLES.filter((p) => p.kind === 'machine').map((p) => ({
+  id: p.id, level: levelOf(p.unlock), price: p.price, copyLevels: COPY_LEVELS.map((_, i) => copyLevel(p, i + 1)!),
+}));
 
 interface Recipe { id: string; machine: string; level: number; minutes: number; inputs: Record<string, number>; count: number; value: number; xp: number; feed?: boolean }
 
@@ -56,14 +66,42 @@ const RECIPES: Recipe[] = DATA_RECIPES.map((r) => ({
   id: r.item, machine: r.machine, level: levelOf(r.unlock), minutes: r.minutes, inputs: r.inputs as Record<string, number>,
   count: r.count, value: valueOf(r.item), xp: r.xp, feed: FEEDS.includes(r.item),
 }));
+const RECIPE_OF = new Map(RECIPES.map((r) => [r.id, r]));
+/** DEMAND_ONE_LEVEL=1: the old demand, inputs prepared one level deep only (to compare). */
+const DEMAND_ONE_LEVEL = !!process.env.DEMAND_ONE_LEVEL;
 
 const hazel = placeable('hazel');
-const HAZEL = { level: levelOf(hazel.unlock), price: hazel.price, max: hazel.maxCount ?? 1, minutes: DATA_HAZEL.minutes, coins: DATA_HAZEL.nuts, xp: DATA_HAZEL.xp };
+const DATA_HAZEL = TREE_YIELDS.hazel;
+const HAZEL_NUTS = 'nuts' in DATA_HAZEL.gives ? DATA_HAZEL.gives.nuts : ([0, 0] as const);
+const HAZEL = { level: levelOf(hazel.unlock), price: hazel.price, max: hazel.maxCount ?? 1, minutes: DATA_HAZEL.minutes, coins: HAZEL_NUTS, xp: DATA_HAZEL.xp };
+
+/** Trees that give fruit (the apple and cherry trees of lot 2): bought like the hazel, picked on each visit. */
+interface FruitTree { id: string; level: number; price: number; max: number; minutes: number; item: string; count: number; xp: number }
+const FRUIT_TREES: FruitTree[] = Object.entries(TREE_YIELDS).flatMap(([id, y]) => {
+  if (!('item' in y.gives)) return [];
+  const p = placeable(id as TreeId);
+  return [{ id, level: levelOf(p.unlock), price: p.price, max: p.maxCount ?? 1, minutes: y.minutes, item: y.gives.item, count: y.gives.count, xp: y.xp }];
+});
 
 const SLOT_PRICES = [3, 4, 5, 6].map((slot) => queueSlotPrice(slot - 1) ?? Infinity); // queue slots 3 to 6
 const MERCHANT_SHARE = DATA_MERCHANT_SHARE;
 const animalPrice = (a: Animal, owned: number) => dataAnimalPrice(DATA_ANIMALS.find((x) => x.id === a.id)!, owned);
 const ORDER_COINS = ORDER_NUTS;
+const CART_LEVEL = levelOf(placeable('marketCart').unlock);
+
+// Gaston's parcels and the album, with three knobs to try other draws without touching the game:
+// ALBUM_LOT1=1 leaves out the rare animals of lot 2 (the album as it was before them);
+// PRIZE_WEIGHTS="queenBee:0.5,blackSheep:0.6" weighs prizes within their rarity (1 by default, uniform as in the game);
+// RARITY_WEIGHTS="62,28,8.5,1.5" replaces the weights of common, rare, epic, legendary.
+const LOT1_ANIMALS = ['chicken', 'cow'];
+const keepPrize = (p: Prize) => !process.env.ALBUM_LOT1 || p.kind !== 'breed' || LOT1_ANIMALS.includes(breed(p.breed).animal);
+const SIM_PRIZES = Object.fromEntries(Object.entries(PRIZES).map(([r, list]) => [r, list.filter(keepPrize)])) as Record<Rarity, Prize[]>;
+const SIM_TREASURES = TREASURES.filter((t) => SIM_PRIZES[t.rarity].some((p) => (p.kind === 'decor' ? p.decor : p.kind === 'breed' ? p.breed : '') === t.id));
+const RARITY_WEIGHTS = process.env.RARITY_WEIGHTS?.split(',').map(Number);
+const SIM_RARITIES = RARITIES.map((r, i) => ({ id: r.id, weight: RARITY_WEIGHTS?.[i] ?? r.weight }));
+const PRIZE_WEIGHTS: Record<string, number> = Object.fromEntries((process.env.PRIZE_WEIGHTS ?? '').split(',').filter(Boolean).map((x) => [x.split(':')[0], Number(x.split(':')[1])]));
+const prizeWeight = (p: Prize) => PRIZE_WEIGHTS[p.kind === 'decor' ? p.decor : p.kind === 'breed' ? p.breed : ''] ?? 1;
+const BREED_LEVEL = Object.fromEntries(BREEDS.map((b) => [b.id, levelOf(DATA_ANIMALS.find((a) => a.id === b.animal)!.unlock)])) as Record<BreedId, number>;
 
 interface Obstacle { cost: number; xp: number; weight: number }
 const OBSTACLE_KINDS: Obstacle[] = DATA_OBSTACLES.map((o) => ({ cost: o.cost, xp: o.xp, weight: o.weight }));
@@ -155,9 +193,21 @@ class Farm {
   stock: Record<string, number> = {};
   fields: Field[] = Array.from({ length: STARTING_FIELDS }, () => ({ crop: null, readyAt: 0 }));
   fieldsBought = 0;
-  machines = new Map<string, { slots: number; queue: Job[] }>();
-  pens = new Map<string, number[]>(); // animal id -> per animal: readyAt, -1 hungry
+  /** Every machine on the farm, copies included: key 	ype#n. */
+  machines = new Map<string, { type: string; slots: number; queue: Job[] }>();
+  pens = new Map<string, number[]>(); // animal id -> per animal of all its pens: readyAt, -1 hungry
+  /** Pens of each kind on the farm (1 to 3). */
+  penCount = new Map<string, number>();
+
+  /** Animals all the pens of this kind hold. */
+  room(a: Animal): number {
+    return a.capacity * (this.penCount.get(a.id) ?? 1);
+  }
   hazels: number[] = [];
+  fruitTrees: { tree: FruitTree; readyAt: number }[] = [];
+  /** The market cart's order, and when it comes back once served or sent away. */
+  cart: { items: Record<string, number>; value: number; since: number; parcel: boolean } | null = null;
+  cartNextAt = 0;
   orders: Order[] = [];
   nextOrderAt: number[] = [];
   obstacles: Obstacle[] = [];
@@ -238,23 +288,70 @@ class Farm {
     }
     for (; this.mail.waiting > 0; this.mail.waiting--) {
       this.mail.opened++;
-      const pool = this.mail.sinceRare >= PITY - 1 ? RARITIES.filter((x) => x.id !== 'common') : RARITIES;
+      const pool = this.mail.sinceRare >= PITY - 1 ? SIM_RARITIES.filter((x) => x.id !== 'common') : SIM_RARITIES;
       let roll = this.random() * pool.reduce((sum, x) => sum + x.weight, 0);
       const rarity = (pool.find((x) => (roll -= x.weight) < 0) ?? pool[0]).id;
       this.mail.sinceRare = rarity === 'common' ? this.mail.sinceRare + 1 : 0;
-      const prizes = PRIZES[rarity];
-      const prize = prizes[Math.floor(this.random() * prizes.length)];
+      // As the game's farmParcels.isPrizeOpen: a rare animal only comes once its kind is unlocked.
+      const prizes = SIM_PRIZES[rarity].filter((p) => p.kind !== 'breed' || this.level >= BREED_LEVEL[p.breed]);
+      let pick = this.random() * prizes.reduce((sum, p) => sum + prizeWeight(p), 0);
+      const prize = prizes.find((p) => (pick -= prizeWeight(p)) < 0) ?? prizes[prizes.length - 1];
       if (prize.kind === 'nuts') this.earn(prize.base + prize.perLevel * this.level, 'colis');
       if (prize.kind === 'boosters') {
         this.boosters.fertilizer += prize.boosters.fertilizer ?? 0;
         this.boosters.wateringCan += prize.boosters.wateringCan ?? 0;
         this.boosters.hourglass += prize.boosters.hourglass ?? 0;
       }
-      // A treasure decoration is placed at once (it is free): its charm counts. A rare animal's extra product is left out.
+      // A treasure decoration is placed at once (it is free): its charm counts.
       if (prize.kind === 'decor') this.placeDecor(placeable(prize.decor), now);
+      // A rare animal joins its pen when there is room, else it waits for the next free place (buy).
+      if (prize.kind === 'breed') this.waitingBreeds.push(prize.breed);
+      if (prize.kind === 'decor' || prize.kind === 'breed') {
+        const id = prize.kind === 'decor' ? prize.decor : prize.breed;
+        if (this.album[id] === undefined) this.album[id] = now;
+      }
     }
+    this.placeBreeds();
+  }
+
+  /** Each treasure (decoration or rare animal) of the album: when it was first found. */
+  album: Record<string, number> = {};
+  waitingBreeds: BreedId[] = [];
+  /** Per animal kind, per animal: the chance that a collect gives one product more (0 for a plain animal). */
+  penBonus = new Map<string, number[]>();
+
+  /** Puts the waiting rare animals in their pens while there is room, as the game's welcomeBreed. */
+  placeBreeds(): void {
+    this.waitingBreeds = this.waitingBreeds.filter((id) => {
+      const b = breed(id);
+      const a = ANIMALS.find((x) => x.id === b.animal)!;
+      const pen = this.pens.get(a.id);
+      if (!pen || pen.length >= this.room(a)) return true;
+      pen.push(-1);
+      this.bonusOf(a.id).push(b.bonusChance);
+      return false;
+    });
+  }
+
+  bonusOf(animal: string): number[] {
+    if (!this.penBonus.has(animal)) this.penBonus.set(animal, []);
+    return this.penBonus.get(animal)!;
   }
   playMinutes = 0;
+  /** Eloisettes in hand when each level was reached, and when the measure stops (last level or last day). */
+  coinsAt: number[] = [];
+  endAt = 0;
+  /** FARM_DETAIL: how many times each event happened before the last level, and the minutes it took in all. */
+  stats = {
+    count: {} as Record<string, number>,
+    minutes: {} as Record<string, number>,
+    farm: this,
+    note(key: string, minutes: number): void {
+      if (this.farm.level >= MAX_LEVEL) return;
+      this.count[key] = (this.count[key] ?? 0) + 1;
+      this.minutes[key] = (this.minutes[key] ?? 0) + minutes;
+    },
+  };
   readonly random: () => number;
 
   constructor(seed: number) {
@@ -301,6 +398,7 @@ class Farm {
       this.xp -= XP_TO_NEXT(this.level);
       this.level++;
       this.levelAt[this.level] = now;
+      this.coinsAt[this.level] = this.coins;
       const reward = levelReward(this.level);
       this.earn(reward.coins, 'niveaux');
       this.boosters.fertilizer += reward.fertilizer;
@@ -317,7 +415,7 @@ class Farm {
     return CROPS.filter((c) => c.level <= this.level);
   }
   recipes(): Recipe[] {
-    return RECIPES.filter((r) => r.level <= this.level && this.machines.has(r.machine));
+    return RECIPES.filter((r) => r.level <= this.level && this.machines.has(`${r.machine}#1`));
   }
   animalCount(id: string): number {
     return this.pens.get(id)?.length ?? 0;
@@ -328,6 +426,7 @@ class Farm {
     const want = new Map<string, number>();
     const need = (id: string, n: number) => want.set(id, (want.get(id) ?? 0) + n);
     for (const order of this.orders) for (const [id, n] of Object.entries(order.items)) need(id, n);
+    if (this.cart) for (const [id, n] of Object.entries(this.cart.items)) need(id, n);
     const stage = BRIDGE.stages[this.bridgeStage];
     if (stage && this.level >= BRIDGE.level) for (const [id, n] of Object.entries(stage.items)) need(id, n - (this.bridgePaid[id] ?? 0));
     for (const a of ANIMALS) {
@@ -335,13 +434,50 @@ class Farm {
       if (count > 0) need(a.feed, count * 2);
     }
     for (const r of this.recipes()) if (!r.feed && this.has(r.id) < 2) for (const [id, n] of Object.entries(r.inputs)) need(id, n);
-    // Inputs of whatever is itself short (one level deep is enough for lot 1 chains).
-    for (const [id, n] of [...want]) {
-      const r = RECIPES.find((x) => x.id === id && x.level <= this.level && this.machines.has(x.machine));
-      if (r && this.has(id) < n) for (const [input, k] of Object.entries(r.inputs)) need(input, Math.ceil((n - this.has(id)) / r.count) * k);
+    if (DEMAND_ONE_LEVEL) {
+      for (const [id, n] of [...want]) {
+        const r = RECIPES.find((x) => x.id === id && x.level <= this.level && this.machines.has(`${x.machine}#1`));
+        if (r && this.has(id) < n) for (const [input, k] of Object.entries(r.inputs)) need(input, Math.ceil((n - this.has(id)) / r.count) * k);
+      }
+    } else {
+      // The whole chain of whatever is short (beet -> sugar -> jam -> layer cake): inputs, then their own inputs, for
+      // the part that is neither in the barn nor already on its way. Each item in the barn is promised only once.
+      const coming = this.coming();
+      const left = new Map<string, number>();
+      const free = (id: string) => left.get(id) ?? this.has(id) + (coming.get(id) ?? 0);
+      const prepare = (id: string, n: number, chain: Set<string>) => {
+        const covered = Math.min(free(id), n);
+        left.set(id, free(id) - covered);
+        const r = this.recipeOf(id);
+        if (!r || covered >= n || chain.has(id)) return;
+        const batches = Math.ceil((n - covered) / r.count);
+        chain.add(id);
+        for (const [input, k] of Object.entries(r.inputs)) {
+          need(input, batches * k);
+          prepare(input, batches * k, chain);
+        }
+        chain.delete(id);
+      };
+      for (const [id, n] of [...want]) prepare(id, n, new Set());
     }
     for (const [id, n] of [...want]) want.set(id, n - this.has(id));
     return want;
+  }
+
+  /** The recipe that makes this item, if it is open and its machine is on the farm. */
+  recipeOf(id: string): Recipe | undefined {
+    const r = RECIPE_OF.get(id);
+    return r && r.level <= this.level && this.machines.has(`${r.machine}#1`) ? r : undefined;
+  }
+
+  /** What is already on its way: queued in a machine, growing in a field, eaten by a fed animal. */
+  coming(): Map<string, number> {
+    const list = new Map<string, number>();
+    const add = (id: string, n: number) => list.set(id, (list.get(id) ?? 0) + n);
+    for (const f of this.fields) if (f.crop) add(f.crop.id, f.crop.yield);
+    for (const m of this.machines.values()) for (const j of m.queue) add(j.recipe.id, j.recipe.count);
+    for (const a of ANIMALS) for (const readyAt of this.pens.get(a.id) ?? []) if (readyAt >= 0) add(a.product, 1);
+    return list;
   }
 
   // -----------------------------------------------
@@ -352,6 +488,8 @@ class Farm {
     const list = this.crops().map((c) => ({ id: c.id, value: c.value }));
     for (const r of this.recipes()) if (!r.feed) list.push({ id: r.id, value: r.value });
     for (const a of ANIMALS) if (this.animalCount(a.id) > 0) list.push({ id: a.product, value: a.value });
+    // Fruit from the trees owned, like the game's orderable().
+    for (const t of FRUIT_TREES) if (this.fruitTrees.some((f) => f.tree === t)) list.push({ id: t.item, value: valueOf(t.item as ItemId) });
     return list;
   }
 
@@ -367,6 +505,7 @@ class Farm {
       const { id, value: v } = pool[i];
       const qty = Math.max(1, Math.min(12, Math.round(target / n / v)));
       items[id] = qty;
+      this.stats.note(`asked ${id}`, 0);
       value += qty * v;
     }
     const special = this.level >= SPECIAL_LEVEL && this.random() < SPECIAL_CHANCE;
@@ -380,6 +519,41 @@ class Farm {
     for (let i = 0; i < due.length; i++) this.orders.push(this.rollOrder(now));
   }
 
+  /** The market cart: rolled like the game's (3 kinds, 6 to 9 items), served as soon as the barn holds it, sent away after a day. */
+  serveCart(now: number): void {
+    if (this.level < CART_LEVEL) return;
+    if (!this.cart && now >= this.cartNextAt) {
+      const pool = this.orderable();
+      const kinds = Math.min(3, pool.length);
+      const picked = new Set<number>();
+      while (picked.size < kinds) picked.add(Math.floor(this.random() * pool.length));
+      const total = 6 + Math.floor(this.random() * 4);
+      const items: Record<string, number> = {};
+      let value = 0;
+      [...picked].forEach((i, k) => {
+        const qty = Math.floor(total / kinds) + (k < total % kinds ? 1 : 0);
+        items[pool[i].id] = qty;
+        this.stats.note(`asked ${pool[i].id}`, 0);
+        value += qty * pool[i].value;
+      });
+      this.cart = { items, value, since: now, parcel: this.random() < CART_PARCEL_CHANCE };
+    }
+    if (!this.cart) return;
+    if (this.canPay(this.cart.items)) {
+      this.pay(this.cart.items);
+      const bonus = 1 + charmStep(this.charm).step.orderBonusPercent / 100;
+      this.earn(Math.round(this.cart.value * CART_NUTS * bonus), 'charrette');
+      this.gainXp(Math.max(1, Math.round(this.cart.value * CART_XP)), now, 'charrette');
+      if (this.cart.parcel) this.mail.waiting++;
+      this.stats.note('cart served', now - this.cart.since);
+      this.cart = null;
+      this.cartNextAt = now + CART_BACK_MINUTES;
+    } else if (now - this.cart.since > MIN_PER_DAY) {
+      this.stats.note('cart sent away', MIN_PER_DAY);
+      this.cart = null;
+      this.cartNextAt = now + CART_SENT_AWAY_MINUTES;
+    }
+  }
   // -----------------------------------------------
   // ONE ACTION ROUND (one game minute of a visit)
   // -----------------------------------------------
@@ -388,6 +562,7 @@ class Farm {
     this.collect(now);
     this.refillOrders(now);
     this.serveOrders(now);
+    this.serveCart(now);
     this.feedBridge(now);
     this.buy(now);
     this.feedAnimals(now);
@@ -416,9 +591,10 @@ class Farm {
     for (const a of ANIMALS) {
       const pen = this.pens.get(a.id);
       if (!pen) continue;
+      const bonus = this.bonusOf(a.id);
       pen.forEach((readyAt, i) => {
         if (readyAt >= 0 && readyAt <= now) {
-          this.add(a.product, 1);
+          this.add(a.product, bonus[i] > 0 && this.random() < bonus[i] ? 2 : 1);
           this.gainXp(a.xp, now, 'animaux');
           pen[i] = -1;
         }
@@ -431,6 +607,12 @@ class Farm {
         this.hazels[i] = now + HAZEL.minutes;
       }
     });
+    for (const t of this.fruitTrees) {
+      if (t.readyAt > now) continue;
+      this.add(t.tree.item, t.tree.count);
+      this.gainXp(t.tree.xp, now, 'arbres fruitiers');
+      t.readyAt = now + t.tree.minutes;
+    }
   }
 
   serveOrders(now: number): void {
@@ -442,12 +624,15 @@ class Farm {
       this.earn(Math.round(order.value * ORDER_COINS * bonus * (order.special ? 2 : 1)), order.special ? 'coups de coeur' : 'commandes');
       if (order.special) this.mail.waiting++;
       this.gainXp(Math.round(order.value * ORDER_XP), now, 'commandes');
+      this.stats.note('order served', now - order.since);
       this.orders.splice(this.orders.indexOf(order), 1);
       this.nextOrderAt.push(now + 1);
     }
     // An order waiting for a whole day is refused: a new one comes 15 minutes later.
     for (const order of [...this.orders]) {
       if (now - order.since > MIN_PER_DAY) {
+        this.stats.note('order refused', MIN_PER_DAY);
+        for (const id of Object.keys(order.items)) this.stats.note(`refused for ${id}`, 0);
         this.orders.splice(this.orders.indexOf(order), 1);
         this.nextOrderAt.push(now + 15);
       }
@@ -477,9 +662,14 @@ class Farm {
   buy(now: number): void {
     const reserve = 20 + 5 * this.level;
     for (const m of MACHINES) {
-      if (m.level <= this.level && !this.machines.has(m.id) && this.coins >= m.price) {
-        this.coins -= m.price;
-        this.machines.set(m.id, { slots: 2, queue: [] });
+      // The first copy as soon as it opens; another one only when every copy's queue is full, with the reserve kept.
+      for (let n = 1; n <= m.copyLevels.length; n++) {
+        if (this.machines.has(`${m.id}#${n}`)) continue;
+        const busy = [...this.machines.values()].filter((x) => x.type === m.id).every((x) => x.queue.length >= x.slots);
+        if (m.copyLevels[n - 1] > this.level || (n > 1 && !busy) || this.coins < m.price * n + (n > 1 ? reserve : 0)) break;
+        this.coins -= m.price * n;
+        this.machines.set(`${m.id}#${n}`, { type: m.id, slots: 2, queue: [] });
+        this.stats.note(`built ${m.id}#${n}`, now);
       }
     }
     for (const a of ANIMALS) {
@@ -490,9 +680,19 @@ class Farm {
         this.pens.set(a.id, []);
       }
       const pen = this.pens.get(a.id)!;
-      while (pen.length < a.capacity && this.coins >= animalPrice(a, pen.length) + reserve) {
+      // Another pen of the kind once all are full, when its level has come, with the reserve kept.
+      const copies = this.penCount.get(a.id) ?? 1;
+      const nextAt = a.penLevels[copies];
+      if (pen.length >= this.room(a) && nextAt !== undefined && nextAt <= this.level && this.coins >= a.penPrice * (copies + 1) + reserve) {
+        this.coins -= a.penPrice * (copies + 1);
+        this.penCount.set(a.id, copies + 1);
+      }
+      // A rare animal waiting for room takes the next place before a bought one.
+      if (this.waitingBreeds.length) this.placeBreeds();
+      while (pen.length < this.room(a) && this.coins >= animalPrice(a, pen.length) + reserve) {
         this.coins -= animalPrice(a, pen.length);
         pen.push(-1);
+        this.bonusOf(a.id).push(0);
       }
     }
     while (this.fields.length < maxFields(this.level) && this.coins >= fieldPrice(this.fieldsBought) + reserve) {
@@ -503,6 +703,13 @@ class Farm {
     while (this.level >= HAZEL.level && this.hazels.length < HAZEL.max && this.coins >= HAZEL.price + reserve) {
       this.coins -= HAZEL.price;
       this.hazels.push(now + HAZEL.minutes);
+    }
+    for (const tree of FRUIT_TREES) {
+      const owned = () => this.fruitTrees.filter((t) => t.tree === tree).length;
+      while (this.level >= tree.level && owned() < tree.max && this.coins >= tree.price + reserve) {
+        this.coins -= tree.price;
+        this.fruitTrees.push({ tree, readyAt: now + tree.minutes });
+      }
     }
     for (const machine of this.machines.values()) {
       const price = SLOT_PRICES[machine.slots - 2];
@@ -541,9 +748,9 @@ class Farm {
 
   queueMachines(now: number): void {
     const want = this.demand();
-    for (const [id, machine] of this.machines) {
+    for (const machine of this.machines.values()) {
       while (machine.queue.length < machine.slots) {
-        const options = this.recipes().filter((r) => r.machine === id && this.canPay(r.inputs));
+        const options = this.recipes().filter((r) => r.machine === machine.type && this.canPay(r.inputs));
         const wanted = options.filter((r) => (want.get(r.id) ?? 0) > 0);
         const extra = options.filter((r) => !r.feed && this.has(r.id) + this.queued(r.id) < 3);
         const pick = (wanted.length ? wanted : extra).sort((a, b) => b.value * b.count - a.value * a.count)[0];
@@ -551,6 +758,8 @@ class Farm {
         this.pay(pick.inputs);
         const start = machine.queue.length ? machine.queue[machine.queue.length - 1].readyAt : now;
         machine.queue.push({ recipe: pick, readyAt: start + pick.minutes });
+        this.stats.note(`machine ${machine.type}`, pick.minutes);
+        this.stats.note(`made ${pick.id}`, pick.count);
         want.set(pick.id, (want.get(pick.id) ?? 0) - pick.count);
       }
     }
@@ -667,18 +876,22 @@ function play(profile: Profile, seed: number): Farm {
     farm.boosters.hourglass += DAILY.chestHourglass;
     farm.mail.waiting += dailyChestReward(farm.level).parcels ?? 0;
     farm.boosters.fertilizer += DAILY.tasks;
-    if (farm.level >= MAX_LEVEL && farm.bridgeDoneAt >= 0) break;
+    const albumDone = !process.env.ALBUM || SIM_TREASURES.every((t) => farm.album[t.id] !== undefined);
+    if (farm.level >= MAX_LEVEL && farm.bridgeDoneAt >= 0 && albumDone) break;
   }
+  farm.endAt = Math.min(DAYS * MIN_PER_DAY, farm.levelAt[MAX_LEVEL] ?? Infinity);
   return farm;
 }
 
 const when = (t: number | undefined) => (t === undefined ? '   -  ' : `j${(t / MIN_PER_DAY + 1).toFixed(1).padStart(5)}`);
 
-console.log(`Ferme, lot 1 - ${DAYS} jours max, graine ${SEED}`);
+console.log(`La ferme - ${DAYS} jours max, graine ${SEED}`);
 console.log(`XP par niveau : ${Array.from({ length: MAX_LEVEL - 1 }, (_, i) => XP_TO_NEXT(i + 1)).join(' ')}`);
-const shown = process.env.ALL_LEVELS ? Array.from({ length: MAX_LEVEL - 1 }, (_, i) => i + 2) : [2, 3, 5, 7, 10, 12, 15];
+const shown = process.env.ALL_LEVELS ? Array.from({ length: MAX_LEVEL - 1 }, (_, i) => i + 2) : [2, 3, 5, 7, 10, 12, 15, 20, 25, 30].filter((l) => l <= MAX_LEVEL);
 console.log(`\n${'profil'.padEnd(32)}${shown.map((l) => `niv${l}`.padStart(8)).join('')}    pont   jeu/jour  boosters (engrais/arrosoir/sablier)`);
-for (const profile of PROFILES) {
+// PROFILE="Reguliere (,Posee (" plays only the profiles whose name holds one of these.
+const PICKED = process.env.PROFILE ? PROFILES.filter((p) => process.env.PROFILE!.split(',').some((k) => p.name.includes(k))) : PROFILES;
+for (const profile of PICKED) {
   const farm = play(profile, SEED);
   const minutesPerDay = profile.visits.reduce((s, v) => s + v[1], 0);
   console.log(
@@ -687,7 +900,42 @@ for (const profile of PROFILES) {
   const steps = CHARM_STEPS.slice(1).map((s, i) => `${s.min} ${when(farm.charmAt[i + 1]).trim()}`).join(' · ');
   const deco = farm.decor ? `, deco : ${farm.decorBought} achats, ${Math.round(farm.decorSpent)} Eloisettes` : '';
   console.log(`    charme ${Math.round(farm.charm)} a la fin ; paliers : ${steps}${deco}`);
-  if (process.env.FARM_DETAIL) console.log(`    XP : ${shares(farm.xpFrom)}\n    Eloisettes : ${shares(farm.coinsFrom)}`);
+  if (process.env.FARM_DETAIL) {
+    console.log(`    XP : ${shares(farm.xpFrom)}\n    Eloisettes : ${shares(farm.coinsFrom)}`);
+    console.log(`    ${detail(farm)}`);
+  }
+  if (process.env.ALBUM) {
+    const found = SIM_TREASURES.filter((t) => farm.album[t.id] !== undefined);
+    const done = found.length === SIM_TREASURES.length ? Math.max(...found.map((t) => farm.album[t.id])) : undefined;
+    console.log(`    album ${found.length}/${SIM_TREASURES.length}, complet ${when(done).trim()} ; colis ouverts ${farm.mail.opened}`);
+    console.log(`    tresors : ${SIM_TREASURES.map((t) => `${t.id}=${when(farm.album[t.id]).trim()}`).join(' ')}`);
+  }
+}
+
+/** FARM_DETAIL: orders, cart, machines, items asked, Eloisettes in hand, before the last level. */
+function detail(farm: Farm): string {
+  const { count, minutes } = farm.stats;
+  const n = (k: string) => count[k] ?? 0;
+  const hours = (k: string) => (n(k) ? (minutes[k] / n(k) / 60).toFixed(1) : '-');
+  const lines = [
+    `commandes servies ${n('order served')} (attente moy. ${hours('order served')} h), refusees ${n('order refused')} ; charrette servie ${n('cart served')} (attente ${hours('cart served')} h), renvoyee ${n('cart sent away')}`,
+  ];
+  // Share of the time each machine type worked, from the day its first copy was built (copies count as more time).
+  const use = MACHINES.map((m) => {
+    const built = [1, 2, 3].filter((k) => count[`built ${m.id}#${k}`]).map((k) => minutes[`built ${m.id}#${k}`]);
+    if (!built.length) return `${m.id} jamais`;
+    const open = built.reduce((s, t) => s + (farm.endAt - t), 0);
+    return `${m.id} ${Math.round((100 * (minutes[`machine ${m.id}`] ?? 0)) / open)}% x${built.length}`;
+  });
+  lines.push(`machines : ${use.join(', ')}`);
+  const asked = Object.keys(count).filter((k) => k.startsWith('asked ')).map((k) => [k.slice(6), count[k]] as const).sort((a, b) => a[1] - b[1]);
+  const refused = Object.keys(count).filter((k) => k.startsWith('refused for ')).map((k) => [k.slice(12), count[k]] as const).sort((a, b) => b[1] - a[1]);
+  const neverAsked = [...new Set([...CROPS.map((c) => c.id), ...RECIPES.filter((r) => !r.feed).map((r) => r.id), ...ANIMALS.map((a) => a.product), ...FRUIT_TREES.map((t) => t.item)])].filter((id) => !count[`asked ${id}`]);
+  const neverMade = RECIPES.filter((r) => !r.feed && !count[`made ${r.id}`]).map((r) => r.id);
+  lines.push(`moins demandes : ${asked.slice(0, 8).map(([id, k]) => `${id} ${k}`).join(', ')} ; jamais demandes : ${neverAsked.join(', ') || '-'}`);
+  lines.push(`commandes refusees a cause de : ${refused.slice(0, 8).map(([id, k]) => `${id} ${k}`).join(', ') || '-'} ; jamais fabriques : ${neverMade.join(', ') || '-'}`);
+  lines.push(`Eloisettes en poche : ${[10, 15, 20, 25, 30].filter((l) => farm.coinsAt[l] !== undefined).map((l) => `niv${l} ${Math.round(farm.coinsAt[l])}`).join(', ')}`);
+  return lines.join('\n    ');
 }
 
 function shares(book: Record<string, number>): string {

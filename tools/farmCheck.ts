@@ -15,19 +15,27 @@ const store = new Map<string, string>();
 
 import { mulberry32 } from '../src/random';
 import { MAP_SIZE } from '../src/games/farm/data/land';
+import { PLACEABLES, TREE_YIELDS, placeable } from '../src/games/farm/data/placeables';
+import { ANIMALS } from '../src/games/farm/data/animals';
+import { CROPS } from '../src/games/farm/data/crops';
+import { RECIPES } from '../src/games/farm/data/machines';
+import { QUESTS } from '../src/games/farm/data/quests';
+import type { ItemId, PlaceableId, TreeId, Unlock } from '../src/games/farm/data/types';
 import { totalCharm } from '../src/games/farm/data/charm';
-import { PITY } from '../src/games/farm/data/parcels';
+import { PITY, PRIZES, TREASURES } from '../src/games/farm/data/parcels';
 import { ITEMS } from '../src/games/farm/data/items';
 import {
-  buyAndPlace, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
+  buyAndPlace, buyRefusal, capOf, ensureCart, priceOf, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
 } from '../src/games/farm/farmMap';
-import { orderable, rollOrder } from '../src/games/farm/farmOrders';
-import { deliverMail, openParcel } from '../src/games/farm/farmParcels';
-import { breedsOf, buyAnimal, collectMachine, collectPen, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
+import { CART_BACK_MINUTES, deliverCart, orderable, refillCart, rollOrder } from '../src/games/farm/farmOrders';
+import { deliverMail, isPrizeOpen, openParcel } from '../src/games/farm/farmParcels';
+import { breedsOf, buyAnimal, collectMachine, collectPen, collectTree, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
 import { loadFarm, saveFarm, type FarmSave } from '../src/games/farm/farmSave';
 import { joinIndex, joinMask, nextSkin, restyleRun, skinOf } from '../src/games/farm/farmJoins';
 import { JOIN_EAST, JOIN_WEST } from '../src/games/farm/data/skins';
 import { MINUTE_MS } from '../src/games/farm/farmTime';
+import { claimQuest, settle } from '../src/games/farm/farmProgress';
+import { MAX_LEVEL, xpToNext } from '../src/games/farm/data/levels';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -38,7 +46,7 @@ function check(name: string, ok: boolean, detail = ''): void {
 const now = Date.UTC(2026, 10, 15, 12);
 
 /** Buys and places a placeable on the first free spot near the middle. */
-function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
+function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   const [w, h] = id === 'coop' ? [3, 3] : [2, 2];
   const spot = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, w, h);
   return spot ? buyAndPlace(farm, id, spot[0], spot[1], 0, now) : null;
@@ -64,7 +72,12 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   const migrated = loadFarm()!;
   ensureMailbox(migrated);
   check('an old farm gets mail, an album and a mailbox', migrated.mail.waiting === 1 && Array.isArray(migrated.album) && migrated.objects.some((o) => o.type === 'mailbox'));
-}
+  // A version 1 farm at level 9 with 900 XP of 950 keeps the same share of the new bar.
+  store.set('mini-jeux.save', JSON.stringify({ app: 'mini-jeux', version: 1, games: { farm: { ...old, version: 1, level: 9, xp: 900 } } }));
+  const rescaled = loadFarm()!;
+  check('an old save keeps its share of the XP bar', rescaled.xp === Math.round((900 / 950) * xpToNext(9)!), `${rescaled.xp} / ${xpToNext(9)}`);
+  saveFarm(rescaled);
+  check('the share is converted only once', loadFarm()!.xp === rescaled.xp);}
 
 // -----------------------------------------------
 // A FULL FARM still gets its mailbox, at the gate
@@ -87,7 +100,7 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   farm.nuts = 1e6;
   farm.level = 15;
   const random = mulberry32(3);
-  const ids = ['field', 'mill', 'bakery', 'coop', 'cowshed', 'fence', 'bench', 'well', 'pond'] as const;
+  const ids = ['field', 'cookiery', 'mill', 'bakery', 'coop', 'cowshed', 'fence', 'bench', 'well', 'pond'] as const;
   for (let i = 0; i < 400; i++) buyAndPlace(farm, ids[i % ids.length], Math.floor(random() * MAP_SIZE), Math.floor(random() * MAP_SIZE), (Math.floor(random() * 4) as 0 | 1 | 2 | 3), now);
   const taken = new Set<string>();
   let overlap = false;
@@ -112,12 +125,19 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   const gain = harvest(farm, field, now);
   check('a ripe field gives its yield', gain?.count === 2 && (farm.stock.wheat ?? 0) === 2);
   check('an empty field sows and grows', sow(farm, field, 'wheat', now) && harvest(farm, field, now) === null && harvest(farm, field, now + 2 * MINUTE_MS)?.count === 2);
-  const mill = placeAnywhere(farm, 'mill');
+  const cookiery = placeAnywhere(farm, 'cookiery');
   farm.stock = { wheat: 20, corn: 10 };
-  const queued = mill !== null && queueRecipe(farm, mill, 'chickenFeed', now) && queueRecipe(farm, mill, 'chickenFeed', now);
-  check('a machine takes two recipes, not a third', queued && !queueRecipe(farm, mill!, 'chickenFeed', now));
-  const made = collectMachine(farm, mill!, now + 10 * MINUTE_MS);
+  const queued = cookiery !== null && queueRecipe(farm, cookiery, 'chickenFeed', now) && queueRecipe(farm, cookiery, 'chickenFeed', now);
+  check('a machine takes two recipes, not a third', queued && !queueRecipe(farm, cookiery!, 'chickenFeed', now));
+  const made = collectMachine(farm, cookiery!, now + 10 * MINUTE_MS);
   check('the tray gives what was made', made.length === 1 && made[0].count === 6);
+  // Feeds left the mill (docs/ferme.md 17): it refuses them, but a feed already in an old save's mill still finishes.
+  const mill = placeAnywhere(farm, 'mill')!;
+  farm.stock = { wheat: 20, corn: 10 };
+  check('the mill no longer makes feed', !queueRecipe(farm, mill, 'chickenFeed', now));
+  mill.queue!.push({ item: 'chickenFeed', readyAt: now });
+  const before = farm.stock.chickenFeed ?? 0;
+  check('a feed already in the mill finishes', collectMachine(farm, mill, now).length === 1 && (farm.stock.chickenFeed ?? 0) === before + 6);
   const coop = placeAnywhere(farm, 'coop')!;
   buyAnimal(farm, coop);
   buyAnimal(farm, coop);
@@ -150,7 +170,7 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   check('rarities near their weights', seen.common / 3000 > 0.5 && seen.common / 3000 < 0.66 && (seen.legendary ?? 0) > 20, JSON.stringify(seen));
   const pen = farm.objects.find((o) => o.type === 'coop')!;
   check('rare hens stay aligned with their breeds', breedsOf(pen).length === pen.animals!.length && pen.breeds!.length === pen.animals!.length);
-  check('the album only holds treasures, once each', new Set(farm.album).size === farm.album.length && farm.album.length <= 9);
+  check('the album only holds treasures, once each', new Set(farm.album).size === farm.album.length && farm.album.length <= TREASURES.length);
 
   const box = newFarm(now);
   box.mail.waiting = 0;
@@ -205,6 +225,20 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   const twoGnomes = totalCharm(['gnome', 'gnome', 'fountain']);
   const paths = totalCharm(Array(10).fill('pathDirt'));
   check('a treasure counts once, ten paths make 2 charm', twoGnomes === 75 && paths === 2, `${twoGnomes}, ${paths}`);
+}
+
+// -----------------------------------------------
+// TREASURES: found in a parcel first, then bought like any decoration
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.nuts = 1000;
+  const gnome = placeable('gnome');
+  const locked = buyRefusal(farm, gnome);
+  farm.album.push('gnome');
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 1, 1)!;
+  const bought = buyAndPlace(farm, 'gnome', x, y, 0, now);
+  check('a treasure is locked until found, then costs its price', locked === 'locked' && !!bought && farm.nuts === 1000 - gnome.price && gnome.price > 0, `${locked}, ${farm.nuts}`);
 }
 
 // -----------------------------------------------
@@ -297,5 +331,136 @@ function placeAnywhere(farm: FarmSave, id: 'mill' | 'coop') {
   check('a decoration whose support is gone goes back to the store', !back.objects.some((o) => o.uid === bird.uid) && back.decorStore.birdhouse === 1);
 }
 
+// -----------------------------------------------
+// CONTENT: every recipe can be made when it opens, every quest asks for things that exist by then
+// -----------------------------------------------
+{
+  const levelOf = (u: Unlock) => ('level' in u ? u.level : 0);
+  /** The level from which an item can be had: its crop, its animal, its recipe (machine included) or its tree. */
+  const itemLevel = new Map<string, number>();
+  for (const c of CROPS) itemLevel.set(c.id, levelOf(c.unlock));
+  for (const a of ANIMALS) itemLevel.set(a.product, Math.max(levelOf(a.unlock), levelOf(placeable(a.pen).unlock)));
+  for (const [id, y] of Object.entries(TREE_YIELDS)) if ('item' in y.gives) itemLevel.set(y.gives.item, levelOf(placeable(id as TreeId).unlock));
+  for (const r of RECIPES) itemLevel.set(r.item, Math.max(levelOf(r.unlock), levelOf(placeable(r.machine).unlock)));
+  const late = RECIPES.flatMap((r) =>
+    Object.keys(r.inputs).filter((i) => (itemLevel.get(i) ?? 99) > levelOf(r.unlock)).map((i) => `${r.item} niv ${levelOf(r.unlock)} <- ${i} niv ${itemLevel.get(i)}`),
+  );
+  check('every recipe input can be had by the recipe level', late.length === 0, late.join(', '));
+  const unfed = ANIMALS.filter((a) => (itemLevel.get(a.feed) ?? 99) > levelOf(a.unlock)).map((a) => a.id);
+  check('every animal can be fed from its level', unfed.length === 0, unfed.join(', '));
+  check('every item has a value', ITEMS.every((i) => i.value > 0));
+
+  const questIds = new Set(QUESTS.map((q) => q.id));
+  const problems: string[] = [];
+  for (const q of QUESTS) {
+    const level = levelOf(q.unlock);
+    if (q.after && !questIds.has(q.after)) problems.push(`${q.id}: after ${q.after}?`);
+    for (const o of q.objectives) {
+      if ('own' in o) {
+        const known = PLACEABLES.some((p) => p.id === o.own) ? levelOf(placeable(o.own as PlaceableId).unlock) : ANIMALS.find((a) => a.id === o.own) ? levelOf(ANIMALS.find((a) => a.id === o.own)!.unlock) : null;
+        if (known === null) problems.push(`${q.id}: own ${o.own}?`);
+        else if (known > level) problems.push(`${q.id}: ${o.own} niv ${known} > ${level}`);
+        continue;
+      }
+      const [type, target] = o.key.split(':');
+      if (!target || ['deco', 'parcel', 'river', 'bridge'].includes(target)) continue;
+      const at = itemLevel.get(target);
+      if (['harvest', 'sow', 'produce', 'collect'].includes(type) && at === undefined) problems.push(`${q.id}: ${o.key}?`);
+      else if (at !== undefined && at > level) problems.push(`${q.id}: ${o.key} niv ${at} > ${level}`);
+    }
+  }
+  check('every quest asks for things that exist at its level', problems.length === 0, problems.join(', '));
+}
+
+// -----------------------------------------------
+// LOT 2 RULES: machine copies, fruit trees, the old apple tree, rare animals by level, the market cart
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.nuts = 1e6;
+  farm.level = 7;
+  const cookiery = placeable('cookiery');
+  check('one Cookiterie at level 7, a 2nd from level 8', capOf(farm, cookiery) === 1 && ((farm.level = 8), capOf(farm, cookiery) === 2));
+  placeAnywhere(farm, 'cookiery');
+  check('the 2nd copy costs twice the price', priceOf(farm, cookiery) === 2 * cookiery.price);
+  const cowshed = placeable('cowshed');
+  check('pens come in copies too: a 2nd Etable from level 12', ((farm.level = 11), capOf(farm, cowshed) === 1) && ((farm.level = 12), capOf(farm, cowshed) === 2));
+
+  farm.level = 9;
+  const spot = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 2, 2)!;
+  const tree = buyAndPlace(farm, 'apple', spot[0], spot[1], 0, now)!;
+  const early = collectTree(farm, tree, now);
+  const ripe = collectTree(farm, tree, now + TREE_YIELDS.apple.minutes * MINUTE_MS);
+  check('an apple tree gives apples when ripe, not before', early === null && ripe?.item === 'apple' && (farm.stock.apple ?? 0) === ripe.count);
+
+  // An old save with a decorative apple tree on the map and one put away.
+  const deco = buyAndPlace(farm, 'fence', spot[0] + 3, spot[1], 0, now)!;
+  deco.type = 'appleTree';
+  farm.decorStore.appleTree = 2;
+  const nutsBefore = farm.nuts;
+  saveFarm(farm);
+  const back = loadFarm()!;
+  const turned = back.objects.find((o) => o.uid === deco.uid);
+  check('an old decorative apple tree becomes a ripe fruit tree, a stored one is paid back', turned?.type === 'apple' && turned.readyAt === 0 && !back.decorStore.appleTree && back.nuts === nutsBefore + 2 * placeable('appleTree').price);
+
+  const duck = PRIZES.epic.find((p) => p.kind === 'breed' && p.breed === 'mandarinDuck')!;
+  check('a rare duck only comes once ducks are unlocked', !isPrizeOpen(back, duck) && ((back.level = 19), isPrizeOpen(back, duck)));
+}
+{
+  const farm = newFarm(now);
+  farm.level = 6;
+  ensureCart(farm, now);
+  check('no market cart before its level', !farm.objects.some((o) => o.type === 'marketCart'));
+  farm.level = 7;
+  ensureCart(farm, now);
+  check('the market cart parks on the farm at its level', farm.objects.filter((o) => o.type === 'marketCart').length === 1);
+  const random = mulberry32(5);
+  check('the cart brings an order of 6 to 9 items', refillCart(farm, now, random) && (() => {
+    const n = Object.values(farm.cart.order!.items).reduce((s, k) => s + (k ?? 0), 0);
+    return n >= 6 && n <= 9 && Object.keys(farm.cart.order!.items).length <= 3;
+  })());
+  const order = farm.cart.order!;
+  check('the cart refuses an empty barn', deliverCart(farm, now) === null);
+  for (const [id, n] of Object.entries(order.items)) farm.stock[id as ItemId] = n;
+  const nuts = farm.nuts;
+  check('the cart pays and leaves for three hours', deliverCart(farm, now) !== null && farm.nuts === nuts + order.nuts && farm.cart.order === null && !refillCart(farm, now + MINUTE_MS, random));
+  check('the cart comes back with a new order', refillCart(farm, now + CART_BACK_MINUTES * MINUTE_MS, random));
+}
+// -----------------------------------------------
+// THE WHOLE STORY: a player climbing from level 1 to 30 who does what each open quest asks ends every quest
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  const stuck: string[] = [];
+  for (let level = 1; level <= MAX_LEVEL; level++) {
+    farm.level = level;
+    if (level >= 10 && !farm.projectsDone.includes('bridge')) farm.projectsDone.push('bridge');
+    for (let round = 0; round < 40; round++) {
+      settle(farm, now);
+      const open = QUESTS.filter((q) => q.id in farm.questStarts);
+      if (open.length === 0) break;
+      for (const q of open) {
+        for (const o of q.objectives) {
+          if ('key' in o) {
+            farm.counters[o.key] = (farm.counters[o.key] ?? 0) + o.count;
+            continue;
+          }
+          const kind = ANIMALS.find((a) => a.id === o.own);
+          if (kind) {
+            let pen = farm.objects.find((x) => x.type === kind.pen);
+            if (!pen) farm.objects.push((pen = { uid: farm.nextUid++, type: kind.pen, x: 0, y: 0, rot: 0, animals: [], breeds: [] }));
+            while ((pen.animals?.length ?? 0) < o.count) pen.animals!.push(-1);
+          } else if (!farm.objects.some((x) => x.type === o.own)) {
+            const pen = placeable(o.own as PlaceableId).kind === 'pen';
+            farm.objects.push({ uid: farm.nextUid++, type: o.own as PlaceableId, x: 0, y: 0, rot: 0, ...(pen ? { animals: [], breeds: [] } : { queue: [], slots: 2 }) });
+          }
+        }
+        if (!claimQuest(farm, q.id)) stuck.push(`${q.id} niv ${level}`);
+      }
+    }
+  }
+  const missing = QUESTS.filter((q) => !farm.questsDone.includes(q.id)).map((q) => q.id);
+  check('the whole story can be played to its end', missing.length === 0 && stuck.length === 0, [...missing, ...stuck].join(', '));
+}
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);
 if (failures > 0) process.exitCode = 1;

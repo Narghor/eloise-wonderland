@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banc d'écoute</title>
+  <style>
+    :root { --paper: #f6ecd9; --card: #fffaf0; --ink: #4a3135; --soft: #8a6f62; --wood: #b07a52; --ok: #5aa54a; --redo: #d9604a; --new: #e8789e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 16px; }
+    h1 { margin: 0 0 4px; font-size: 24px; }
+    .intro { color: var(--soft); margin: 0 0 14px; }
+    .bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--paper); padding: 10px 0; border-bottom: 2px solid #e2d3b8; margin-bottom: 8px; }
+    .bar label { display: flex; align-items: center; gap: 8px; }
+    section { margin: 18px 0; }
+    h2 { font-size: 18px; margin: 0 0 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; background: var(--card); border: 2px solid #e8d9bf; border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
+    .row.is-ok { border-color: var(--ok); }
+    .row.is-redo { border-color: var(--redo); }
+    .name b { display: block; }
+    .name small { color: var(--soft); }
+    .tag { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--new); border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+    button { font: inherit; border: 2px solid var(--wood); background: #fff; color: var(--ink); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+    button.play { background: var(--wood); color: #fff; font-weight: 700; min-width: 64px; }
+    button.play.is-playing { background: var(--ok); border-color: var(--ok); }
+    .judge { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .judge button.is-on.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .judge button.is-on.redo { background: var(--redo); border-color: var(--redo); color: #fff; }
+    .note { grid-column: 1 / -1; width: 100%; font: inherit; border: 1px solid #e2d3b8; border-radius: 8px; padding: 6px 8px; background: #fffdf8; display: none; }
+    .row.is-redo .note, .row.has-note .note { display: block; }
+    .muted { color: var(--redo); font-weight: 700; }
+    @media (max-width: 520px) { .row { grid-template-columns: auto 1fr; } .judge { grid-column: 1 / -1; justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Banc d'écoute</h1>
+    <p class="intro">Les vrais sons du site (ils viennent de <code>src/games/casino/fx/sound.ts</code>), joués comme en jeu. Marque chaque son « Bien » ou « À revoir », ajoute une note, puis « Copier mes retours » et colle-les à Claude.</p>
+    <div class="bar">
+      <label>Volume des effets <input id="volume" type="range" min="0" max="1" step="0.05"></label>
+      <span id="muted" class="muted" hidden>Son coupé dans les réglages du site.</span>
+      <button id="unmute" hidden>Remettre le son</button>
+      <button id="copy">Copier mes retours</button>
+      <button id="reset">Tout effacer</button>
+    </div>
+    <div id="sections"></div>
+  </main>
+
+  <script type="module">
+    import * as S from '/src/games/casino/fx/sound.ts';
+
+    // -----------------------------------------------
+    // THE SOUNDS, by family; `isNew` marks the ones nobody has heard yet
+    // -----------------------------------------------
+    const SECTIONS = [
+      {
+        title: 'Ferme : les animaux',
+        sounds: [
+          ['playCluck', 'Poule', 'nourrie, ramassée, adoptée'],
+          ['playMoo', 'Vache', 'grave et douce'],
+          ['playBaa', 'Mouton', 'un bêlement qui tremble', true],
+          ['playOink', 'Cochon', 'deux petits grognements', true],
+          ['playBuzz', 'Abeilles', 'un bourdonnement doux', true],
+          ['playBleat', 'Chèvre', 'plus aigu et plus rapide que le mouton', true],
+          ['playQuack', 'Canard', 'deux coin-coin', true],
+          ['playSniff', 'Lapin', 'presque rien : un reniflement et un petit cri', true],
+        ],
+      },
+      {
+        title: 'Ferme : les gestes',
+        sounds: [
+          ['playPluck', 'Récolter', 'un champ cueilli (monte le long d’un glissé)', false, (i) => S.playPluck(i)],
+          ['playSeed', 'Semer', 'une graine posée', false, (i) => S.playSeed(i)],
+          ['playPop', 'Ramasser', 'œufs, plateau, noisettes'],
+          ['playThunk', 'Poser', 'un objet posé sur la ferme'],
+          ['playClack', 'Lancer une recette', 'une machine démarre'],
+          ['playRustle', 'Dégager', 'feuilles et broussailles'],
+          ['playCoinLand', 'Livrer', 'une commande ou la charrette servie', false, () => S.playCoinLand('small')],
+          ['playFanfare', 'Niveau, quête', 'une petite fanfare'],
+        ],
+      },
+      {
+        title: 'Le reste du site',
+        sounds: [
+          ['playSmallWin', 'Petit gain', ''],
+          ['playBigWin', 'Gros gain', '', false, () => S.playBigWin(2)],
+          ['playCoinTick', 'Compteur', ''],
+          ['playBonusTrigger', 'Bonus', ''],
+          ['playDoorOpen', 'Portes qui s’ouvrent', ''],
+          ['playMedusaAwake', 'Médusa', ''],
+          ['playBookOpen', 'Livre', ''],
+          ['playSuspenseHit', 'Suspense gagné', ''],
+          ['playSuspenseMiss', 'Suspense raté', ''],
+          ['playGambleWin', 'Quitte ou double gagné', ''],
+          ['playGambleLose', 'Quitte ou double perdu', ''],
+          ['playLose', 'Tour perdu', ''],
+          ['playFishBite', 'Touche (pêche)', ''],
+          ['playSprinkle', 'Nourriture dans l’eau', ''],
+          ['playGulp', 'Poisson qui mange', '', false, () => S.playGulp(true)],
+          ['playWipe', 'Vitre essuyée', ''],
+          ['playShine', 'Vitre propre', ''],
+          ['playChime', 'Boîte à musique', ''],
+          ['playCompost', 'Compost', ''],
+          ['playFold', 'Pli de papier', ''],
+        ],
+      },
+    ];
+
+    // -----------------------------------------------
+    // NOTES, kept in this browser only
+    // -----------------------------------------------
+    const KEY = 'sound-bench';
+    const load = () => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}'); } catch { return {}; } };
+    const store = load();
+    const keep = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
+
+    // -----------------------------------------------
+    // THE PAGE
+    // -----------------------------------------------
+    let armed = false;
+    const arm = () => { if (!armed) { S.armSoundUnlock(); armed = true; } };
+    const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+    let step = 0;
+
+    function play(fn, id) {
+      arm();
+      if (fn) fn(step++ % 8);
+      else S[id]();
+    }
+
+    const root = document.getElementById('sections');
+    for (const section of SECTIONS) {
+      const block = document.createElement('section');
+      const h2 = document.createElement('h2');
+      h2.textContent = section.title;
+      const all = document.createElement('button');
+      all.textContent = 'Tout jouer';
+      h2.append(all);
+      block.append(h2);
+      const rows = [];
+      for (const [id, name, hint, isNew, fn] of section.sounds) {
+        if (typeof S[id] !== 'function') continue;
+        const row = document.createElement('div');
+        row.className = 'row';
+        const button = document.createElement('button');
+        button.className = 'play';
+        button.textContent = '▶';
+        const label = document.createElement('div');
+        label.className = 'name';
+        label.innerHTML = `<b>${name}${isNew ? '<span class="tag">nouveau</span>' : ''}</b>${hint ? `<small>${hint}</small>` : ''}`;
+        const judge = document.createElement('div');
+        judge.className = 'judge';
+        const ok = Object.assign(document.createElement('button'), { className: 'ok', textContent: 'Bien' });
+        const redo = Object.assign(document.createElement('button'), { className: 'redo', textContent: 'À revoir' });
+        const noteBtn = Object.assign(document.createElement('button'), { textContent: 'Note' });
+        judge.append(ok, redo, noteBtn);
+        const note = Object.assign(document.createElement('textarea'), { className: 'note', rows: 2, placeholder: 'Ce qui ne va pas, ce que tu voudrais entendre…' });
+        row.append(button, label, judge, note);
+        block.append(row);
+
+        const entry = (store[id] ??= { verdict: '', note: '' });
+        const refresh = () => {
+          row.classList.toggle('is-ok', entry.verdict === 'ok');
+          row.classList.toggle('is-redo', entry.verdict === 'redo');
+          row.classList.toggle('has-note', !!entry.note || row.dataset.open === '1');
+          ok.classList.toggle('is-on', entry.verdict === 'ok');
+          redo.classList.toggle('is-on', entry.verdict === 'redo');
+          note.value = entry.note;
+        };
+        const flash = () => { button.classList.add('is-playing'); setTimeout(() => button.classList.remove('is-playing'), 500); };
+        button.addEventListener('click', () => { play(fn, id); flash(); });
+        ok.addEventListener('click', () => { entry.verdict = entry.verdict === 'ok' ? '' : 'ok'; keep(); refresh(); });
+        redo.addEventListener('click', () => { entry.verdict = entry.verdict === 'redo' ? '' : 'redo'; keep(); refresh(); });
+        noteBtn.addEventListener('click', () => { row.dataset.open = '1'; refresh(); note.focus(); });
+        note.addEventListener('input', () => { entry.note = note.value; keep(); });
+        refresh();
+        rows.push({ button, fn, id, flash });
+      }
+      all.addEventListener('click', async () => {
+        for (const r of rows) {
+          play(r.fn, r.id);
+          r.flash();
+          r.button.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          await wait(1300);
+        }
+      });
+      root.append(block);
+    }
+
+    // Volume and mute: the site's own settings, so what you hear is what the game plays.
+    const volume = document.getElementById('volume');
+    const muted = document.getElementById('muted');
+    const unmute = document.getElementById('unmute');
+    const showMute = () => { muted.hidden = unmute.hidden = !S.isMuted(); };
+    volume.value = String(S.getEffectsVolume() || 1);
+    volume.addEventListener('input', () => { S.setEffectsVolume(Number(volume.value)); showMute(); });
+    unmute.addEventListener('click', () => { S.setMuted(false); if (S.getEffectsVolume() === 0) S.setEffectsVolume(1); volume.value = String(S.getEffectsVolume()); showMute(); });
+    showMute();
+
+    document.getElementById('copy').addEventListener('click', async () => {
+      const lines = [];
+      for (const section of SECTIONS) for (const [id, name] of section.sounds) {
+        const e = store[id];
+        if (!e || (!e.verdict && !e.note)) continue;
+        lines.push(`- ${name} (${id}) : ${e.verdict === 'ok' ? 'bien' : e.verdict === 'redo' ? 'à revoir' : 'sans avis'}${e.note ? ` — ${e.note}` : ''}`);
+      }
+      const text = lines.length ? `Retours du banc d'écoute :\n${lines.join('\n')}` : 'Aucun retour noté.';
+      try { await navigator.clipboard.writeText(text); alert('Copié ! Colle-le à Claude.'); } catch { prompt('Copie ce texte :', text); }
+    });
+    document.getElementById('reset').addEventListener('click', () => {
+      if (!confirm('Effacer tous tes retours ?')) return;
+      for (const k of Object.keys(store)) delete store[k];
+      keep();
+      location.reload();
+    });
+  </script>
+</body>
+</html>

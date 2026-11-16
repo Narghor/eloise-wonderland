@@ -4,9 +4,10 @@ import { item } from './data/items';
 import { FEEDS, RECIPES } from './data/machines';
 import { orderSlots } from './data/levels';
 import { PERSON_IDS } from './data/people';
-import type { ItemId } from './data/types';
+import { TREE_YIELDS } from './data/placeables';
+import type { ItemId, TreeId } from './data/types';
 import { MINUTE_MS } from './farmTime';
-import type { FarmSave, Order } from './farmSave';
+import type { CartOrder, FarmSave, Order } from './farmSave';
 import { charm, earn, emit, gainXp, hasItems, isUnlocked, ownCount, pay, takeItems } from './farmProgress';
 import { charmStep } from './data/charm';
 
@@ -30,6 +31,8 @@ export function orderable(save: FarmSave): ItemId[] {
   const list: ItemId[] = CROPS.filter((c) => isUnlocked(save, c.unlock)).map((c) => c.id);
   for (const r of RECIPES) if (!FEEDS.includes(r.item) && isUnlocked(save, r.unlock) && ownCount(save, r.machine) > 0) list.push(r.item);
   for (const a of ANIMALS) if (ownCount(save, a.id) > 0) list.push(a.product);
+  // Fruit from the trees on the farm (the hazel gives Eloisettes, nothing to ask).
+  for (const [tree, y] of Object.entries(TREE_YIELDS)) if ('item' in y.gives && ownCount(save, tree as TreeId) > 0) list.push(y.gives.item);
   return list;
 }
 
@@ -106,4 +109,61 @@ export function refuse(save: FarmSave, id: number, now: number, helpingHand: boo
 
 export function deliverableCount(save: FarmSave): number {
   return save.orders.filter((o) => canDeliver(save, o)).length;
+}
+
+// -----------------------------------------------
+// THE MARKET CART (docs/ferme.md 18): one big order of several kinds, better paid, back a few hours after
+// -----------------------------------------------
+
+/** The cart pays this many times the value of its items (the board: ORDER_NUTS), and this share in XP. */
+export const CART_NUTS = 2.2;
+export const CART_XP = 0.45;
+export const CART_PARCEL_CHANCE = 0.35;
+/** Hours before the cart comes back once served; minutes once sent away without its goods. */
+export const CART_BACK_MINUTES = 180;
+export const CART_SENT_AWAY_MINUTES = 60;
+
+/** The cart's order, rolled when it is on the farm, unlocked, and its wait is over. Returns true when one came. */
+export function refillCart(save: FarmSave, now: number, random: () => number = Math.random): boolean {
+  if (save.cart.order || now < save.cart.nextAt || ownCount(save, 'marketCart') === 0) return false;
+  save.cart.order = rollCart(save, random);
+  return true;
+}
+
+/** Three kinds (fewer early on), 6 to 9 items in all, worth about three board orders. */
+export function rollCart(save: FarmSave, random: () => number): CartOrder {
+  const pool = orderable(save);
+  const kinds = Math.min(3, pool.length);
+  const picked = new Set<ItemId>();
+  while (picked.size < kinds) picked.add(pool[Math.floor(random() * pool.length)]);
+  const total = 6 + Math.floor(random() * 4);
+  const items: Partial<Record<ItemId, number>> = {};
+  [...picked].forEach((id, i) => (items[id] = Math.floor(total / kinds) + (i < total % kinds ? 1 : 0)));
+  const value = Object.entries(items).reduce((s, [id, n]) => s + item(id as ItemId).value * (n ?? 0), 0);
+  return {
+    items,
+    nuts: Math.round(value * CART_NUTS * (1 + charmStep(charm(save)).step.orderBonusPercent / 100)),
+    xp: Math.max(1, Math.round(value * CART_XP)),
+    parcel: random() < CART_PARCEL_CHANCE,
+  };
+}
+
+export function deliverCart(save: FarmSave, now: number): CartOrder | null {
+  const order = save.cart.order;
+  if (!order || !hasItems(save, order.items)) return null;
+  takeItems(save, order.items);
+  save.cart = { order: null, nextAt: now + CART_BACK_MINUTES * MINUTE_MS };
+  for (const [itemId, n] of Object.entries(order.items)) emit(save, { type: 'deliver', target: itemId, count: n ?? 0 });
+  emit(save, { type: 'order', target: 'cart', count: 1 });
+  earn(save, order.nuts);
+  if (order.parcel) pay(save, { parcels: 1 });
+  gainXp(save, order.xp);
+  return order;
+}
+
+/** Sends the cart away empty: another order comes an hour later. */
+export function sendCartAway(save: FarmSave, now: number): boolean {
+  if (!save.cart.order) return false;
+  save.cart = { order: null, nextAt: now + CART_SENT_AWAY_MINUTES * MINUTE_MS };
+  return true;
 }

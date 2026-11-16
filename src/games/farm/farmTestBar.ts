@@ -1,6 +1,9 @@
 import { el } from '../../dom';
 import { xpToNext } from './data/levels';
-import type { BoosterId, ItemId } from './data/types';
+import { ANIMALS } from './data/animals';
+import { ITEM_IDS } from './data/items';
+import type { BoosterId } from './data/types';
+import { CRIES } from './farmCries';
 import { gainXp, have } from './farmProgress';
 import type { FarmSave } from './farmSave';
 import type { FarmScene } from './farmScene';
@@ -42,6 +45,7 @@ export function testBar(host: TestBarHost): HTMLElement {
         if (o.queue) for (const j of o.queue) j.readyAt = Math.min(j.readyAt, now);
       }
       save.orderWaits = save.orderWaits.map(() => now);
+      save.cart.nextAt = Math.min(save.cart.nextAt, now);
     }),
     button('+5 colis', () => (save.mail.waiting += 5)),
     button('Heure +3 h', () => {
@@ -49,7 +53,14 @@ export function testBar(host: TestBarHost): HTMLElement {
       host.toast(`Heure affichée : ${(new Date().getHours() + host.scene.hourOffset) % 24} h`);
     }),
     button('+10 de chaque produit', () => {
-      for (const id of ['wheat', 'corn', 'carrot', 'egg', 'milk', 'flour', 'chickenFeed', 'cowFeed'] as ItemId[]) save.stock[id] = have(save, id) + 10;
+      for (const id of ITEM_IDS) save.stock[id] = have(save, id) + 10;
+    }),
+    // To hear every animal once, one after the other.
+    button('Cris des animaux', () => {
+      ANIMALS.forEach((a, i) => window.setTimeout(() => {
+        CRIES[a.id]();
+        host.toast(a.name);
+      }, i * 1100));
     }),
   );
 }

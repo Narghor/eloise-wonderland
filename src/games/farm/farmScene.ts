@@ -1,7 +1,8 @@
 import { prefersReducedMotion } from '../casino/fx/effects';
 import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
-import { placeable } from './data/placeables';
-import type { PlaceableId, SkinId } from './data/types';
+import { isTree, placeable } from './data/placeables';
+import { LOT2_CROP_COLOURS } from './farmArtItems';
+import type { AnimalId, CropId, ItemId, PlaceableId, SkinId } from './data/types';
 import { joinIndex, joinKey, joinMask, skinOf, type JoinCell } from './farmJoins';
 import { JOIN_CARRIES } from './data/skins';
 import {
@@ -16,13 +17,14 @@ import {
   joinedSprite,
   fernSprite,
   fieldSprite,
-  hazelSprite,
+  treeSprite,
   heartSprite,
   itemIcon,
   mailboxSprite,
   millHub,
   millSails,
   objectSprite,
+  penAreaOf,
   perchedSprite,
   seatOf,
   type PercherId,
@@ -37,7 +39,6 @@ import {
 import { footprint, gateTile, isOwned, isRoad, type ParcelOffer } from './farmMap';
 import { FarmVillage } from './farmVillage';
 import { breedsOf, fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
-import type { CropId } from './data/types';
 import { have } from './farmProgress';
 import type { FarmSave, PlacedObject, Rotation } from './farmSave';
 import { mulberry32 } from '../../random';
@@ -144,6 +145,21 @@ function daylightKeys(date: Date): [number, readonly [number, number, number, nu
   ];
 }
 
+/**
+ * How each animal moves in its yard: speed against the hen's, how long its idle gesture (frame 1) lasts in ms, and
+ * whether it flies (it flaps and bobs all the time and hardly rests).
+ */
+const GAIT: Record<AnimalId, { pace: number; gesture: number; flies?: boolean }> = {
+  chicken: { pace: 1, gesture: 500 },
+  cow: { pace: 0.5, gesture: 1400 },
+  sheep: { pace: 0.55, gesture: 1300 },
+  pig: { pace: 0.65, gesture: 1100 },
+  bee: { pace: 1.6, gesture: 0, flies: true },
+  goat: { pace: 1, gesture: 900 },
+  duck: { pace: 0.75, gesture: 700 },
+  rabbit: { pace: 1.2, gesture: 600 },
+};
+
 /** The grains that fly off each crop when it is picked. */
 const CROP_COLOURS: Record<CropId, string[]> = {
   wheat: ['#f2c94c', '#fbe38a', '#d9a339'],
@@ -154,6 +170,7 @@ const CROP_COLOURS: Record<CropId, string[]> = {
   sunflower: ['#f5c518', '#8a5a2b', '#7cc456'],
   pumpkin: ['#f08a3c', '#ffb066', '#7cc456'],
   cotton: ['#ffffff', '#f3eee4', '#9ccc65'],
+  ...LOT2_CROP_COLOURS,
 };
 
 interface Butterfly {
@@ -556,7 +573,7 @@ export class FarmScene {
       const state = fieldState(o, Date.now());
       return state === 'empty' ? soilTile() : cropSprite(o.crop!, state, 0);
     }
-    if (o.type === 'hazel') return hazelSprite(readyOn(o, Date.now()) !== null);
+    if (isTree(o.type)) return treeSprite(o.type, readyOn(o, Date.now()) !== null);
     if (o.type === 'mailbox') return mailboxSprite(this.save.mail.waiting > 0, o.rot % 2 === 1 ? 'profile' : 'face');
     const key = joinKey(o);
     if (key) {
@@ -972,7 +989,7 @@ export class FarmScene {
     const [w, h] = footprint(ghost);
     const key = joinKey(ghost);
     const sprite = ghost.type === 'field' ? fieldSprite(null, 'empty')
-      : ghost.type === 'hazel' ? hazelSprite(false)
+      : isTree(ghost.type) ? treeSprite(ghost.type, false)
       : key ? joinedSprite(ghost.type, skinOf(ghost), joinMask(this.joins, ghost.x, ghost.y, key))
       : objectSprite(ghost.type, ghost.rot % 2 === 1 ? 'profile' : 'face');
     const at = this.origin(ghost, sprite);
@@ -1004,9 +1021,14 @@ export class FarmScene {
     let icon: Sprite | null = null;
     let alpha = 1;
     if (o.type === 'mailbox') icon = this.save.mail.waiting > 0 ? uiIcon('gift') : null;
-    else if (ready === 'nuts') icon = uiIcon('nut');
+    else if (o.type === 'marketCart') {
+      // The cart's order: plain when it can be delivered, faded while goods are missing.
+      const order = this.save.cart.order;
+      icon = order ? uiIcon('orders') : null;
+      alpha = order && Object.entries(order.items).every(([id, n]) => have(this.save, id as ItemId) >= (n ?? 0)) ? 1 : 0.6;
+    } else if (ready === 'nuts') icon = uiIcon('nut');
     else if (ready) icon = itemIcon(ready);
-    else if (o.type === 'coop' || o.type === 'cowshed') {
+    else if (placeable(o.type).kind === 'pen') {
       const animal = penAnimal(o);
       if (hungryAnimals(o) > 0 && have(this.save, animal.feed) > 0) {
         icon = itemIcon(animal.feed);
@@ -1030,9 +1052,24 @@ export class FarmScene {
   // ANIMALS: wander in their pen's yard
   // -----------------------------------------------
 
+  /** Where the pen's animals may stand (their sprite's top-left): the drawing's own area when it has one, else the lower half. */
   private yard(pen: PlacedObject): { x0: number; y0: number; x1: number; y1: number } {
     const [w, h] = footprint(pen);
     const sprite = animalSprite(penAnimal(pen).id, 0);
+    const view = pen.rot % 2 === 1 ? 'profile' : 'face';
+    const area = penAreaOf(pen.type, view);
+    if (area) {
+      const body = objectSprite(pen.type as Parameters<typeof objectSprite>[0], view);
+      const at = this.origin(pen, body);
+      // A profile turned the other way is drawn mirrored: so is its area.
+      const mirrored = pen.rot === 3;
+      return {
+        x0: at.x + (mirrored ? body.width - area.x1 - sprite.width : area.x0),
+        x1: at.x + (mirrored ? body.width - area.x0 - sprite.width : area.x1),
+        y0: at.y + area.y0,
+        y1: at.y + area.y1,
+      };
+    }
     return { x0: pen.x * TILE + 5, y0: pen.y * TILE + Math.round(h * TILE * 0.5), x1: (pen.x + w) * TILE - 5 - sprite.width, y1: (pen.y + h) * TILE - 6 - sprite.height };
   }
 
@@ -1061,11 +1098,17 @@ export class FarmScene {
   private queueAnimals(pen: PlacedObject, list: { base: number; draw: () => void }[], penBase: number): void {
     const id = penAnimal(pen).id;
     const breeds = breedsOf(pen);
+    const flies = GAIT[id].flies;
+    const now = performance.now();
     this.actorsOf(pen).forEach((a, i) => {
-      const frame = a.peck > 0 ? 1 : 0;
+      // A flying animal flaps all the time (frame 1 = wings up) and bobs in the air; the others show frame 1 when idle.
+      const frame = flies ? ((Math.floor(now / 120 + i * 3) % 2) as 0 | 1) : a.peck > 0 ? 1 : 0;
+      const bob = flies && !this.reduced ? Math.round(Math.sin(now / 280 + i * 1.7) * 1.5) : 0;
       const rare = breeds[i];
       const sprite = rare ? breedSprite(rare, frame) : animalSprite(id, frame);
-      list.push({ base: penBase + 0.01 + a.y / 10000, draw: () => this.stamp(sprite, Math.round(a.x), Math.round(a.y), a.face < 0) });
+      // Flyers are drawn over the whole pen, its hives included.
+      const base = flies ? penBase + 0.5 : penBase + 0.01 + a.y / 10000;
+      list.push({ base, draw: () => this.stamp(sprite, Math.round(a.x), Math.round(a.y) + bob, a.face < 0) });
     });
   }
 
@@ -1130,9 +1173,9 @@ export class FarmScene {
   private walk(dt: number): void {
     if (this.reduced) return;
     for (const pen of this.save.objects) {
-      if (pen.type !== 'coop' && pen.type !== 'cowshed') continue;
+      if (placeable(pen.type).kind !== 'pen') continue;
       const yard = this.yard(pen);
-      const slow = pen.type === 'cowshed' ? 0.5 : 1;
+      const gait = GAIT[penAnimal(pen).id];
       for (const a of this.actorsOf(pen)) {
         if (a.peck > 0) a.peck -= dt;
         if (a.wait > 0) {
@@ -1147,11 +1190,11 @@ export class FarmScene {
         const dy = a.ty - a.y;
         const distance = Math.hypot(dx, dy);
         if (distance < 1) {
-          a.wait = 800 + Math.random() * 2600;
-          if (Math.random() < 0.6) a.peck = pen.type === 'cowshed' ? 1400 : 500;
+          a.wait = gait.flies ? 150 + Math.random() * 500 : 800 + Math.random() * 2600;
+          if (!gait.flies && Math.random() < 0.6) a.peck = gait.gesture;
           continue;
         }
-        const step = Math.min(distance, dt * WALK_SPEED * slow);
+        const step = Math.min(distance, dt * WALK_SPEED * gait.pace);
         a.x += (dx / distance) * step;
         a.y += (dy / distance) * step;
         a.face = dx >= 0 ? 1 : -1;
