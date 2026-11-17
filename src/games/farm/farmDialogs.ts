@@ -10,7 +10,7 @@ import { boosterIcon, breedSprite, faceSprite, itemIcon, objectSprite, parcelSpr
 import { confetti } from './farmFeedback';
 import { FARM_HELP } from './farmHelp';
 import { rewardLine } from './farmPanels';
-import { openParcel, type Opened } from './farmParcels';
+import { openParcel, waitingBreedHint, type Opened } from './farmParcels';
 import type { AwayNews } from './farmProduction';
 import { unlocksAt, type Notice } from './farmProgress';
 import { levelReward, xpToNext } from './data/levels';
@@ -205,7 +205,7 @@ export class FarmDialogs {
       el('div', { class: 'farm-parcel-prize' }, el('span', { class: 'farm-rays', 'aria-hidden': 'true' }), spriteImage(icon, scale)),
       el('h2', { text: name }),
       ...(opened.isNew ? [el('span', { class: 'farm-new', text: 'Nouveau dans l’album !' })] : []),
-      ...(opened.waiting ? [el('p', { class: 'farm-note', text: 'Il n’y a pas de place pour elle : elle t’attend dans la Boutique, onglet Animaux.' })] : []),
+      ...(opened.waiting && opened.prize.kind === 'breed' ? [el('p', { class: 'farm-note', text: waitingBreedHint(this.save, opened.prize.breed) })] : []),
       ...(opened.prize.kind === 'decor' ? [el('p', { class: 'farm-note', text: 'Elle t’attend dans la Boutique, onglet Déco : pose-la où tu veux.' })] : []),
       ...(more > 0 ? [next] : []),
       el('button', { class: `farm-btn is-wide${more > 0 ? ' is-ghost' : ''}`, type: 'button', text: 'Super !' }),

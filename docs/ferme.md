@@ -1291,3 +1291,50 @@ niv. 10, ~6 000 au 15, ~9 000 au 20, ~15 000 au 30. Les décos de 2 à 400 valai
   (`Etc/GMT±N`) pour forcer la nuit, bouton « Vue d'ensemble » pour voir loin.
 - **Pas fait** : le manège ne tourne pas, la balancelle et le hamac ne bougent pas, personne ne s'assoit dans les
   grandes pièces (gestes neufs à dessiner si Eloise le demande).
+
+## 24. Retours de Flo et Eloise du 17/11 : un repas par enclos, la farine (non commité, pas joué sur téléphone)
+
+**Un minuteur par enclos** (demande : « pas qu'une bête ait son propre minuteur ») : avant, chaque bête avait le sien ;
+une bête achetée plus tard, ou nourrie quand les cookies manquaient, restait décalée pour toujours (« poule A dans
+10 min, poule B dans 12 »). Maintenant l'enclos fait UN REPAS :
+- Nourrir lance le repas de toutes les bêtes que la grange peut nourrir, avec un seul minuteur (`readyAt` de l'enclos,
+  `fed` = combien mangent : les premières de `animals`) ;
+- pendant le repas, on ne nourrit plus : une bête arrivée entre-temps (achat, colis) ou laissée sans cookie mange au
+  repas suivant (la bulle le dit : « 2 mangeront au prochain repas », « Il manque 2 cookies : les autres mangeront au
+  prochain repas ») ;
+- Ramasser prend tout le repas et l'enclos entier a faim de nouveau.
+- Chaque enclos reste à toucher séparément (choix de Flo : pas de « nourrir tous les poulaillers » d'un coup).
+- Toucher un enclos affamé ne nourrit d'un coup que si la grange nourrit TOUT l'enclos ; sinon la bulle s'ouvre
+  (« 4 en grange » en rouge + qui attendra) : sans ça, un toucher laissait 2 poules un cycle entier sans prévenir.
+- Sauvegarde : FARM_VERSION 4, `animals` = la race de chaque bête (null = ordinaire), `breeds` supprimé ; une vieille
+  sauvegarde garde ses bêtes, celles qui mangeaient passent en tête et le repas finit avec la dernière (personne ne
+  gagne de temps). Le sablier raccourcit le repas. farm-check : 6 vérifications neuves.
+- Le simulateur n'a pas changé : il regroupe les bêtes par espèce et n'agit qu'aux visites, où elles mangent déjà ensemble.
+
+**La farine** (ressenti « trop de commandes de farine, un seul moulin » au niveau 8) : MESURE du 17/11 sur 20 000
+commandes au niveau 8, 38 % des commandes demandent de la farine (directe, pain, tarte), 6,7 sacs chacune, soit
+67 min de moulin ; le 2e moulin n'ouvre qu'au niveau 10. Cause : la quantité d'une commande suit la VALEUR (farine 4,
+le produit de machine le moins cher) et ne compte pas les 10 min de moulin par sac.
+Correctif (go de Flo) : **le Moulin fait 2 farines par fournée** (6 blés -> 2 farines, 10 min). Valeur, Éloisettes,
+XP des commandes et blé par sac inchangés ; temps de moulin moyen par commande 25 -> ~12 min.
+MESURE `farm-sim` (graines 7 et 3, 90 jours) : de 0 à 10 % plus rapide entre les niveaux 5 et 15, surtout chez l'accro
+(niv 15 : j15,5 -> j14,0 graine 7 ; j14,6 -> j13,7 graine 3), dans le bruit au-delà (niv 30 accro j57,5 -> j55,5 /
+j55,9 -> j55,0 ; régulière niv 20 : -1,6 j / +0,8 j). Le Fournil (30 min le pain) reste lent, voulu.
+La quête de Léon « Fabriquer 2 farines » se fait en une fournée.
+
+**Races rares = apparences à mettre depuis l'enclos** (idée de Flo, 17/11 ; avant, une race trouvée enclos pleins
+attendait qu'on construise un nouvel enclos) : une race trouvée dans un colis entre toujours comme une bête de plus
+s'il y a de la place ; sinon elle attend (`waitingBreeds` = les races trouvées que personne ne porte). Dans la bulle d'un
+enclos qui a une race de son espèce (portée ici ou en attente), une rangée montre ses bêtes : toucher une bête la fait
+passer à l'apparence suivante (ordinaire, puis chaque race de son espèce encore libre ; `restyleAnimal`, farmParcels).
+Une race trouvée habille UNE bête : l'enlever la remet en attente, le bonus de production suit la race portée.
+Le conseil « que faire de cette race » est écrit à un seul endroit (`waitingBreedHint`) : boutique et colis.
+Plus tard, la même idée pour les bâtiments (skins de machines).
+
+**Décos hautes sur 2 cases** (demande d'Eloise : « en placer plus ») : puits, balançoire et fontaine dorée passent de
+2 x 2 à 2 x 1, leur dessin monte sur la rangée de derrière comme le feuillage des arbres ; `turnsInPlace` = leur emprise
+ne tourne pas avec elles (un puits vu de côté prend la même largeur). FARM_VERSION 5 : les déjà posées descendent
+d'une rangée et restent dessinées au même endroit. Places des promeneurs écrites depuis la base (`h`), vérifiées en
+capture (puits de face et de profil, fontaine). GARDÉS en 2 x 2 : le pigeonnier (presque 4 cases de haut, il cacherait
+3 rangées ; pièce unique, le réduire ne fait rien placer de plus) et les mares (eau plate : sur 2 x 1, un banc
+derrière semblerait dans l'eau ; à redessiner plus petites si Eloise le demande). farm-check 103.

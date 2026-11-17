@@ -19,7 +19,7 @@ import type { BoosterId, BreedId, CropId, DecorId, ItemId, JoinFamily, PersonId,
 // of shape, with its migration in `loadFarm`.
 
 const GAME_ID = 'farm';
-export const FARM_VERSION = 3;
+export const FARM_VERSION = 5;
 
 /** Version 1 played with lot 1's XP table: its progress in the level is kept as a share of the new one. */
 const LOT1_XP_TABLE = [15, 30, 50, 80, 200, 320, 480, 680, 950, 1600, 2900, 3700, 4500, 5300];
@@ -44,19 +44,17 @@ export interface PlacedObject {
   on?: number;
   /** Field: what grows. */
   crop?: CropId;
-  /** Field and tree: when it is ready. */
+  /** Field, tree and pen: when it is ready (a pen has one timer for all its animals). */
   readyAt?: number;
-  /** Pen: one entry per animal, when its product is ready; HUNGRY while it waits for food. */
-  animals?: number[];
-  /** Pen: the rare breed of each animal, same order as `animals`; null for a plain one. */
-  breeds?: (BreedId | null)[];
+  /** Pen: one entry per animal, its rare breed; null for a plain one. */
+  animals?: (BreedId | null)[];
+  /** Pen: how many animals eat in the running meal, the first ones of `animals`; none while the pen waits for food. */
+  fed?: number;
   /** Machine: jobs in order; the finished ones wait on the tray until collected. */
   queue?: Job[];
   /** Machine: jobs that may wait unfinished at once. */
   slots?: number;
 }
-
-export const HUNGRY = -1;
 
 export interface Order {
   id: number;
@@ -202,6 +200,7 @@ export function loadFarm(): FarmSave | null {
   };
   retireDecorAppleTrees(save);
   if (count(data.version) < 3) standTreesOnTrunks(save);
+  if (count(data.version) < 5) standTallDecorOnBase(save);
   settlePerches(save);
   // Two objects must never share a uid: the newest uid is always above every one in use.
   save.nextUid = Math.max(save.nextUid, ...save.objects.map((o) => o.uid + 1));
@@ -225,11 +224,7 @@ function readObject(value: unknown): PlacedObject[] {
     object.crop = o.crop;
     object.readyAt = o.readyAt;
   } else if (typeof o.readyAt === 'number') object.readyAt = o.readyAt;
-  if (Array.isArray(o.animals)) {
-    object.animals = o.animals.filter((t): t is number => typeof t === 'number');
-    const breeds = asArray(o.breeds);
-    object.breeds = object.animals.map((_, i) => (isOneOf(breeds[i], BREED_IDS) ? breeds[i] : null));
-  }
+  if (Array.isArray(o.animals)) readPen(object, o);
   if (Array.isArray(o.queue)) {
     object.queue = o.queue.flatMap((j) => {
       const job = asRecord(j);
@@ -238,6 +233,27 @@ function readObject(value: unknown): PlacedObject[] {
   }
   if (isCount(o.slots)) object.slots = o.slots;
   return [object];
+}
+
+function readPen(pen: PlacedObject, o: Record<string, unknown>): void {
+  const entries = asArray(o.animals);
+  // Up to version 3 each animal had its own timer (-1 = hungry) and `breeds` ran beside them: the busy ones now
+  // share one meal, ready when the last of them was.
+  if (entries.some((t) => typeof t === 'number')) {
+    const breeds = asArray(o.breeds);
+    const old = entries.flatMap((t, i) => (typeof t === 'number' ? [{ readyAt: t, breed: isOneOf(breeds[i], BREED_IDS) ? breeds[i] : null }] : []));
+    const busy = old.filter((a) => a.readyAt >= 0);
+    pen.animals = [...busy, ...old.filter((a) => a.readyAt < 0)].map((a) => a.breed);
+    if (busy.length > 0) {
+      pen.fed = busy.length;
+      pen.readyAt = Math.max(...busy.map((a) => a.readyAt));
+    } else delete pen.readyAt;
+    return;
+  }
+  pen.animals = entries.map((b) => (isOneOf(b, BREED_IDS) ? b : null));
+  const fed = isCount(o.fed) ? Math.min(o.fed, pen.animals.length) : 0;
+  if (fed > 0 && pen.readyAt !== undefined) pen.fed = fed;
+  else delete pen.readyAt;
 }
 
 /** XP gained inside the current level; a version 1 save keeps the same share of the bar with the lot 2 table. */
@@ -268,6 +284,13 @@ function retireDecorAppleTrees(save: FarmSave): void {
 /** Version 3: a tree took 2 x 2 tiles, it now takes its trunk's one, the lower left tile of its old square. */
 function standTreesOnTrunks(save: FarmSave): void {
   for (const o of save.objects) if (placeable(o.type).kind === 'tree') o.y += 1;
+}
+
+/** Up to version 4 these took 2 x 2 tiles; they now stand on their bottom row and are drawn where they were. */
+const TALL_DECOR_ON_BASE: readonly PlaceableId[] = ['well', 'swing', 'fountain'];
+
+function standTallDecorOnBase(save: FarmSave): void {
+  for (const o of save.objects) if (TALL_DECOR_ON_BASE.includes(o.type) && o.on === undefined) o.y += 1;
 }
 
 /**

@@ -3,8 +3,8 @@ import { loadCompanion, saveCompanion } from '../../companion/companionSave';
 import { BOOSTERS, GAME_DROPS_PER_DAY, GAME_DROP_ODDS, booster } from './data/boosters';
 import type { BoosterId } from './data/types';
 import { MINUTE_MS } from './farmTime';
-import { HUNGRY, loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
-import { fieldState } from './farmProduction';
+import { loadFarm, saveFarm, type FarmSave, type PlacedObject } from './farmSave';
+import { fieldState, mealReadyAt } from './farmProduction';
 import { CASINO_TEST_BUTTONS } from '../casino/fx/testMode'; // TEST-BUTTONS
 
 // -----------------------------------------------
@@ -94,11 +94,11 @@ export function water(save: FarmSave, now: number): number {
 /** Whether an hourglass would gain time on this machine or pen. */
 export function canHurry(object: PlacedObject, now: number): boolean {
   if (object.queue) return object.queue.some((j) => j.readyAt > now);
-  if (object.animals) return object.animals.some((t) => t !== HUNGRY && t > now);
+  if (object.animals) return mealReadyAt(object, now) !== null;
   return false;
 }
 
-/** Hourglass: an hour less on what runs in a machine (its whole queue moves up) or in a pen (every busy animal). */
+/** Hourglass: an hour less on what runs in a machine (its whole queue moves up) or in a pen (its meal). */
 export function hurry(save: FarmSave, object: PlacedObject, now: number): boolean {
   if (!canHurry(object, now) || !use(save, 'hourglass')) return false;
   const cut = HOURGLASS_MINUTES * MINUTE_MS;
@@ -107,6 +107,6 @@ export function hurry(save: FarmSave, object: PlacedObject, now: number): boolea
     const shift = Math.min(cut, running[0].readyAt - now);
     for (const job of running) job.readyAt -= shift;
   }
-  if (object.animals) object.animals = object.animals.map((t) => (t !== HUNGRY && t > now ? Math.max(now, t - cut) : t));
+  if (object.animals) object.readyAt = Math.max(now, object.readyAt! - cut);
   return true;
 }

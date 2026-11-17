@@ -18,6 +18,15 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-17-ferme',
+    date: '17 novembre',
+    news: [
+      '🐔 Un seul repas par enclos : toutes les bêtes mangent et produisent en même temps.',
+      '✨ Les races rares s’enfilent comme des costumes : touche un enclos et choisis quelle bête porte quelle race, plus besoin d’un nouvel enclos.',
+      '🌾 Le moulin fait 2 farines à la fois, et le puits, la balançoire et la fontaine ne prennent plus que 2 cases.',
+    ],
+  },
+  {
     id: '2026-11-16-grand-lot-decos',
     date: '16 novembre',
     news: [

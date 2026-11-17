@@ -30,8 +30,8 @@ import {
   buyAndPlace, buyRefusal, capOf, decorShopList, ensureCart, priceOf, canPerch, canStand, ensureMailbox, footprint, freePerchNear, freeSpotNear, gateTile, isOwned, isRoad, moveObject, newFarm, objectAt, storeObject,
 } from '../src/games/farm/farmMap';
 import { CART_BACK_MINUTES, averageOrderNuts, deliverCart, orderable, refillCart, rollOrder } from '../src/games/farm/farmOrders';
-import { deliverMail, isPrizeOpen, openParcel } from '../src/games/farm/farmParcels';
-import { breedsOf, buyAnimal, collectMachine, collectPen, collectTree, feedPen, harvest, queueRecipe, sow } from '../src/games/farm/farmProduction';
+import { deliverMail, hasRareLooks, isPrizeOpen, openParcel, restyleAnimal, welcomeBreed } from '../src/games/farm/farmParcels';
+import { buyAnimal, collectMachine, collectPen, collectTree, feedPen, harvest, hungryAnimals, queueRecipe, sow } from '../src/games/farm/farmProduction';
 import { loadFarm, saveFarm, type FarmSave } from '../src/games/farm/farmSave';
 import { joinIndex, joinMask, nextSkin, restyleRun, skinOf } from '../src/games/farm/farmJoins';
 import { JOIN_EAST, JOIN_WEST } from '../src/games/farm/data/skins';
@@ -143,14 +143,83 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   const coop = placeAnywhere(farm, 'coop')!;
   buyAnimal(farm, coop);
   buyAnimal(farm, coop);
-  check('animals and their breeds stay side by side', breedsOf(coop).length === coop.animals!.length && coop.breeds!.length === coop.animals!.length);
+  farm.stock = { chickenFeed: 10 };
   const fed = feedPen(farm, coop, now);
   const eggs = collectPen(farm, coop, now + 20 * MINUTE_MS);
   check('hens eat, then lay', fed === 2 && eggs?.count === 2);
+
+  // One meal, one timer (Eloise, 17/11): a late hen or a missing feed waits for the next meal, the pen never splits.
+  feedPen(farm, coop, now);
+  buyAnimal(farm, coop);
+  check('a hen bought during a meal cannot be fed', feedPen(farm, coop, now + MINUTE_MS) === 0 && hungryAnimals(coop) === 0);
+  check('the meal gives only the hens that ate', collectPen(farm, coop, now + 20 * MINUTE_MS)?.count === 2 && hungryAnimals(coop) === 3);
+  farm.stock = { chickenFeed: 2 };
+  check('short of feed, the first hens eat and the rest wait', feedPen(farm, coop, now) === 2 && hungryAnimals(coop) === 0);
+  check('nothing is ready before the meal is over', collectPen(farm, coop, now + 19 * MINUTE_MS) === null);
+  farm.stock = { chickenFeed: 3 };
+  collectPen(farm, coop, now + 20 * MINUTE_MS);
+  feedPen(farm, coop, now + 21 * MINUTE_MS);
+  check('the next meal takes the whole pen at once', collectPen(farm, coop, now + 41 * MINUTE_MS)?.count === 3);
 }
 
 // -----------------------------------------------
-// PARCELS: the pity rule holds, the rarities come out near their weights, breeds stay aligned
+// PENS FROM VERSION 3: one timer per animal becomes one meal per pen
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  const old = JSON.parse(JSON.stringify(farm)) as Record<string, unknown>;
+  const late = now + 12 * MINUTE_MS;
+  (old.objects as unknown[]).push({ uid: 9000, type: 'coop', x: 1, y: 1, rot: 0, animals: [now + 10 * MINUTE_MS, -1, late], breeds: [null, 'goldenHen', null] });
+  store.set('mini-jeux.save', JSON.stringify({ app: 'mini-jeux', version: 1, games: { farm: { ...old, version: 3 } } }));
+  const coop = loadFarm()!.objects.find((o) => o.uid === 9000)!;
+  check('an old pen keeps its animals and breeds, the eating ones first', JSON.stringify(coop.animals) === JSON.stringify([null, null, 'goldenHen']), JSON.stringify(coop.animals));
+  check('an old pen shares one meal, ready with its last animal', coop.fed === 2 && coop.readyAt === late);
+}
+
+// -----------------------------------------------
+// TALL DECORATIONS FROM VERSION 4: on their base row, drawn where they were
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  const old = JSON.parse(JSON.stringify(farm)) as Record<string, unknown>;
+  (old.objects as unknown[]).push({ uid: 9100, type: 'well', x: 3, y: 4, rot: 1 }, { uid: 9101, type: 'flowerPot', x: 3, y: 4, rot: 0, on: 9100 });
+  store.set('mini-jeux.save', JSON.stringify({ app: 'mini-jeux', version: 1, games: { farm: { ...old, version: 4 } } }));
+  const back = loadFarm()!;
+  const well = back.objects.find((o) => o.uid === 9100)!;
+  const pot = back.objects.find((o) => o.uid === 9101);
+  check('an old well stands on its bottom row', well.y === 5 && JSON.stringify(footprint(well)) === '[2,1]');
+  check('what sat on the well stays on it', pot?.on === 9100 && pot.y === well.y);
+  saveFarm(back);
+  check('the well moves down only once', loadFarm()!.objects.find((o) => o.uid === 9100)!.y === 5);
+}
+
+// -----------------------------------------------
+// RARE LOOKS (Flo, 17/11): a breed found in a parcel dresses one animal of a full pen, and comes back when taken off
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.level = 8;
+  farm.nuts = 100_000;
+  const coop = placeAnywhere(farm, 'coop')!;
+  for (let i = 0; i < 6; i++) buyAnimal(farm, coop);
+  check('a full pen leaves a found breed waiting', !welcomeBreed(farm, 'goldenHen') && farm.waitingBreeds.join() === 'goldenHen');
+  check('with a breed of its kind, the pen shows looks', hasRareLooks(farm, coop));
+  check('a plain hen puts on the waiting breed', restyleAnimal(farm, coop, 2) === 'goldenHen' && coop.animals![2] === 'goldenHen' && farm.waitingBreeds.length === 0);
+  check('the breed dresses one hen only', restyleAnimal(farm, coop, 3) === undefined && coop.animals![3] === null);
+  check('taking it off gives it back', restyleAnimal(farm, coop, 2) === null && farm.waitingBreeds.join() === 'goldenHen');
+  restyleAnimal(farm, coop, 4);
+  farm.stock = { chickenFeed: 6 };
+  feedPen(farm, coop, now);
+  const eggs = collectPen(farm, coop, now + 20 * MINUTE_MS, () => 0);
+  check('the worn breed gives its bonus', eggs?.count === 7, `${eggs?.count} eggs`);
+  const cows = placeAnywhere(farm, 'coop')!;
+  cows.type = 'cowshed';
+  cows.animals = [null];
+  check('a hen breed is no look for a cow', !hasRareLooks(farm, cows) && restyleAnimal(farm, cows, 0) === undefined);
+}
+
+// -----------------------------------------------
+// PARCELS: the pity rule holds, the rarities come out near their weights, rare animals join their pen
 // -----------------------------------------------
 {
   const farm: FarmSave = newFarm(now);
@@ -171,7 +240,7 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   check(`never more than ${PITY - 1} plain parcels in a row`, worstRun <= PITY - 1, `worst run ${worstRun}`);
   check('rarities near their weights', seen.common / 3000 > 0.5 && seen.common / 3000 < 0.66 && (seen.legendary ?? 0) > 20, JSON.stringify(seen));
   const pen = farm.objects.find((o) => o.type === 'coop')!;
-  check('rare hens stay aligned with their breeds', breedsOf(pen).length === pen.animals!.length && pen.breeds!.length === pen.animals!.length);
+  check('rare hens join their pen', pen.animals!.some((b) => b !== null) && pen.animals!.length <= 6);
   check('the album only holds treasures, once each', new Set(farm.album).size === farm.album.length && farm.album.length <= TREASURES.length);
 
   const box = newFarm(now);
@@ -467,11 +536,11 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
           const kind = ANIMALS.find((a) => a.id === o.own);
           if (kind) {
             let pen = farm.objects.find((x) => x.type === kind.pen);
-            if (!pen) farm.objects.push((pen = { uid: farm.nextUid++, type: kind.pen, x: 0, y: 0, rot: 0, animals: [], breeds: [] }));
-            while ((pen.animals?.length ?? 0) < o.count) pen.animals!.push(-1);
+            if (!pen) farm.objects.push((pen = { uid: farm.nextUid++, type: kind.pen, x: 0, y: 0, rot: 0, animals: [] }));
+            while ((pen.animals?.length ?? 0) < o.count) pen.animals!.push(null);
           } else if (!farm.objects.some((x) => x.type === o.own)) {
             const pen = placeable(o.own as PlaceableId).kind === 'pen';
-            farm.objects.push({ uid: farm.nextUid++, type: o.own as PlaceableId, x: 0, y: 0, rot: 0, ...(pen ? { animals: [], breeds: [] } : { queue: [], slots: 2 }) });
+            farm.objects.push({ uid: farm.nextUid++, type: o.own as PlaceableId, x: 0, y: 0, rot: 0, ...(pen ? { animals: [] } : { queue: [], slots: 2 }) });
           }
         }
         if (!claimQuest(farm, q.id)) stuck.push(`${q.id} niv ${level}`);

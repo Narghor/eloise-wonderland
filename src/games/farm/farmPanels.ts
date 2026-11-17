@@ -1,7 +1,7 @@
 import { el } from '../../dom';
-import { ANIMALS, PEN_CAPACITY, animal } from './data/animals';
+import { ANIMALS, PEN_CAPACITY } from './data/animals';
 import { BREED_IDS, PITY, TREASURES, breed, rarityName } from './data/parcels';
-import { placeableBreeds } from './farmParcels';
+import { hasRareLooks, placeableBreeds, waitingBreedHint } from './farmParcels';
 import { BOOSTERS, booster } from './data/boosters';
 import { CROPS, crop } from './data/crops';
 import { DAILY_TASKS, dailyChestReward, dailyTaskReward } from './data/daily';
@@ -19,10 +19,11 @@ import type { SheetId } from './farmHud';
 import { buyRefusal, capOf, decorShopList, parcelOffers, priceOf, type ParcelOffer } from './farmMap';
 import { canDeliver } from './farmOrders';
 import {
+  animalsLeftOut,
   fieldState,
   hungryAnimals,
   machineRecipes,
-  nextAnimalAt,
+  mealReadyAt,
   nextAnimalPrice,
   nextSlotPrice,
   penAnimal,
@@ -87,6 +88,7 @@ export interface FarmUi {
   sell(itemId: ItemId, count: number): void;
   buyBooster(id: BoosterId): void;
   placeBreed(id: BreedId): void;
+  restyleAnimal(pen: PlacedObject, index: number): void;
   /** Sheets remember a chosen item (the barn) between refreshes. */
   sheetState: { barnItem: ItemId | null };
 }
@@ -235,14 +237,16 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
   const count = pen.animals!.length;
   const ready = readyAnimals(pen, now);
   const hungry = hungryAnimals(pen);
-  const next = nextAnimalAt(pen, now);
+  const next = mealReadyAt(pen, now);
+  const leftOut = animalsLeftOut(pen);
   const feed = have(ui.save, a.feed);
   const capacity = PEN_CAPACITY[pen.type as PenId];
   const lines: HTMLElement[] = [];
   if (count === 0) lines.push(el('p', { text: `Pas encore de ${a.plural.toLowerCase()} ici : adoptes-en ${a.feminine ? 'une' : 'un'} !` }));
   if (ready > 0) lines.push(line(itemIcon(a.product), `${itemCount(a.product, ready)} à ramasser`, '', 'ok'));
-  if (hungry > 0) lines.push(line(itemIcon(a.feed), `${hungry} ${hungry > 1 ? 'ont' : 'a'} faim`, `${feed} en grange`, feed > 0 ? 'ok' : 'missing'));
+  if (hungry > 0) lines.push(line(itemIcon(a.feed), `${hungry} ${hungry > 1 ? 'ont' : 'a'} faim`, `${feed} en grange`, feed >= hungry ? 'ok' : 'missing'));
   if (next !== null) lines.push(line(itemIcon(a.product), item(a.product).name, timeLeft(next, now)));
+  if (leftOut > 0) lines.push(line(itemIcon(a.feed), `${leftOut} ${leftOut > 1 ? 'mangeront' : 'mangera'} au prochain repas`, ''));
   const room = capacity - count;
   const animalPrice = nextAnimalPrice(ui.save, pen);
   const actions = el('div', { class: 'farm-row' });
@@ -250,13 +254,36 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
   if (hungry > 0) actions.append(button([img(itemIcon(a.feed)), 'Nourrir'], () => ui.feed(pen), { disabled: feed === 0 }));
   if (room > 0) actions.append(button([`+ 1 ${a.name.toLowerCase()} · ${animalPrice}`, nut(1)], () => ui.buyAnimal(pen), { ghost: true, disabled: ui.save.nuts < animalPrice }));
   if (canHurry(pen, now)) actions.append(button([img(boosterIcon('hourglass')), `Sablier (${ui.save.boosters.hourglass})`], () => ui.useBooster('hourglass', pen), { ghost: true, disabled: ui.save.boosters.hourglass === 0 }));
-  const recipe = feed === 0 && hungry > 0 ? el('p', { text: `Les ${item(a.feed).plural.toLowerCase()} se font à la Cookiterie.` }) : null;
+  const recipe =
+    hungry > 0 && feed < hungry
+      ? el('p', {
+          text:
+            feed === 0
+              ? `Les ${item(a.feed).plural.toLowerCase()} se font à la Cookiterie.`
+              : `Il manque ${itemCount(a.feed, hungry - feed)} : les autres mangeront au prochain repas.`,
+        })
+      : null;
   return [
     el('h3', { text: `${placeable(pen.type).name} · ${count} / ${capacity} ${a.plural.toLowerCase()}` }),
     el('div', { class: 'farm-lines' }, ...lines),
     ...(recipe ? [recipe] : []),
     actions,
+    ...(count > 0 && hasRareLooks(ui.save, pen) ? penLooks(ui, pen) : []),
   ];
+}
+
+/** The pen's animals in a row: touching one dresses it in its next look (plain, then each rare breed waiting). */
+function penLooks(ui: FarmUi, pen: PlacedObject): Node[] {
+  const a = penAnimal(pen);
+  const spare = ui.save.waitingBreeds.filter((b) => breed(b).animal === a.id).length;
+  const scale = Math.max(2, Math.floor(20 / animalSprite(a.id, 0).width));
+  const looks = pen.animals!.map((b, i) => {
+    const look = el('button', { class: `farm-look${b ? ' is-rare' : ''}`, type: 'button', 'aria-label': b ? breed(b).name : a.name }, img(b ? breedSprite(b, 0) : animalSprite(a.id, 0), scale));
+    look.addEventListener('click', () => ui.restyleAnimal(pen, i));
+    return look;
+  });
+  const note = spare > 0 ? `Touche une bête : ${spare} race${spare > 1 ? 's' : ''} à placer.` : 'Touche une bête pour changer sa race.';
+  return [el('p', { text: note }), el('div', { class: 'farm-looks' }, ...looks)];
 }
 
 /** Beyond this many recipes, a machine's bubble shows them in two columns. */
@@ -689,7 +716,7 @@ function animalsShop(ui: FarmUi): Node[] {
     return el(
       'div',
       { class: 'farm-card is-ready' },
-      el('div', { class: 'farm-who' }, img(breedSprite(id, 0), 3), el('span', {}, `${breed(id).name}${count > 1 ? ` × ${count}` : ''}`, el('small', { text: ready ? `${animal(breed(id).animal).feminine ? 'Elle' : 'Il'} t’attend : il y a de la place.` : `Il faut de la place : ${placeable(animal(breed(id).animal).pen).name}.` }))),
+      el('div', { class: 'farm-who' }, img(breedSprite(id, 0), 3), el('span', {}, `${breed(id).name}${count > 1 ? ` × ${count}` : ''}`, el('small', { text: waitingBreedHint(ui.save, id) }))),
       button(['L’installer'], () => ui.placeBreed(id), { disabled: !ready, wide: true }),
     );
   });

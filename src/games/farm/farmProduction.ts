@@ -4,9 +4,9 @@ import { item } from './data/items';
 import { MAX_QUEUE, RECIPES, queueSlotPrice, recipe, type Recipe } from './data/machines';
 import { TREE_YIELDS, isTree, placeable } from './data/placeables';
 import { breed } from './data/parcels';
-import type { BreedId, CropId, ItemId, MachineId, PenId, TreeId } from './data/types';
+import type { CropId, ItemId, MachineId, PenId, TreeId } from './data/types';
 import { MINUTE_MS } from './farmTime';
-import { HUNGRY, type FarmSave, type PlacedObject } from './farmSave';
+import type { FarmSave, PlacedObject } from './farmSave';
 import { penRoom } from './farmMap';
 import { averageOrderNuts } from './farmOrders';
 import { addItem, earn, emit, gainXp, have, hasItems, isUnlocked, ownCount, spend, takeItems } from './farmProgress';
@@ -61,25 +61,33 @@ export function harvest(save: FarmSave, field: PlacedObject, now: number): Gain 
 }
 
 // -----------------------------------------------
-// PENS: each animal eats one feed, produces, waits to be collected
+// PENS: one meal for the whole pen, one timer; each animal eats one feed and gives one product
 // -----------------------------------------------
+// An animal that finds no feed, or that arrives during a meal, waits for the next one: the pen never splits
+// into animals ready at different times.
 
 export function penAnimal(pen: PlacedObject): Animal {
   return animalOfPen(pen.type as PenId);
 }
 
+/** Products waiting in the pen: the animals of the meal, once it is over. */
 export function readyAnimals(pen: PlacedObject, now: number): number {
-  return (pen.animals ?? []).filter((t) => t !== HUNGRY && t <= now).length;
+  return pen.fed && pen.readyAt !== undefined && pen.readyAt <= now ? pen.fed : 0;
 }
 
+/** Animals waiting to be fed: all of them between two meals, none during one. */
 export function hungryAnimals(pen: PlacedObject): number {
-  return (pen.animals ?? []).filter((t) => t === HUNGRY).length;
+  return pen.fed ? 0 : (pen.animals?.length ?? 0);
 }
 
-/** When the next animal of the pen is ready, or null when none is busy. */
-export function nextAnimalAt(pen: PlacedObject, now: number): number | null {
-  const busy = (pen.animals ?? []).filter((t) => t !== HUNGRY && t > now);
-  return busy.length ? Math.min(...busy) : null;
+/** Animals left out of the running meal: they eat at the next one. */
+export function animalsLeftOut(pen: PlacedObject): number {
+  return pen.fed ? (pen.animals?.length ?? 0) - pen.fed : 0;
+}
+
+/** When the running meal is over, or null when no meal is running. */
+export function mealReadyAt(pen: PlacedObject, now: number): number | null {
+  return pen.fed && pen.readyAt !== undefined && pen.readyAt > now ? pen.readyAt : null;
 }
 
 export function nextAnimalPrice(save: FarmSave, pen: PlacedObject): number {
@@ -87,48 +95,36 @@ export function nextAnimalPrice(save: FarmSave, pen: PlacedObject): number {
   return animalPrice(a, ownCount(save, a.id));
 }
 
-/** A new animal arrives hungry. */
+/** A new animal arrives hungry: it eats at the pen's next meal. */
 export function buyAnimal(save: FarmSave, pen: PlacedObject): boolean {
   const a = penAnimal(pen);
   if (!isUnlocked(save, a.unlock) || penRoom(pen) <= 0 || !spend(save, nextAnimalPrice(save, pen))) return false;
-  pen.breeds = [...breedsOf(pen), null];
-  pen.animals!.push(HUNGRY);
+  pen.animals!.push(null);
   emit(save, { type: 'buy', target: a.id, kind: 'animal', count: 1 });
   return true;
 }
 
-/** Each animal's rare breed (null for a plain one), always as long as the pen's animals. */
-export function breedsOf(pen: PlacedObject): (BreedId | null)[] {
-  return (pen.animals ?? []).map((_, i) => pen.breeds?.[i] ?? null);
-}
-
-/** Feeds every hungry animal the barn can feed; returns how many ate. */
+/** Starts the pen's meal for every animal the barn can feed; returns how many ate (0 while a meal runs). */
 export function feedPen(save: FarmSave, pen: PlacedObject, now: number): number {
   const a = penAnimal(pen);
-  let fed = 0;
-  pen.animals = pen.animals!.map((t) => {
-    if (t !== HUNGRY || have(save, a.feed) <= 0) return t;
-    addItem(save, a.feed, -1);
-    fed++;
-    return now + a.minutes * MINUTE_MS;
-  });
-  if (fed > 0) emit(save, { type: 'feed', target: a.id, kind: 'animal', count: fed });
+  const fed = Math.min(hungryAnimals(pen), have(save, a.feed));
+  if (fed === 0) return 0;
+  addItem(save, a.feed, -fed);
+  pen.fed = fed;
+  pen.readyAt = now + a.minutes * MINUTE_MS;
+  emit(save, { type: 'feed', target: a.id, kind: 'animal', count: fed });
   return fed;
 }
 
-/** Collects every ready product (a rare animal sometimes gives one more); the animals are hungry again. */
+/** Collects the meal's products (a rare animal sometimes gives one more); the whole pen is hungry again. */
 export function collectPen(save: FarmSave, pen: PlacedObject, now: number, random: () => number = Math.random): Gain | null {
   const a = penAnimal(pen);
   const ready = readyAnimals(pen, now);
   if (ready === 0) return null;
-  const breeds = breedsOf(pen);
   let bonus = 0;
-  pen.animals = pen.animals!.map((t, i) => {
-    if (t === HUNGRY || t > now) return t;
-    const rare = breeds[i];
-    if (rare && random() < breed(rare).bonusChance) bonus++;
-    return HUNGRY;
-  });
+  for (const rare of pen.animals!.slice(0, ready)) if (rare && random() < breed(rare).bonusChance) bonus++;
+  delete pen.fed;
+  delete pen.readyAt;
   const count = ready + bonus;
   addItem(save, a.product, count);
   gainXp(save, a.xp * ready);
@@ -261,7 +257,7 @@ export function awayNews(save: FarmSave, since: number, now: number): AwayNews {
   const news: AwayNews = { fields: 0, animals: 0, machines: 0, trees: 0 };
   for (const o of save.objects) {
     if (o.type === 'field' && o.crop && within(o.readyAt)) news.fields++;
-    if (o.animals) news.animals += o.animals.filter((t) => t !== HUNGRY && within(t)).length;
+    if (o.animals && o.fed && within(o.readyAt)) news.animals += o.fed;
     if (o.queue) news.machines += o.queue.filter((j) => within(j.readyAt)).length;
     if (isTree(o.type) && within(o.readyAt)) news.trees++;
   }

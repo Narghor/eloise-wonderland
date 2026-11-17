@@ -25,7 +25,7 @@ export const RECIPES: readonly Recipe[] = [
   { item: 'goatFeed', machine: 'cookiery', unlock: atLevel(16), minutes: 20, inputs: { carrot: 3, tomato: 2 }, count: 5, xp: 1 },
   { item: 'duckFeed', machine: 'cookiery', unlock: atLevel(19), minutes: 25, inputs: { wheat: 4, blueberry: 1 }, count: 6, xp: 1 },
   { item: 'rabbitFeed', machine: 'cookiery', unlock: atLevel(23), minutes: 25, inputs: { carrot: 4, lavender: 1 }, count: 6, xp: 1 },
-  { item: 'flour', machine: 'mill', unlock: atLevel(4), minutes: 10, inputs: { wheat: 3 }, count: 1, xp: 1 },
+  { item: 'flour', machine: 'mill', unlock: atLevel(4), minutes: 10, inputs: { wheat: 6 }, count: 2, xp: 1 },
   { item: 'bread', machine: 'bakery', unlock: atLevel(4), minutes: 30, inputs: { flour: 2 }, count: 1, xp: 3 },
   { item: 'carrotPie', machine: 'bakery', unlock: atLevel(5), minutes: 45, inputs: { flour: 1, carrot: 2, egg: 1 }, count: 1, xp: 4 },
   { item: 'strawberryCake', machine: 'bakery', unlock: atLevel(9), minutes: 120, inputs: { flour: 1, egg: 2, strawberry: 3, cream: 1 }, count: 1, xp: 9 },

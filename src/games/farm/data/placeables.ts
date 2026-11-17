@@ -32,6 +32,11 @@ export interface Placeable {
   retired?: boolean;
   /** A big, very dear decoration, one per farm: where the Eloisettes go once everything else is bought (docs/ferme.md 23). */
   showpiece?: boolean;
+  /**
+   * Takes the same ground whichever way it is turned: a tall piece on its base row (a well, a swing), its drawing
+   * rising over the tiles behind, as a tree's foliage does.
+   */
+  turnsInPlace?: boolean;
 }
 
 /** Machines and pens: their copies open with the levels (COPY_LEVELS), not with a fixed count. */
@@ -82,7 +87,7 @@ export const PLACEABLES: readonly Placeable[] = [
   deco('scarecrow', 'Épouvantail', [1, 1], 30, 3),
   deco('flowersWhite', 'Parterre de marguerites', [1, 1], 12, 4),
   { ...deco('bench', 'Banc', [2, 1], 40, 4), carries: true },
-  { ...deco('well', 'Puits', [2, 2], 120, 5), carries: true },
+  { ...deco('well', 'Puits', [2, 1], 120, 5), carries: true, turnsInPlace: true },
   { ...deco('logPile', 'Tas de bûches', [2, 1], 25, 5), carries: true },
   deco('wheelbarrow', 'Brouette', [1, 1], 35, 6),
   // The decorative apple tree became the fruit tree 'apple' (lot 2): placed ones turn into it on load.
@@ -137,8 +142,8 @@ export const PLACEABLES: readonly Placeable[] = [
   treasure('hayBales', 'Bottes de foin', [2, 1], 60),
   treasure('teaTable', 'Table à thé', [1, 1], 60),
   treasure('flowerArch', 'Arche fleurie', [2, 1], 150),
-  treasure('swing', 'Balançoire', [2, 2], 150),
-  treasure('fountain', 'Fontaine dorée', [2, 2], 400),
+  { ...treasure('swing', 'Balançoire', [2, 1], 150), turnsInPlace: true },
+  { ...treasure('fountain', 'Fontaine dorée', [2, 1], 400), turnsInPlace: true },
 ];
 
 export const PLACEABLE_IDS = PLACEABLES.map((p) => p.id);

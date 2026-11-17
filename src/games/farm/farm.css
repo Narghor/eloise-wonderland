@@ -931,6 +931,30 @@
   margin: 0;
 }
 
+/* A pen's animals, each one a button that changes its look. */
+.farm-looks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.farm-look {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 2px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-soft);
+  cursor: pointer;
+}
+
+.farm-look.is-rare {
+  border-color: #f2b632;
+  background: #fff8dc;
+}
+
 .farm-who {
   display: flex;
   align-items: center;

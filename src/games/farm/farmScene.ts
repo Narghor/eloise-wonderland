@@ -42,7 +42,7 @@ import {
 import { footprint, gateTile, isOwned, isRoad, type ParcelOffer } from './farmMap';
 import { FarmStrollers } from './farmStrollers';
 import { FarmVillage } from './farmVillage';
-import { breedsOf, fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
+import { fieldState, hungryAnimals, penAnimal, pendingJobs, readyOn } from './farmProduction';
 import { have } from './farmProgress';
 import type { FarmSave, PlacedObject, Rotation } from './farmSave';
 import { mulberry32 } from '../../random';
@@ -1183,7 +1183,7 @@ export class FarmScene {
   /** Animals stand in the yard, so they are drawn right after their pen, front ones last. */
   private queueAnimals(pen: PlacedObject, list: { base: number; draw: () => void }[], penBase: number): void {
     const id = penAnimal(pen).id;
-    const breeds = breedsOf(pen);
+    const breeds = pen.animals ?? [];
     const flies = GAIT[id].flies;
     const now = performance.now();
     this.actorsOf(pen).forEach((a, i) => {

@@ -41,7 +41,6 @@ export function testBar(host: TestBarHost): HTMLElement {
       const now = Date.now();
       for (const o of save.objects) {
         if (o.readyAt !== undefined) o.readyAt = Math.min(o.readyAt, now);
-        if (o.animals) o.animals = o.animals.map((t) => (t >= 0 ? Math.min(t, now) : t));
         if (o.queue) for (const j of o.queue) j.readyAt = Math.min(j.readyAt, now);
       }
       save.orderWaits = save.orderWaits.map(() => now);

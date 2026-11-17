@@ -201,7 +201,7 @@ function places(o: PlacedObject): Place[] {
       const water = { x: left + 16, y: bottom - 10 };
       const rim = [0, 1].map((i): Place => ({
         index: i,
-        tiles: i ? [[o.x + 1, o.y + 2], [o.x + 2, o.y + 1]] : [[o.x, o.y + 2], [o.x - 1, o.y + 1]],
+        tiles: i ? [[o.x + 1, o.y + h], [o.x + w, o.y + h - 1]] : [[o.x, o.y + h], [o.x - 1, o.y + h - 1]],
         point: { x: left + (i ? 23 : 9), y: bottom + 1 },
         view: 'front',
         face: 1,
@@ -223,7 +223,7 @@ function places(o: PlacedObject): Place[] {
       const water = { x: left + (mirrored ? 15 : 16), y: bottom - 13 };
       const crank: Place = {
         index: 0,
-        tiles: east ? [[o.x + 2, o.y + 1], [o.x + 2, o.y]] : [[o.x - 1, o.y + 1], [o.x - 1, o.y]],
+        tiles: east ? [[o.x + w, o.y + h - 1], [o.x + w, o.y + h - 2]] : [[o.x - 1, o.y + h - 1], [o.x - 1, o.y + h - 2]],
         point: { x: hub.x + (east ? 6 : -6), y: bottom - 6 },
         view: 'side',
         face: east ? -1 : 1,
@@ -237,7 +237,7 @@ function places(o: PlacedObject): Place[] {
       // Leaning over the rim from the front, the back to us.
       const lean = [0, 1].map((i): Place => ({
         index: 1 + i,
-        tiles: [[o.x + i, o.y + 2]],
+        tiles: [[o.x + i, o.y + h]],
         point: { x: left + (i ? 20 : 12), y: bottom + 6 },
         view: 'back',
         face: 1,
@@ -252,7 +252,7 @@ function places(o: PlacedObject): Place[] {
     case 'swing': {
       // The drawing's top-left (30 x 40 with its outline margin), where the moving seat is stamped (swingSeatSprite).
       const drawing = { x: left, y: bottom - 41 };
-      const seatTiles: Tile[] = [[o.x, o.y + 2], [o.x + 1, o.y + 2], [o.x - 1, o.y + 1], [o.x + 2, o.y + 1]];
+      const seatTiles: Tile[] = [[o.x, o.y + h], [o.x + 1, o.y + h], [o.x - 1, o.y + h - 1], [o.x + w, o.y + h - 1]];
       if (!profile) {
         return [{ index: 0, tiles: seatTiles, point: { x: left + 16, y: bottom + 1 }, view: 'front', face: 1, lift: 16, alone: ['swingFront'], together: null, over, aim: drawing }];
       }
@@ -263,7 +263,7 @@ function places(o: PlacedObject): Place[] {
         { index: 0, tiles: seatTiles, point: { x: left + (mirrored ? 13 : 18), y: bottom + 1 }, view: 'side', face, lift: 16, alone: ['swingSide'], together: 'swingPushed', over, aim: drawing },
         {
           index: 1,
-          tiles: [mirrored ? [o.x + 2, o.y + 1] : [o.x - 1, o.y + 1]],
+          tiles: [mirrored ? [o.x + w, o.y + h - 1] : [o.x - 1, o.y + h - 1]],
           point: { x: mirrored ? left + 34 : left - 2, y: bottom - 2 },
           view: 'side',
           face,

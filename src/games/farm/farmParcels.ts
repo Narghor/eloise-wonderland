@@ -1,9 +1,9 @@
-import { PEN_CAPACITY, animal } from './data/animals';
-import { MAILBOX_SIZE, PITY, PRIZES, RARITIES, breed, type Prize } from './data/parcels';
+import { PEN_CAPACITY, animal, animalOfPen } from './data/animals';
+import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, breed, type Prize } from './data/parcels';
 import { charmStep } from './data/charm';
-import type { BreedId, Rarity } from './data/types';
+import type { BreedId, PenId, Rarity } from './data/types';
 import { MINUTE_MS } from './farmTime';
-import { HUNGRY, type FarmSave } from './farmSave';
+import type { FarmSave, PlacedObject } from './farmSave';
 import { charm, emit, isUnlocked, pay } from './farmProgress';
 
 // -----------------------------------------------
@@ -96,8 +96,7 @@ export function welcomeBreed(save: FarmSave, id: BreedId): boolean {
     save.waitingBreeds.push(id);
     return false;
   }
-  pen.animals!.push(HUNGRY);
-  pen.breeds = [...(pen.breeds ?? pen.animals!.slice(0, -1).map(() => null)), id];
+  pen.animals!.push(id);
   return true;
 }
 
@@ -107,6 +106,40 @@ export function placeableBreeds(save: FarmSave): BreedId[] {
     const kind = animal(breed(id).animal);
     return isUnlocked(save, kind.unlock) && save.objects.some((o) => o.type === kind.pen && (o.animals?.length ?? 0) < PEN_CAPACITY[kind.pen]);
   });
+}
+
+/** Whether the pen's animals have looks to choose: a rare breed of their kind worn here or waiting to be worn. */
+export function hasRareLooks(save: FarmSave, pen: PlacedObject): boolean {
+  const kind = animalOfPen(pen.type as PenId).id;
+  return [...save.waitingBreeds, ...(pen.animals ?? [])].some((b) => b !== null && breed(b).animal === kind);
+}
+
+/**
+ * Dresses an animal of the pen in its next look: plain, then each rare breed of its kind still waiting (found in a
+ * parcel, worn by no animal). The look it wore goes back to the waiting ones; a breed found once dresses one animal.
+ * Returns the new look, or undefined when there is no other look to wear.
+ */
+export function restyleAnimal(save: FarmSave, pen: PlacedObject, index: number): BreedId | null | undefined {
+  const animals = pen.animals!;
+  if (index < 0 || index >= animals.length) return undefined;
+  const kind = animalOfPen(pen.type as PenId).id;
+  const worn = animals[index];
+  const looks: (BreedId | null)[] = [null, ...BREEDS.filter((b) => b.animal === kind && (b.id === worn || save.waitingBreeds.includes(b.id))).map((b) => b.id)];
+  if (looks.length === 1) return undefined;
+  const next = looks[(looks.indexOf(worn) + 1) % looks.length];
+  if (next !== null) save.waitingBreeds.splice(save.waitingBreeds.indexOf(next), 1);
+  if (worn !== null) save.waitingBreeds.push(worn);
+  animals[index] = next;
+  return next;
+}
+
+/** What to do with a rare animal waiting: settle it where there is room, else dress an animal of its kind, else build. */
+export function waitingBreedHint(save: FarmSave, id: BreedId): string {
+  const kind = animal(breed(id).animal);
+  const she = kind.feminine ? 'Elle' : 'Il';
+  if (placeableBreeds(save).includes(id)) return `${she} t’attend : il y a de la place.`;
+  if (!save.objects.some((o) => o.type === kind.pen && (o.animals?.length ?? 0) > 0)) return `${she} t’attend : il faut d’abord des ${kind.plural.toLowerCase()} sur la ferme.`;
+  return `Pour habiller ${kind.feminine ? 'une' : 'un'} de tes ${kind.plural.toLowerCase()}, touche son enclos.`;
 }
 
 /** Moves a waiting rare animal into its pen. */

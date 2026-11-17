@@ -39,10 +39,11 @@ export function isOwned(save: FarmSave, x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE && save.parcels.includes(parcelOf(x, y));
 }
 
-/** Width and height on the map: a quarter turn swaps them. */
+/** Width and height on the map: a quarter turn swaps them, unless the piece turns in place. */
 export function footprint(o: Pick<PlacedObject, 'type' | 'rot'>): [number, number] {
-  const [w, h] = placeable(o.type).size;
-  return o.rot % 2 === 1 ? [h, w] : [w, h];
+  const p = placeable(o.type);
+  const [w, h] = p.size;
+  return o.rot % 2 === 1 && !p.turnsInPlace ? [h, w] : [w, h];
 }
 
 /** What stands on the ground of a tile; a decoration sitting on another takes no tile. */
@@ -164,10 +165,7 @@ function newObject(save: FarmSave, id: PlaceableId, x: number, y: number, rot: R
     const skin = chosenSkin(save, p.joins);
     if (skin) object.skin = skin;
   }
-  if (p.kind === 'pen') {
-    object.animals = [];
-    object.breeds = [];
-  }
+  if (p.kind === 'pen') object.animals = [];
   if (p.kind === 'machine') {
     object.queue = [];
     object.slots = STARTING_QUEUE;

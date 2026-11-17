@@ -42,7 +42,7 @@ import {
   treeBubble,
   type FarmUi,
 } from './farmPanels';
-import { deliverMail, placeWaitingBreed } from './farmParcels';
+import { deliverMail, placeWaitingBreed, restyleAnimal } from './farmParcels';
 import {
   awayNews,
   buyAnimal,
@@ -366,7 +366,9 @@ class FarmScreen implements FarmUi {
     if (kind === 'pen') {
       this.scene.cheer(target);
       if (readyAnimals(target, now) > 0) return this.collect(target);
-      if (hungryAnimals(target) > 0 && have(this.save, penAnimal(target).feed) > 0 && this.bubble?.target !== target) return this.feed(target);
+      // A touch feeds at once only when the whole pen eats: short of feed, the bubble says who would wait a meal.
+      const hungry = hungryAnimals(target);
+      if (hungry > 0 && have(this.save, penAnimal(target).feed) >= hungry && this.bubble?.target !== target) return this.feed(target);
       return this.openBubble(target);
     }
     if (kind === 'machine' && trayJobs(target, now) > 0 && this.bubble?.target !== target) return this.collect(target);
@@ -782,6 +784,16 @@ class FarmScreen implements FarmUi {
     if (!placeWaitingBreed(this.save, id)) return this.toast(kind.feminine ? 'Pas encore de place pour elle.' : 'Pas encore de place pour lui.');
     CRIES[kind.id]();
     this.toast(`${breed(id).name} s’installe dans son enclos !`);
+    this.commit();
+  }
+
+  /** An animal of the pen changes its look: plain, then each rare breed waiting to be worn. */
+  restyleAnimal(pen: PlacedObject, index: number): void {
+    const look = restyleAnimal(this.save, pen, index);
+    if (look === undefined) return;
+    const kind = penAnimal(pen);
+    CRIES[kind.id]();
+    this.toast(look ? `${breed(look).name} !` : `${kind.name} ordinaire.`);
     this.commit();
   }
 }
