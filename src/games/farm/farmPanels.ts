@@ -626,10 +626,12 @@ function shopCard(ui: FarmUi, p: Placeable, onBuy: () => void, extra?: string): 
   if (stored > 0) foot = el('span', { class: 'farm-price', text: `${stored} rangée${stored > 1 ? 's' : ''}` });
   else if (refusal === 'locked') foot = el('span', { class: 'farm-price' }, img(uiIcon('lock'), 1), unlockText(p.unlock));
   else if (refusal === 'max') {
-    const text = p.kind === 'field' ? `${capOf(ui.save, p)} max au niv. ${ui.save.level}` : nextCopy ? `${own + 1}e au niv. ${nextCopy}` : 'déjà là';
+    const text = p.kind === 'field' ? `${capOf(ui.save, p)} max au niv. ${ui.save.level}` : nextCopy ? `prochain au niv. ${nextCopy}` : 'déjà là';
     foot = el('span', { class: 'farm-price', text });
   } else foot = price(priceOf(ui.save, p), refusal === 'nuts');
-  const card = el('button', { class: `farm-item${refusal === 'locked' && stored === 0 ? ' is-locked' : ''}`, type: 'button' }, placeableArt(p.id), el('span', { text: p.name }), ...(extra ? [el('small', { class: 'farm-note', text: extra })] : []), foot);
+  // Dimmed when nothing can be bought now (locked or at the cap): only what can be bought stands out.
+  const shut = stored === 0 && (refusal === 'locked' || refusal === 'max');
+  const card = el('button', { class: `farm-item${shut ? ' is-locked' : ''}`, type: 'button' }, placeableArt(p.id), el('span', { text: p.name }), ...(extra ? [el('small', { class: 'farm-note', text: extra })] : []), foot);
   card.addEventListener('click', () => {
     if (stored > 0 || refusal === null) onBuy();
     else if (refusal === 'nuts') ui.toast(`Il te manque ${priceOf(ui.save, p) - ui.save.nuts} Éloisettes.`);
@@ -647,7 +649,7 @@ function buildingsShop(ui: FarmUi): Node[] {
   const list = PLACEABLES.filter((p) => p.kind === 'field' || p.kind === 'machine' || p.kind === 'pen' || p.kind === 'tree').sort((a, b) => baseLevel(a) - baseLevel(b));
   const fields = ownCount(ui.save, 'field');
   return [
-    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), p.kind === 'field' ? `${fields} / ${capOf(ui.save, p)}` : p.kind === 'tree' ? `${ownCount(ui.save, p.id)} / ${p.maxCount}` : hasCopies(p) && ownCount(ui.save, p.id) > 0 ? `${ownCount(ui.save, p.id)} sur ta ferme` : undefined))),
+    el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), p.kind === 'field' ? `${fields} / ${capOf(ui.save, p)}` : !isUnlocked(ui.save, p.unlock) ? undefined : p.kind === 'tree' ? `${ownCount(ui.save, p.id)} / ${p.maxCount}` : hasCopies(p) ? `${ownCount(ui.save, p.id)} / ${capOf(ui.save, p)}` : undefined))),
     el('p', { class: 'farm-note', text: 'Les terrains autour de la ferme s’achètent sur leur panneau.' }),
   ];
 }

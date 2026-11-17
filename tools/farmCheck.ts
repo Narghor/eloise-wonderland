@@ -341,6 +341,7 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   /** The level from which an item can be had: its crop, its animal, its recipe (machine included) or its tree. */
   const itemLevel = new Map<string, number>();
   for (const c of CROPS) itemLevel.set(c.id, levelOf(c.unlock));
+  check('the crops are listed in the order they open', CROPS.every((c, i) => i === 0 || levelOf(CROPS[i - 1].unlock) <= levelOf(c.unlock)));
   for (const a of ANIMALS) itemLevel.set(a.product, Math.max(levelOf(a.unlock), levelOf(placeable(a.pen).unlock)));
   for (const [id, y] of Object.entries(TREE_YIELDS)) if ('item' in y.gives) itemLevel.set(y.gives.item, levelOf(placeable(id as TreeId).unlock));
   for (const r of RECIPES) itemLevel.set(r.item, Math.max(levelOf(r.unlock), levelOf(placeable(r.machine).unlock)));

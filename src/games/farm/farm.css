@@ -1073,6 +1073,10 @@
   font-size: 14px;
 }
 
+.farm-item.is-locked {
+  opacity: 0.55;
+}
+
 .farm-item.is-chosen {
   border-color: var(--ui-accent);
 }
