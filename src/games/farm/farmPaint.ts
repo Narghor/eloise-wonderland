@@ -176,6 +176,25 @@ export const ROOF_RED: Tones = ['#f6a98a', '#de7a5c', '#bb5a42', '#9c4634'];
 export const ROOF_BLUE: Tones = ['#a4c8ee', '#6a98cc', '#4f78ab', '#3d5f8c'];
 export const ROOF_BROWN: Tones = ['#c39064', '#9a6644', '#7a4c31', '#5e3824'];
 export const ROOF_SLATE: Tones = ['#a08b8b', '#7a6666', '#5e4d4d', '#463939'];
+export const ROOF_PINK: Tones = ['#fbc4d2', '#ec94ac', '#cc6e8a', '#a8526c'];
+export const ROOF_TEAL: Tones = ['#a6dfd3', '#62b3a4', '#468f83', '#356f66'];
+export const ROOF_MOSS: Tones = ['#c2e08a', '#86b350', '#64903a', '#4a6d2b'];
+export const ROOF_SKY: Tones = ['#d8ecfb', '#9cc8ef', '#78a8d6', '#5a88b8'];
+export const ROOF_MUSTARD: Tones = ['#f8dc86', '#e0ae46', '#bb8a2e', '#946a22'];
+export const ROOF_CHOCO: Tones = ['#a87563', '#7b4a3c', '#5f362c', '#47271f'];
+export const ROOF_LAVENDER: Tones = ['#dccaf2', '#ab8fd8', '#8a6dbb', '#6a5199'];
+export const ROOF_BRETON: Tones = ['#9aa8b6', '#66768a', '#4c5a6c', '#38434f'];
+export const ROOF_SAGE: Tones = ['#c8e3a6', '#93c06f', '#6f9c52', '#557d3e'];
+export const THATCH: Tones = ['#f7e6a8', '#e2c472', '#c4a052', '#9a7a38'];
+export const THATCH_SHEEPFOLD: Tones = ['#f7e3a6', '#e3c271', '#c69f52', '#a07c3a'];
+export const MILL_CAP: Tones = ['#c07b55', '#9a5b3f', '#7d4630', '#6a3a27'];
+/** The cowshed's planks: the barn's own colour, so a building style repaints it like a roof. */
+export const BARN_RED: Tones = ['#e06a5f', '#c9483f', '#b33f37', '#a5372f'];
+/** Every roof's tones: a building style repaints these colours. A new roof joins this list. */
+export const ROOF_TONES: readonly Tones[] = [
+  ROOF_RED, ROOF_BLUE, ROOF_BROWN, ROOF_SLATE, ROOF_PINK, ROOF_TEAL, ROOF_MOSS, ROOF_SKY, ROOF_MUSTARD, ROOF_CHOCO,
+  ROOF_LAVENDER, ROOF_BRETON, ROOF_SAGE, THATCH, THATCH_SHEEPFOLD, MILL_CAP, BARN_RED,
+];
 export const DOOR: Tones = ['#c08657', '#a46c46', '#8d5a3c', '#6b4430'];
 export const DOOR_BLUE: Tones = ['#a4c8ee', '#5b86b8', '#45699a', '#2f4f78'];
 export const TIMBER = '#7a4b33';
@@ -339,7 +358,6 @@ export function planks(P: Painter, x: number, y: number, w: number, h: number): 
 // COOKIES: the Cookiterie and every animal's food
 // -----------------------------------------------
 
-export const ROOF_PINK: Tones = ['#fbc4d2', '#ec94ac', '#cc6e8a', '#a8526c'];
 export const COOKIE = { light: '#f6d29a', base: '#e3ab66', dark: '#b9773f', chip: '#6b3e26' };
 
 /** A big round cookie, its chips, a glint top left. */

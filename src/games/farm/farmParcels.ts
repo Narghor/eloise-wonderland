@@ -1,6 +1,8 @@
 import { PEN_CAPACITY, animal, animalOfPen } from './data/animals';
 import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, breed, type Prize } from './data/parcels';
 import { charmStep } from './data/charm';
+import { placeable } from './data/placeables';
+import { decorStyle } from './data/styles';
 import type { BreedId, PenId, Rarity } from './data/types';
 import { MINUTE_MS } from './farmTime';
 import type { FarmSave, PlacedObject } from './farmSave';
@@ -58,17 +60,23 @@ export function openParcel(save: FarmSave, random: () => number = Math.random): 
   else if (prize.kind === 'decor') {
     pay(save, { decor: { [prize.decor]: 1 } });
     opened.isNew = addToAlbum(save, prize.decor);
-  } else {
+  } else if (prize.kind === 'breed') {
     opened.waiting = !welcomeBreed(save, prize.breed);
     opened.isNew = addToAlbum(save, prize.breed);
-  }
+  } else opened.isNew = addToAlbum(save, prize.style);
   emit(save, { type: 'collect', target: 'parcel', kind: rarity, count: 1 });
   return opened;
 }
 
-/** A rare animal only comes once its kind is unlocked: a duck at level 3 would wait for months. */
+/**
+ * A rare animal only comes once its kind is unlocked: a duck at level 3 would wait for months. A style comes once:
+ * a second one would hold nothing. A decoration style comes once its decoration is sold: a look for nothing to wear it.
+ */
 export function isPrizeOpen(save: FarmSave, prize: Prize): boolean {
-  return prize.kind !== 'breed' || isUnlocked(save, animal(breed(prize.breed).animal).unlock);
+  if (prize.kind === 'breed') return isUnlocked(save, animal(breed(prize.breed).animal).unlock);
+  if (prize.kind === 'style') return !save.album.includes(prize.style);
+  if (prize.kind === 'decorStyle') return !save.album.includes(prize.style) && isUnlocked(save, placeable(decorStyle(prize.style).decor).unlock);
+  return true;
 }
 
 function rollRarity(atLeastRare: boolean, random: () => number): Rarity {

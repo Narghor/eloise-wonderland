@@ -1,0 +1,67 @@
+<title>Ferme : lot 3 de décos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600&display=swap">
+<style>
+  /* Layout: a garden catalogue, one card per decoration, pixel art drawn by the game's own code at x4. */
+  :root {
+    --bg: #f3f6ec;
+    --card: #ffffff;
+    --ink: #2f2a26;
+    --muted: #6d6a5f;
+    --line: #dfe5d2;
+    --accent: #4f8a3b;
+    --rare: #4a90d9;
+    --epic: #9b59d0;
+    --legendary: #c98f12;
+    --display: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+    --text: 'Nunito', system-ui, sans-serif;
+    --zoom: 4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b2018; --card: #262c22; --ink: #eef0e6; --muted: #b0b5a4; --line: #384132; --accent: #9fd27f;
+      --rare: #79b3f0; --epic: #c99af0; --legendary: #f2c94c; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b2018; --card: #262c22; --ink: #eef0e6; --muted: #b0b5a4; --line: #384132; --accent: #9fd27f;
+    --rare: #79b3f0; --epic: #c99af0; --legendary: #f2c94c; color-scheme: dark;
+  }
+  @media (max-width: 700px) { :root { --zoom: 3; } }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--text); font-size: 15px; line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 56px;
+  }
+  main { max-width: 1180px; margin: 0 auto; display: grid; gap: 44px; }
+  .intro h1 { font-family: var(--display); font-weight: 600; font-size: 2rem; margin: 0 0 6px; text-wrap: balance; }
+  .intro p { margin: 0; color: var(--muted); max-width: 64ch; }
+  section header { margin-bottom: 14px; }
+  section h2 { font-family: var(--display); font-weight: 600; font-size: 1.35rem; margin: 0 0 2px; color: var(--accent); text-wrap: balance; }
+  section header p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .pics { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  .pics.wide { gap: 14px; }
+  .shot { max-width: 100%; overflow-x: auto; }
+  .shot canvas { display: block; image-rendering: pixelated; max-width: none; border-radius: 4px; }
+  .meta h3 { font-family: var(--display); font-weight: 500; font-size: 1.05rem; margin: 0; }
+  .nums { display: flex; gap: 10px; margin: 2px 0 0; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
+  .nums span:nth-child(2) { color: var(--ink); font-weight: 600; }
+  .note { margin: 4px 0 0; font-size: 0.86rem; color: var(--muted); }
+  .chip { display: inline-block; margin: 0 0 4px; padding: 1px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--card); background: var(--tone); }
+  .variant { border-top: 4px solid var(--tone); }
+  .is-rare { --tone: var(--rare); }
+  .is-epic { --tone: var(--epic); }
+  .is-legendary { --tone: var(--legendary); }
+</style>
+<main>
+  <div class="intro">
+    <h1>Ferme : lot 3 de décos</h1>
+    <p>Tri du 18/11 : 21 décos neuves gardées (les cloches à semis sont coupées) et 11 variantes rares gardées, dessinées avec le code du jeu (×4). Reste à choisir la version du Bassin aux lotus, juste en dessous.</p>
+  </div>
+  <div id="board" style="display: grid; gap: 44px;"></div>
+</main>
+<script>/*BOARD*/</script>

@@ -70,6 +70,8 @@ export interface Glow {
   x: number;
   y: number;
   r: number;
+  /** "r, g, b" of the light; none: the warm light of a flame. */
+  tint?: string;
 }
 
 /** Where a garden decoration glows at night; empty for most. */

@@ -6,7 +6,10 @@ import { chosenSkin, lockedSkin, nextSkin, restyleRun, skinOf } from './farmJoin
 import { unlockText } from './farmProgress';
 import type { PlaceableId } from './data/types';
 import { spriteImage, uiIcon } from './farmArt';
+import type { FarmDialogs } from './farmDialogs';
 import type { FarmHud } from './farmHud';
+import { styleCard } from './farmStylePicker';
+import { hasStyles } from './farmStyles';
 import {
   buyAndPlace, buyRefusal, canMove, canPerch, canStand, canStore, carriedBy, footprint, freePerchNear, freeSpotNear, moveObject, perchAt, storeObject,
 } from './farmMap';
@@ -28,6 +31,7 @@ export interface EditorHost {
   readonly scene: FarmScene;
   readonly hud: FarmHud;
   readonly overlay: HTMLElement;
+  readonly dialogs: FarmDialogs;
   toast(text: string): void;
   commit(): void;
   /** Closes the bubble, the seed row and the sheet: editing takes the whole screen. */
@@ -219,6 +223,7 @@ export class FarmEditor {
         });
         buttons.push(store);
       }
+      if (object && hasStyles(object.type)) buttons.push(this.styleCardButton(object, ghost));
       const ok = el('button', { class: 'farm-btn', type: 'button' }, spriteImage(uiIcon('check'), 2), 'OK');
       ok.addEventListener('click', () => this.applySelection());
       buttons.push(ok);
@@ -264,6 +269,22 @@ export class FarmEditor {
     return button;
   }
 
+  /** A machine, a pen or a decoration that has styles: its styles to look at, wear or buy (farmStylePicker). */
+  private styleCardButton(object: PlacedObject, ghost: Ghost): HTMLElement {
+    const { host } = this;
+    const button = el('button', { class: 'farm-btn is-ghost', type: 'button' }, spriteImage(uiIcon('brush'), 2), 'Style');
+    button.addEventListener('click', () => {
+      host.dialogs.show(() =>
+        styleCard(host.save, object, () => {
+          if (object.style) ghost.style = object.style;
+          else delete ghost.style;
+          host.commit();
+        }),
+      );
+    });
+    return button;
+  }
+
   /** The hint at the top; the ways out sit lower, by the thumb (the Fini button, the ghost's Annuler). */
   private showBanner(text: string): void {
     this.banner?.remove();
@@ -279,6 +300,7 @@ export class FarmEditor {
     scene.ghost = {
       type: object.type, x: object.x, y: object.y, rot: object.rot, uid: object.uid,
       ...(worn ? { skin: worn } : {}),
+      ...(object.style ? { style: object.style } : {}),
       ...(object.on !== undefined ? { on: object.on } : {}),
     };
     scene.selected = object.uid;

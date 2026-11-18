@@ -13,8 +13,10 @@ import { QUESTS } from './data/quests';
 import { obstacle } from './data/land';
 import { orderLine, person } from './data/people';
 import { charmOf, charmStep } from './data/charm';
-import type { BoosterId, BreedId, CropId, DecorId, ItemId, ObstacleId, PenId, PlaceableId, Reward, TreeId } from './data/types';
-import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, treeSprite, itemIcon, objectSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
+import type { BoosterId, BreedId, CropId, DecorId, DecorStyleId, ItemId, ObstacleId, PenId, PlaceableId, Reward, StyleId, TreeId } from './data/types';
+import { DECOR_STYLE_IDS, STYLE_IDS, decorStyle, style } from './data/styles';
+import { STYLE_HOW } from './farmStylePicker';
+import { animalSprite, boosterIcon, breedSprite, faceSprite, parcelSprite, fieldSprite, treeSprite, itemIcon, objectSprite, spriteImage, styleShowcase, uiIcon, type Sprite } from './farmArt';
 import type { SheetId } from './farmHud';
 import { buyRefusal, capOf, decorShopList, parcelOffers, priceOf, type ParcelOffer } from './farmMap';
 import { canDeliver } from './farmOrders';
@@ -607,9 +609,19 @@ function albumSheet(ui: FarmUi): Node[] {
   const cards = TREASURES.map((t) => {
     const found = ui.save.album.includes(t.id);
     const isBreed = (BREED_IDS as readonly string[]).includes(t.id);
-    const sprite = isBreed ? breedSprite(t.id as BreedId, 0) : objectSprite(t.id as DecorId, 'face');
-    const scale = Math.max(1, Math.min(isBreed ? 4 : 3, Math.floor(56 / sprite.height)));
-    const name = isBreed ? breed(t.id as BreedId).name : placeable(t.id as DecorId).name;
+    const isStyle = (STYLE_IDS as readonly string[]).includes(t.id);
+    const isDecorStyle = (DECOR_STYLE_IDS as readonly string[]).includes(t.id);
+    // A decoration style is shown on its own decoration.
+    const sprite = isBreed ? breedSprite(t.id as BreedId, 0)
+      : isStyle ? styleShowcase(t.id as StyleId)
+      : isDecorStyle ? objectSprite(decorStyle(t.id as DecorStyleId).decor, 'face', t.id as DecorStyleId)
+      : objectSprite(t.id as DecorId, 'face');
+    // As big as the card allows, in height and in width (a bench is two tiles wide).
+    const scale = Math.max(1, Math.min(isBreed ? 4 : 3, Math.floor(56 / sprite.height), Math.floor(72 / sprite.width)));
+    const name = isBreed ? breed(t.id as BreedId).name
+      : isStyle ? `Style ${style(t.id as StyleId).name}`
+      : isDecorStyle ? decorStyle(t.id as DecorStyleId).name
+      : placeable(t.id as DecorId).name;
     return el(
       'div',
       { class: `farm-item farm-treasure is-${t.rarity}${found ? '' : ' is-missing'}` },
@@ -679,6 +691,7 @@ function buildingsShop(ui: FarmUi): Node[] {
   return [
     el('div', { class: 'farm-shop' }, ...list.map((p) => shopCard(ui, p, () => ui.startPlacing(p.id), p.kind === 'field' ? `${fields} / ${capOf(ui.save, p)}` : !isUnlocked(ui.save, p.unlock) ? undefined : p.kind === 'tree' ? `${ownCount(ui.save, p.id)} / ${p.maxCount}` : hasCopies(p) ? `${ownCount(ui.save, p.id)} / ${capOf(ui.save, p)}` : undefined))),
     el('p', { class: 'farm-note', text: 'Les terrains autour de la ferme s’achètent sur leur panneau.' }),
+    el('p', { class: 'farm-note', text: STYLE_HOW }),
   ];
 }
 

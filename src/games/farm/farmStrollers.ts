@@ -39,7 +39,7 @@ const WANDER_REACH = 12;
 /** Where everyone comes from and goes back to: down the road, as in farmVillage. */
 const ROAD_END_Y = (MAP_SIZE + 6) * TILE;
 /** Decorations along a line are not looked at: one stops before a well, not a fence. */
-const NOT_LOOKED_AT = new Set(['fence', 'hedge']);
+const NOT_LOOKED_AT = new Set(['fence', 'hedge', 'wall']);
 const STORAGE_KEY = 'farm-strollers';
 
 export type { Point };

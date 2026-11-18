@@ -3,7 +3,7 @@ import { PLAYER_AWAY_MS } from '../../wakeLock';
 import { MAP_SIZE, PARCEL, PARCELS_PER_SIDE, isWater } from './data/land';
 import { isTree, placeable } from './data/placeables';
 import { LOT2_CROP_COLOURS } from './farmArtItems';
-import type { AnimalId, CropId, ItemId, PlaceableId, SkinId } from './data/types';
+import type { AnimalId, CropId, ItemId, ObjectStyleId, PlaceableId, SkinId } from './data/types';
 import { joinIndex, joinKey, joinMask, skinOf, type JoinCell } from './farmJoins';
 import { JOIN_CARRIES } from './data/skins';
 import {
@@ -63,6 +63,8 @@ export interface Ghost {
   uid?: number;
   /** A piece that joins: the skin it wears. */
   skin?: SkinId;
+  /** A machine, a pen or a decoration: the style it wears. */
+  style?: ObjectStyleId;
   /** A decoration sitting on a support: the support's uid (the support, not the ghost's tile, says where it is). */
   on?: number;
 }
@@ -634,7 +636,7 @@ export class FarmScene {
     const view = o.rot % 2 === 1 ? 'profile' : 'face';
     // Someone on the swing: its seat is drawn with them, where it has swung to (farmStrollerActs).
     if (o.type === 'swing' && this.strollers.isSwinging(o.uid)) return swingFrameSprite(view);
-    return objectSprite(o.type, view);
+    return objectSprite(o.type, view, o.style);
   }
 
   /** What sits on each support this frame, by the support's uid; the one being moved is the ghost's to draw. */
@@ -648,24 +650,24 @@ export class FarmScene {
   private drawCarried(support: PlacedObject): void {
     const top = this.carried.get(support.uid);
     if (!top) return;
-    const place = this.perchedPlace(top.type, top.rot, support);
+    const place = this.perchedPlace(top, support);
     this.stamp(place.sprite, place.x, place.y, top.rot === 3);
   }
 
   /** A decoration sitting on `support` (an object, or the ghost moving it): its drawing and top-left world pixel. */
-  private perchedPlace(type: PlaceableId, rot: Rotation, support: PlacedObject): { sprite: Sprite; x: number; y: number } {
+  private perchedPlace({ type, rot, style }: { type: PlaceableId; rot: Rotation; style?: ObjectStyleId }, support: PlacedObject): { sprite: Sprite; x: number; y: number } {
     const base = this.spriteOf(support, 0);
     const at = this.origin(support, base);
     const seat = seatOf(support.type, support.rot % 2 === 1 ? 'profile' : 'face', skinOf(support));
     const seatX = support.rot === 3 ? base.width - 1 - seat.x : seat.x;
-    const sprite = perchedSprite(type as PercherId, rot % 2 === 1 ? 'profile' : 'face');
+    const sprite = perchedSprite(type as PercherId, rot % 2 === 1 ? 'profile' : 'face', style);
     return { sprite, x: at.x + seatX - Math.floor(sprite.width / 2), y: at.y + seat.y - sprite.height + 1 };
   }
 
   /** An object's drawing and top-left world pixel, on the ground or sitting on its support. */
   private drawnPlace(o: PlacedObject): { sprite: Sprite; x: number; y: number } {
     const support = this.supportOf(o);
-    if (support) return this.perchedPlace(o.type, o.rot, support);
+    if (support) return this.perchedPlace(o, support);
     const sprite = this.spriteOf(o, 0);
     return { sprite, ...this.origin(o, sprite) };
   }
@@ -858,15 +860,16 @@ export class FarmScene {
       ctx.globalCompositeOperation = 'lighter';
       for (const o of this.save.objects) {
         if (o.uid === this.ghost?.uid) continue;
-        const glows = glowsOf(o.type, o.rot % 2 === 1 ? 'profile' : 'face');
+        const glows = glowsOf(o.type, o.rot % 2 === 1 ? 'profile' : 'face', o.style);
         if (glows.length === 0) continue;
         const { sprite, ...at } = this.drawnPlace(o);
         for (const g of glows) {
           const x = at.x + (o.rot === 3 ? sprite.width - g.x : g.x);
           const y = at.y + g.y;
           const glow = ctx.createRadialGradient(x, y, 1, x, y, g.r);
-          glow.addColorStop(0, `rgba(255, 205, 120, ${0.55 * light.night})`);
-          glow.addColorStop(1, 'rgba(255, 205, 120, 0)');
+          const tint = g.tint ?? '255, 205, 120';
+          glow.addColorStop(0, `rgba(${tint}, ${0.55 * light.night})`);
+          glow.addColorStop(1, `rgba(${tint}, 0)`);
           ctx.fillStyle = glow;
           ctx.fillRect(x - g.r, y - g.r, 2 * g.r, 2 * g.r);
         }
@@ -1036,7 +1039,7 @@ export class FarmScene {
     const support = this.supportOf(ghost);
     if (support) {
       // Sitting on a support: drawn on it, the support's footprint tinted.
-      const place = this.perchedPlace(ghost.type, ghost.rot, support);
+      const place = this.perchedPlace(ghost, support);
       ctx.globalAlpha = 0.85;
       this.stamp(place.sprite, place.x, place.y, ghost.rot === 3);
       ctx.globalAlpha = 1;
@@ -1051,7 +1054,7 @@ export class FarmScene {
     const sprite = ghost.type === 'field' ? fieldSprite(null, 'empty')
       : isTree(ghost.type) ? treeSprite(ghost.type, false)
       : key ? joinedSprite(ghost.type, skinOf(ghost), joinMask(this.joins, ghost.x, ghost.y, key))
-      : objectSprite(ghost.type, ghost.rot % 2 === 1 ? 'profile' : 'face');
+      : objectSprite(ghost.type, ghost.rot % 2 === 1 ? 'profile' : 'face', ghost.style);
     const at = this.origin(ghost, sprite);
     ctx.globalAlpha = 0.8;
     this.stamp(sprite, at.x, at.y, ghost.rot === 3);

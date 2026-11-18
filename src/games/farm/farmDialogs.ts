@@ -6,7 +6,9 @@ import { breed, rarityName } from './data/parcels';
 import { person } from './data/people';
 import { placeable } from './data/placeables';
 import type { BoosterId, PersonId } from './data/types';
-import { boosterIcon, breedSprite, faceSprite, itemIcon, objectSprite, parcelSprite, spriteImage, uiIcon, type Sprite } from './farmArt';
+import { boosterIcon, breedSprite, faceSprite, itemIcon, objectSprite, parcelSprite, spriteImage, styleShowcase, uiIcon, type Sprite } from './farmArt';
+import { decorStyle, style } from './data/styles';
+import { STYLE_HOW, decorStyleHow } from './farmStylePicker';
 import { confetti } from './farmFeedback';
 import { FARM_HELP } from './farmHelp';
 import { rewardLine } from './farmPanels';
@@ -207,6 +209,8 @@ export class FarmDialogs {
       ...(opened.isNew ? [el('span', { class: 'farm-new', text: 'Nouveau dans l’album !' })] : []),
       ...(opened.waiting && opened.prize.kind === 'breed' ? [el('p', { class: 'farm-note', text: waitingBreedHint(this.save, opened.prize.breed) })] : []),
       ...(opened.prize.kind === 'decor' ? [el('p', { class: 'farm-note', text: 'Elle t’attend dans la Boutique, onglet Déco : pose-la où tu veux.' })] : []),
+      ...(opened.prize.kind === 'style' ? [el('p', { class: 'farm-note', text: STYLE_HOW })] : []),
+      ...(opened.prize.kind === 'decorStyle' ? [el('p', { class: 'farm-note', text: decorStyleHow(opened.prize.style) })] : []),
       ...(more > 0 ? [next] : []),
       el('button', { class: `farm-btn is-wide${more > 0 ? ' is-ghost' : ''}`, type: 'button', text: 'Super !' }),
     );
@@ -226,6 +230,11 @@ function prizeLook(opened: Opened): { icon: Sprite; scale: number; name: string 
   if (prize.kind === 'decor') {
     const sprite = objectSprite(prize.decor, 'face');
     return { icon: sprite, scale: Math.max(2, Math.min(4, Math.floor(110 / sprite.height))), name: placeable(prize.decor).name };
+  }
+  if (prize.kind === 'style') return { icon: styleShowcase(prize.style), scale: 3, name: `Style ${style(prize.style).name}` };
+  if (prize.kind === 'decorStyle') {
+    const sprite = objectSprite(decorStyle(prize.style).decor, 'face', prize.style);
+    return { icon: sprite, scale: Math.max(2, Math.min(4, Math.floor(110 / sprite.height))), name: decorStyle(prize.style).name };
   }
   return { icon: breedSprite(prize.breed, 0), scale: 6, name: breed(prize.breed).name };
 }

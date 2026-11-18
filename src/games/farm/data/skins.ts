@@ -32,7 +32,7 @@ export const SKINS: readonly Skin[] = [
 export const SKIN_IDS = SKINS.map((s) => s.id);
 
 /** The family's name inside a sentence: "Style de barrière : Ranch". */
-export const FAMILY_NAMES: Record<JoinFamily, string> = { fence: 'barrière', hedge: 'haie', pathDirt: 'chemin de terre', pathStone: 'chemin pavé', pathFlag: 'chemin dallé', pathGravel: 'allée de gravier', pathPlank: 'chemin de planches' };
+export const FAMILY_NAMES: Record<JoinFamily, string> = { fence: 'barrière', hedge: 'haie', pathDirt: 'chemin de terre', pathStone: 'chemin pavé', pathFlag: 'chemin dallé', pathGravel: 'allée de gravier', pathPlank: 'chemin de planches', wall: 'muret' };
 
 export function skin(id: SkinId): Skin {
   return SKINS.find((s) => s.id === id)!;

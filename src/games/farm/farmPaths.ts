@@ -7,7 +7,8 @@ import type { FarmSave } from './farmSave';
 // WALKING ON THE FARM: which tiles a villager can walk, and the way between two tiles (docs/ferme.md 22)
 // -----------------------------------------------
 // Four directions, tile to tile. Paths, the gate's yard and the bridge cost 1, grass costs GRASS_COST: a path is taken
-// unless it is that many times longer. Anything standing on the ground blocks, except flat pieces and the garden gate.
+// unless it is that many times longer. Anything standing on the ground blocks, except flat pieces and the gates (the
+// garden gate, the round gate in the wall).
 
 export type Tile = [number, number];
 
@@ -24,7 +25,7 @@ export function stepCost(save: FarmSave, x: number, y: number): number | null {
   const there = objectAt(save, x, y);
   if (!there) return GRASS_COST;
   if (placeable(there.type).flat) return 1;
-  return there.type === 'fenceGate' ? GRASS_COST : null;
+  return there.type === 'fenceGate' || there.type === 'moonGate' ? GRASS_COST : null;
 }
 
 export function isWalkable(save: FarmSave, x: number, y: number): boolean {

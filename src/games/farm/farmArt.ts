@@ -1,11 +1,14 @@
-import type { AnimalId, BoosterId, BreedId, CropId, ItemId, PersonId, PlaceableId, Rarity, SkinId, TreeId } from './data/types';
+import type { AnimalId, BoosterId, BreedId, CropId, ItemId, ObjectStyleId, PersonId, PlaceableId, Rarity, SkinId, StyleId, TreeId } from './data/types';
+import { DECOR_STYLES, isDecorStyle, style } from './data/styles';
+import { decorStyleGlows, decorStyledSprite, styledSprite } from './farmArtStyles';
+import { LOT3_SYMMETRIC, WALL_SEAT, isLot3Decor, lot3Decor, lot3Glows, moonGate, perchedTorch, stoneWall, type Lot3Decor } from './farmArtLot3';
 import { JOIN_CARRIES, JOIN_EAST, JOIN_NORTH, JOIN_NORTH_GATE, JOIN_SOUTH, JOIN_WEST, SKINS } from './data/skins';
 import { BRIDGE_TILES, MAP_SIZE, ROAD_COLUMN, isWater } from './data/land';
 import { mulberry32 } from '../../random';
 import {
   TILE, OUTLINE, canvas, sprite, cached, mapSprite, C, ROOF_RED, ROOF_BLUE, ROOF_BROWN, ROOF_SLATE, DOOR, DOOR_BLUE, TIMBER, TIMBER_LIGHT,
   WARM_STONE, GLINT, tiledRoof, eave, tiledGable, stones, framedWindow, plankDoor, yard, sideAndFrontFence, backFence, planks,
-  ROOF_PINK, COOKIE, cookieDisc, IRON, IRON_LIGHT, RIDGES, SKIN, ROSE, ROSE_DARK, ROSE_LIGHT, SPARKLE, WATER_MIST, twinkle, pathTile,
+  ROOF_PINK, BARN_RED, MILL_CAP, COOKIE, cookieDisc, IRON, IRON_LIGHT, RIDGES, SKIN, ROSE, ROSE_DARK, ROSE_LIGHT, SPARKLE, WATER_MIST, twinkle, pathTile,
 } from './farmPaint';
 import type { Sprite, View, FieldStage, Painter, PixelMap } from './farmPaint';
 import { LOT2_CROP_PAINT, LOT2_ITEM_MAPS, type Lot2Crop, type Lot2Item } from './farmArtItems';
@@ -326,23 +329,23 @@ function mill(view: View): Sprite {
     if (view === 'face') {
       millTower(P, true);
       // The cap in scalloped shingles, the axle hub.
-      P.ellipse(15, 12, 9, 5, '#6a3a27');
-      P.ellipse(15, 11, 9, 5, '#9a5b3f');
-      for (let y = 9; y < 16; y += 3) for (let x = 7 + (y % 2) * 2; x < 24; x += 4) P.rect(x, y, 3, 1, '#7d4630');
-      P.ellipse(12, 8, 4, 2, '#c07b55');
-      P.rect(6, 15, 19, 2, '#6a3a27');
+      P.ellipse(15, 12, 9, 5, MILL_CAP[3]);
+      P.ellipse(15, 11, 9, 5, MILL_CAP[1]);
+      for (let y = 9; y < 16; y += 3) for (let x = 7 + (y % 2) * 2; x < 24; x += 4) P.rect(x, y, 3, 1, MILL_CAP[2]);
+      P.ellipse(12, 8, 4, 2, MILL_CAP[0]);
+      P.rect(6, 15, 19, 2, MILL_CAP[3]);
       P.disc(15, 11, 2, C.woodDark);
       P.px(15, 11, C.wood);
     } else {
       millTower(P, false);
       // The cap seen from the side, its axle sticking out to the left towards the sails.
-      P.rect(12, 7, 9, 1, '#c07b55');
-      P.rect(9, 8, 16, 6, '#9a5b3f');
-      for (let x = 10; x < 24; x += 3) P.rect(x, 10, 2, 1, '#7d4630');
-      for (let x = 11; x < 24; x += 3) P.rect(x, 12, 2, 1, '#7d4630');
-      P.rect(10, 14, 14, 2, '#6a3a27');
-      P.rect(10, 9, 6, 1, '#c07b55');
-      P.rect(21, 9, 3, 3, '#6a3a27');
+      P.rect(12, 7, 9, 1, MILL_CAP[0]);
+      P.rect(9, 8, 16, 6, MILL_CAP[1]);
+      for (let x = 10; x < 24; x += 3) P.rect(x, 10, 2, 1, MILL_CAP[2]);
+      for (let x = 11; x < 24; x += 3) P.rect(x, 12, 2, 1, MILL_CAP[2]);
+      P.rect(10, 14, 14, 2, MILL_CAP[3]);
+      P.rect(10, 9, 6, 1, MILL_CAP[0]);
+      P.rect(21, 9, 3, 3, MILL_CAP[3]);
       P.rect(3, 10, 7, 2, C.woodDark);
       P.px(3, 10, C.wood);
     }
@@ -713,10 +716,7 @@ function coop(view: View): Sprite {
 }
 
 function cowshed(view: View): Sprite {
-  const red = '#c9483f';
-  const redDark = '#a5372f';
-  const redLight = '#e06a5f';
-  const redShade = '#b33f37';
+  const [redLight, red, redShade, redDark] = BARN_RED;
   const roof = ROOF_SLATE;
   return sprite(46, 60, (P) => {
     yard(P, 24, '#e3cf8f', '#d1ba73', '#f0e1ab', 9);
@@ -1106,6 +1106,12 @@ const FENCE_ART: Record<SkinId, (P: Painter, sides: number, gate: boolean, climb
 /** A piece that joins its neighbours (farmJoins.ts), drawn from the sides it joins. */
 export function joinedSprite(type: PlaceableId, skin: SkinId | null, mask: number): Sprite {
   if (type === 'hedge') return hedgeSprite(mask);
+  if (type === 'stoneWall') {
+    const sides = mask & (ACROSS | ALONG);
+    return cached(`wall-${sides}`, () => stoneWall(sides));
+  }
+  // The round gate joins the walls beside it, its own drawing whole.
+  if (type === 'moonGate') return cached('obj-moonGate-face', () => moonGate());
   if (type === 'pathDirt' || type === 'pathStone') return pathSprite(type === 'pathStone', mask);
   if (isGardenPath(type)) {
     const sides = mask & (ACROSS | ALONG);
@@ -1440,12 +1446,14 @@ function flowerPot(): Sprite {
 // DECORATIONS SITTING ON OTHERS (docs/ferme.md 16)
 // -----------------------------------------------
 
-export type PercherId = 'lantern' | 'birdhouse' | 'flowerPot' | 'wateringCan' | 'candleJar';
+export type PercherId = 'lantern' | 'birdhouse' | 'flowerPot' | 'wateringCan' | 'candleJar' | 'torch' | 'fireflyJar';
 
-/** A decoration as it looks sitting on a support: without the pole it has on the ground. */
-export function perchedSprite(id: PercherId, view: View): Sprite {
-  // The watering can and the candle jar have no pole: they look the same anywhere.
-  if (id === 'wateringCan' || id === 'candleJar') return objectSprite(id, 'face');
+/** A decoration as it looks sitting on a support: without the pole it has on the ground; `wearing`, its style. */
+export function perchedSprite(id: PercherId, view: View, wearing?: ObjectStyleId): Sprite {
+  if (wearing && isDecorStyle(wearing)) return cached(`perched-${id}-${view}-${wearing}`, () => decorStyledSprite(perchedSprite(id, view), wearing, view));
+  // The watering can, the candle jar and the firefly jar have no pole: they look the same anywhere.
+  if (id === 'wateringCan' || id === 'candleJar' || id === 'fireflyJar') return objectSprite(id, 'face');
+  if (id === 'torch') return cached('perched-torch', () => perchedTorch());
   const v: View = id === 'birdhouse' ? view : 'face';
   return cached(`perched-${id}-${v}`, () => {
     if (id === 'lantern') {
@@ -1462,10 +1470,27 @@ export function perchedSprite(id: PercherId, view: View): Sprite {
   });
 }
 
-/** Where a decoration glows at night: points of its drawing as drawn (margin included, not mirrored). */
-export function glowsOf(id: PlaceableId, view: View): Glow[] {
+/**
+ * Where a decoration glows at night: points of its drawing as drawn (margin included, not mirrored). A perched torch
+ * or lantern keeps its flame at the same point of its smaller drawing.
+ */
+export function glowsOf(id: PlaceableId, view: View, wearing?: ObjectStyleId): Glow[] {
+  const v = drawnView(id, view);
+  const own = ownGlows(id, v);
+  return wearing && isDecorStyle(wearing) ? decorStyleGlows(own, wearing, v) : own;
+}
+
+function ownGlows(id: PlaceableId, view: View): Glow[] {
   if (id === 'lantern') return [{ x: 6, y: 5, r: 26 }];
-  return isGardenDecor(id) ? gardenGlows(id, GARDEN_SYMMETRIC.has(id) ? 'face' : view) : [];
+  if (isLot3Decor(id)) return lot3Glows(id, view);
+  return isGardenDecor(id) ? gardenGlows(id, view) : [];
+}
+
+/** The view a decoration is drawn in: the face for the pieces seen the same from every side. */
+function drawnView(id: PlaceableId, view: View): View {
+  if (isGardenDecor(id)) return GARDEN_SYMMETRIC.has(id) ? 'face' : view;
+  if (isLot3Decor(id)) return LOT3_SYMMETRIC.has(id) ? 'face' : view;
+  return SYMMETRIC.has(id as ObjectId) ? 'face' : view;
 }
 
 /**
@@ -1478,6 +1503,7 @@ export function seatOf(id: PlaceableId, view: View, skin: SkinId | null): { x: n
     case 'bench': return view === 'face' ? { x: 14, y: 8 } : { x: 5, y: 17 };
     case 'well': return { x: 8, y: 24 };
     case 'logPile': return view === 'face' ? { x: 16, y: 2 } : { x: 6, y: 3 };
+    case 'stoneWall': return WALL_SEAT;
     default: return { x: 8, y: 2 };
   }
 }
@@ -2155,13 +2181,28 @@ export function heartSprite(): Sprite {
 // ANY OBJECT
 // -----------------------------------------------
 
-export function objectSprite(id: ObjectId, view: View): Sprite {
+/** How a building style is shown on its own (parcel, album): the bakery wearing it. */
+export function styleShowcase(id: StyleId): Sprite {
+  return objectSprite('bakery', 'face', id);
+}
+
+/** `wearing`: the style of a machine, a pen or a decoration (data/styles.ts), painted over its own drawing. */
+export function objectSprite(id: ObjectId, view: View, wearing?: ObjectStyleId): Sprite {
+  if (wearing) {
+    const v = drawnView(id, view);
+    return cached(`obj-${id}-${v}-${wearing}`, () => (isDecorStyle(wearing) ? decorStyledSprite(objectSprite(id, v), wearing, v) : styledSprite(objectSprite(id, v), style(wearing))));
+  }
   if (isGardenPath(id)) return joinedSprite(id, null, 0);
+  if (id === 'stoneWall') return joinedSprite(id, null, ACROSS);
+  if (isLot3Decor(id)) {
+    const v: View = LOT3_SYMMETRIC.has(id) ? 'face' : view;
+    return cached(`obj-${id}-${v}`, () => lot3Decor(id, v));
+  }
   if (isGardenDecor(id)) {
     const v: View = GARDEN_SYMMETRIC.has(id) ? 'face' : view;
     return cached(`obj-${id}-${v}`, () => gardenDecor(id, v));
   }
-  const own: Exclude<ObjectId, GardenDecor | GardenPath> = id;
+  const own: Exclude<ObjectId, GardenDecor | GardenPath | Lot3Decor | 'stoneWall'> = id;
   const v: View = SYMMETRIC.has(own) ? 'face' : view;
   return cached(`obj-${own}-${v}`, () => {
     switch (own) {
@@ -2767,6 +2808,10 @@ const BOARD_OBJECTS: ObjectId[] = [
   'logPile', 'wheelbarrow', 'appleTree', 'lantern', 'birdhouse', 'pond', 'bush', 'stump', 'rock', 'bigRock',
 ];
 const BOARD_TREASURES: ObjectId[] = ['gnome', 'hayBales', 'teaTable', 'flowerArch', 'swing', 'fountain'];
+const BOARD_LOT3: Lot3Decor[] = [
+  'torch', 'steppingStones', 'topiaryBall', 'hopscotch', 'fireflyJar', 'sundial', 'wickerSet', 'sandbox', 'topiaryRabbit',
+  'paperLanterns', 'columnUrn', 'doeStatue', 'slide', 'topiaryHeart', 'toolShed', 'tipi', 'moonGate', 'rockery', 'roulotte', 'carriage',
+];
 const BOARD_ITEMS: ItemId[] = [
   'wheat', 'corn', 'carrot', 'tomato', 'strawberry', 'sunflower', 'pumpkin', 'cotton', 'egg', 'milk', 'chickenFeed', 'cowFeed',
   'flour', 'bread', 'carrotPie', 'strawberryCake', 'pumpkinPie', 'cream', 'butter', 'cheese', 'thread', 'fabric',
@@ -2851,6 +2896,17 @@ export function artBoard(): HTMLElement {
   section('Grand lot de décos (face / profil)', BOARD_GARDEN.flatMap((id): [Sprite, string][] => GARDEN_SYMMETRIC.has(id)
     ? [[objectSprite(id, 'face'), id]]
     : [[objectSprite(id, 'face'), id], [objectSprite(id, 'profile'), `${id} profil`]]));
+  section('Lot 3 de décos (face / profil)', BOARD_LOT3.flatMap((id): [Sprite, string][] => LOT3_SYMMETRIC.has(id)
+    ? [[objectSprite(id, 'face'), id]]
+    : [[objectSprite(id, 'face'), id], [objectSprite(id, 'profile'), `${id} profil`]]));
+  section('Muret (bout, ligne, angle, croisement), torche et bocal posés', [
+    [joinedSprite('stoneWall', null, 0), 'muret'], [joinedSprite('stoneWall', null, JOIN_EAST | JOIN_WEST), 'ligne'],
+    [joinedSprite('stoneWall', null, JOIN_EAST | JOIN_SOUTH), 'angle'], [joinedSprite('stoneWall', null, 15), 'croisement'],
+    [perchedSprite('torch', 'face'), 'torche posée'], [perchedSprite('fireflyJar', 'face'), 'bocal posé'],
+  ], 4);
+  section('Styles de décos (colis)', DECOR_STYLES.flatMap((s): [Sprite, string][] => [
+    [objectSprite(s.decor as ObjectId, 'face', s.id), s.name], [objectSprite(s.decor as ObjectId, 'profile', s.id), `${s.name} profil`],
+  ]));
   section('Chemins du grand lot (bout, ligne, angle, croisement)', (['pathFlag', 'pathGravel', 'pathPlank'] as const).flatMap((id): [Sprite, string][] => [
     [joinedSprite(id, null, 0), id], [joinedSprite(id, null, JOIN_EAST | JOIN_WEST), 'ligne'], [joinedSprite(id, null, JOIN_EAST | JOIN_SOUTH), 'angle'], [joinedSprite(id, null, 15), 'croisement'],
   ]), 4);

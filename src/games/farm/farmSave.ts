@@ -2,7 +2,7 @@ import { readGame, writeGame } from '../../save';
 import { xpToNext } from './data/levels';
 import { CROP_IDS } from './data/crops';
 import { ITEM_IDS } from './data/items';
-import { PLACEABLE_IDS, placeable } from './data/placeables';
+import { PLACEABLE_IDS, isBuilding, placeable } from './data/placeables';
 import { BOOSTER_IDS } from './data/boosters';
 import { PERSON_IDS } from './data/people';
 import { PROJECTS } from './data/projects';
@@ -10,7 +10,8 @@ import { QUESTS } from './data/quests';
 import { MAP_SIZE } from './data/land';
 import { BREED_IDS, PARCEL_EVERY_MINUTES, TREASURES, type TreasureId } from './data/parcels';
 import { SKINS, SKIN_IDS, skin } from './data/skins';
-import type { BoosterId, BreedId, CropId, DecorId, ItemId, JoinFamily, PersonId, PlaceableId, ProjectId, QuestId, SkinId } from './data/types';
+import { DECOR_STYLE_IDS, STYLE_IDS, fitsStyle, isTreasureStyle, style } from './data/styles';
+import type { BoosterId, BreedId, BuildingId, CropId, DecorId, ItemId, JoinFamily, ObjectStyleId, PersonId, PlaceableId, ProjectId, QuestId, SkinId, StyleId } from './data/types';
 
 // -----------------------------------------------
 // THE 'farm' BLOCK OF THE SITE SAVE
@@ -40,6 +41,8 @@ export interface PlacedObject {
   rot: Rotation;
   /** A piece that joins (fence, gate): its look; none = the family's first skin. */
   skin?: SkinId;
+  /** A machine, a pen or a decoration that has styles: the style it wears (data/styles.ts); none = as drawn. */
+  style?: ObjectStyleId;
   /** A small decoration sitting on another: the uid of its support, whose tile it keeps (it takes none itself). */
   on?: number;
   /** Field: what grows. */
@@ -120,6 +123,8 @@ export interface FarmSave {
   waitingBreeds: BreedId[];
   /** The skin last chosen per family: what the next piece bought wears. */
   lastSkins: Partial<Record<JoinFamily, SkinId>>;
+  /** The shop styles bought, per kind of building: every copy of that building may wear them. */
+  boughtStyles: Partial<Record<BuildingId, StyleId[]>>;
   /** The market cart's big order (none while it is away), and when it comes back. */
   cart: { order: CartOrder | null; nextAt: number };
 }
@@ -196,6 +201,7 @@ export function loadFarm(): FarmSave | null {
     lastSkins: Object.fromEntries(
       Object.entries(asRecord(data.lastSkins)).filter(([family, id]) => SKINS.some((s) => s.id === id && s.family === family)),
     ) as FarmSave['lastSkins'],
+    boughtStyles: readBoughtStyles(data.boughtStyles),
     cart: readCart(data.cart),
   };
   retireDecorAppleTrees(save);
@@ -219,6 +225,7 @@ function readObject(value: unknown): PlacedObject[] {
   const rot = isCount(o.rot) && o.rot <= 3 && !placeable(o.type).joins ? (o.rot as Rotation) : 0;
   const object: PlacedObject = { uid: o.uid, type: o.type, x: o.x, y: o.y, rot };
   if (isOneOf(o.skin, SKIN_IDS) && skin(o.skin).family === placeable(o.type).joins) object.skin = o.skin;
+  if ((isOneOf(o.style, STYLE_IDS) || isOneOf(o.style, DECOR_STYLE_IDS)) && fitsStyle(o.type, o.style)) object.style = o.style;
   if (isCount(o.on) && placeable(o.type).perches) object.on = o.on;
   if (isOneOf(o.crop, CROP_IDS) && typeof o.readyAt === 'number') {
     object.crop = o.crop;
@@ -319,6 +326,17 @@ function readMail(value: unknown): Mail {
   const m = asRecord(value);
   if (!isCount(m.waiting) || typeof m.nextAt !== 'number') return newMail(Date.now());
   return { waiting: m.waiting, nextAt: m.nextAt, opened: count(m.opened), sinceRare: count(m.sinceRare) };
+}
+
+/** Shop styles only (a treasure style is owned through the album), each once, for machines and pens. */
+function readBoughtStyles(value: unknown): FarmSave['boughtStyles'] {
+  const bought: FarmSave['boughtStyles'] = {};
+  for (const [building, list] of Object.entries(asRecord(value))) {
+    if (!isOneOf(building, PLACEABLE_IDS) || !isBuilding(building)) continue;
+    const styles = asArray(list).filter((id): id is StyleId => isOneOf(id, STYLE_IDS) && !isTreasureStyle(style(id)));
+    if (styles.length > 0) bought[building] = [...new Set(styles)];
+  }
+  return bought;
 }
 
 function readCart(value: unknown): FarmSave['cart'] {

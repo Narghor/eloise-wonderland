@@ -2,7 +2,7 @@
 // FARM SIM: how long the farm takes to play, per player profile
 // -----------------------------------------------
 // node tools/farm-sim.mjs [days] [seed]
-// Options (environment): ALL_LEVELS=1, FARM_DETAIL=1 (sources, orders, machines, items asked), XP_TABLE="...",
+// Options (environment): NO_STYLES=1 (nobody buys building styles), ALL_LEVELS=1, FARM_DETAIL=1 (sources, orders, machines, items asked), XP_TABLE="...",
 // PROFILE="Reguliere (,Posee (", ALBUM=1 (plays on until the album is complete, first find of each treasure),
 // ALBUM_LOT1 / PRIZE_WEIGHTS / RARITY_WEIGHTS (other parcel draws, see below), DEMAND_ONE_LEVEL=1 (the old demand).
 // Model player of docs/ferme.md 8bis on the game's real content tables (src/games/farm/data) and order prices.
@@ -22,11 +22,12 @@ import { FEEDS, RECIPES as DATA_RECIPES, queueSlotPrice } from '../src/games/far
 import { DECOR, COPY_LEVELS, PLACEABLES, TREE_YIELDS, copyLevel, placeable, type Placeable } from '../src/games/farm/data/placeables';
 import { CHARM_STEPS, charmOf, charmStep, totalCharm } from '../src/games/farm/data/charm';
 import { project } from '../src/games/farm/data/projects';
-import type { BreedId, ItemId, PlaceableId, Rarity, TreeId, Unlock } from '../src/games/farm/data/types';
+import type { BreedId, BuildingId, ItemId, PlaceableId, Rarity, TreeId, Unlock } from '../src/games/farm/data/types';
 import {
   CART_BACK_MINUTES, CART_NUTS, CART_PARCEL_CHANCE, CART_SENT_AWAY_MINUTES, CART_XP, ORDER_NUTS, ORDER_XP, SPECIAL_CHANCE, SPECIAL_LEVEL, orderBasket,
 } from '../src/games/farm/farmOrders';
-import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, TREASURES, breed, type Prize } from '../src/games/farm/data/parcels';
+import { BREEDS, MAILBOX_SIZE, PITY, PRIZES, RARITIES, TREASURES, breed, treasureOf, type Prize } from '../src/games/farm/data/parcels';
+import { DECOR_STYLES, STYLES, decorStyle, isTreasureStyle, stylePrice } from '../src/games/farm/data/styles';
 import { MERCHANT_SHARE as DATA_MERCHANT_SHARE, TREE_NUTS_SPREAD, treeNuts } from '../src/games/farm/farmProduction';
 import { strollerTip } from '../src/games/farm/farmStrollers';
 
@@ -107,11 +108,11 @@ const CART_LEVEL = levelOf(placeable('marketCart').unlock);
 const LOT1_ANIMALS = ['chicken', 'cow'];
 const keepPrize = (p: Prize) => !process.env.ALBUM_LOT1 || p.kind !== 'breed' || LOT1_ANIMALS.includes(breed(p.breed).animal);
 const SIM_PRIZES = Object.fromEntries(Object.entries(PRIZES).map(([r, list]) => [r, list.filter(keepPrize)])) as Record<Rarity, Prize[]>;
-const SIM_TREASURES = TREASURES.filter((t) => SIM_PRIZES[t.rarity].some((p) => (p.kind === 'decor' ? p.decor : p.kind === 'breed' ? p.breed : '') === t.id));
+const SIM_TREASURES = TREASURES.filter((t) => SIM_PRIZES[t.rarity].some((p) => treasureOf(p) === t.id));
 const RARITY_WEIGHTS = process.env.RARITY_WEIGHTS?.split(',').map(Number);
 const SIM_RARITIES = RARITIES.map((r, i) => ({ id: r.id, weight: RARITY_WEIGHTS?.[i] ?? r.weight }));
 const PRIZE_WEIGHTS: Record<string, number> = Object.fromEntries((process.env.PRIZE_WEIGHTS ?? '').split(',').filter(Boolean).map((x) => [x.split(':')[0], Number(x.split(':')[1])]));
-const prizeWeight = (p: Prize) => PRIZE_WEIGHTS[p.kind === 'decor' ? p.decor : p.kind === 'breed' ? p.breed : ''] ?? 1;
+const prizeWeight = (p: Prize) => PRIZE_WEIGHTS[treasureOf(p) ?? ''] ?? 1;
 const BREED_LEVEL = Object.fromEntries(BREEDS.map((b) => [b.id, levelOf(DATA_ANIMALS.find((a) => a.id === b.animal)!.unlock)])) as Record<BreedId, number>;
 
 interface Obstacle { cost: number; xp: number; weight: number }
@@ -303,6 +304,31 @@ class Farm {
     this.placeDecor(next, now);
   }
 
+  /** Shop styles bought, per building kind; what they cost in all; how many were bought by each level. */
+  styles = new Set<string>();
+  styleSpent = 0;
+  stylesAt: number[] = [];
+
+  /**
+   * Every player dresses her buildings with what is left once the next open showpiece is paid for and the reserve
+   * kept: the cheapest style first, for the buildings on the farm (docs/ferme.md 26).
+   */
+  buyStyles(): void {
+    const nextShowpiece = DECOR.filter((d) => d.showpiece && this.showpieceAt[d.id] === undefined && levelOf(d.unlock) <= this.level)[0];
+    const keep = 2 * (20 + 5 * this.level) + (nextShowpiece?.price ?? 0);
+    const buildings = new Set([...[...this.machines.values()].map((m) => m.type), ...DATA_ANIMALS.filter((a) => (this.penCount.get(a.id) ?? 0) > 0).map((a) => a.pen)]);
+    const offers = [...buildings].flatMap((b) =>
+      STYLES.filter((s) => !isTreasureStyle(s) && levelOf(s.unlock!) <= this.level && !this.styles.has(`${b}:${s.id}`)).map((s) => ({ key: `${b}:${s.id}`, price: stylePrice(b as BuildingId) })),
+    );
+    for (const offer of offers.sort((a, b) => a.price - b.price)) {
+      if (this.coins < offer.price + keep) return;
+      this.coins -= offer.price;
+      this.styleSpent += offer.price;
+      this.styles.add(offer.key);
+      this.stylesAt[this.level] = this.styles.size;
+    }
+  }
+
   /** Collects Gaston's rounds and opens every parcel, as a player would on each visit. */
   openMail(now: number): void {
     while (now >= this.mail.nextAt) {
@@ -319,8 +345,11 @@ class Farm {
       let roll = this.random() * pool.reduce((sum, x) => sum + x.weight, 0);
       const rarity = (pool.find((x) => (roll -= x.weight) < 0) ?? pool[0]).id;
       this.mail.sinceRare = rarity === 'common' ? this.mail.sinceRare + 1 : 0;
-      // As the game's farmParcels.isPrizeOpen: a rare animal only comes once its kind is unlocked.
-      const prizes = SIM_PRIZES[rarity].filter((p) => p.kind !== 'breed' || this.level >= BREED_LEVEL[p.breed]);
+      // As the game's farmParcels.isPrizeOpen: a rare animal only comes once its kind is unlocked, a style once, a
+      // decoration style once and only once its decoration is sold.
+      const prizes = SIM_PRIZES[rarity].filter((p) => (p.kind !== 'breed' || this.level >= BREED_LEVEL[p.breed])
+        && (p.kind !== 'style' || this.album[p.style] === undefined)
+        && (p.kind !== 'decorStyle' || (this.album[p.style] === undefined && this.level >= levelOf(placeable(decorStyle(p.style).decor).unlock))));
       let pick = this.random() * prizes.reduce((sum, p) => sum + prizeWeight(p), 0);
       const prize = prizes.find((p) => (pick -= prizeWeight(p)) < 0) ?? prizes[prizes.length - 1];
       if (prize.kind === 'nuts') this.earn(prize.base + prize.perLevel * this.level, 'colis');
@@ -333,10 +362,8 @@ class Farm {
       if (prize.kind === 'decor') this.placeDecor(placeable(prize.decor), now);
       // A rare animal joins its pen when there is room, else it waits for the next free place (buy).
       if (prize.kind === 'breed') this.waitingBreeds.push(prize.breed);
-      if (prize.kind === 'decor' || prize.kind === 'breed') {
-        const id = prize.kind === 'decor' ? prize.decor : prize.breed;
-        if (this.album[id] === undefined) this.album[id] = now;
-      }
+      const found = treasureOf(prize);
+      if (found && this.album[found] === undefined) this.album[found] = now;
     }
     this.placeBreeds();
   }
@@ -606,6 +633,7 @@ class Farm {
     this.sellSurplus();
     this.buyDecor(now);
     this.buyShowpieces(now);
+    if (!process.env.NO_STYLES) this.buyStyles();
   }
 
   collect(now: number): void {
@@ -939,6 +967,9 @@ for (const profile of PICKED) {
   const deco = farm.decor ? `, deco : ${farm.decorBought} achats, ${Math.round(farm.decorSpent)} Eloisettes` : '';
   console.log(`    charme ${Math.round(farm.charm)} a la fin ; paliers : ${steps}${deco}`);
   console.log(`    grandes pieces : ${DECOR.filter((p) => p.showpiece).map((p) => `${p.id} ${when(farm.showpieceAt[p.id]).trim()}`).join(' · ')}`);
+  const stylesBy = (l: number) => Math.max(0, ...farm.stylesAt.slice(0, l + 1).filter((n) => n !== undefined));
+  console.log(`    styles : ${farm.styles.size} achetes (${Math.round(farm.styleSpent)} Eloisettes) ; au niv10 ${stylesBy(10)}, niv15 ${stylesBy(15)}, niv20 ${stylesBy(20)}, niv30 ${stylesBy(30)} ; colis : ${['cherry', 'icing', 'winter', 'golden'].map((id) => `${id} ${when(farm.album[id]).trim()}`).join(' · ')}`);
+  console.log(`    styles de decos : ${DECOR_STYLES.map((s) => `${s.id} ${when(farm.album[s.id]).trim()}`).join(' · ')}`);
   if (process.env.FARM_DETAIL) {
     console.log(`    XP : ${shares(farm.xpFrom)}\n    Eloisettes : ${shares(farm.coinsFrom)}`);
     console.log(`    ${detail(farm)}`);

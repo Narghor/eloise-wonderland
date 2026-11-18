@@ -18,6 +18,15 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-18-ferme-styles-decos',
+    date: '18 novembre',
+    news: [
+      '🏠 Tes bâtiments peuvent changer de style ! Chaumière, Provence, Bord de mer, Forêt et Chalet s’achètent en Éloisettes, bâtiment par bâtiment (Aménager, touche un bâtiment, puis Style). Gaston cache aussi quatre styles rares dans ses colis : Cerisier, Sucre glace, Hiver et Doré.',
+      '🪨 Un 3e lot de 21 décos : muret de pierre et porte ronde, torches et bocaux à lucioles à poser sur les barrières, marelle, toboggan, tipi, cascade de rocaille, roulotte… jusqu’au carrosse fleuri.',
+      '✨ Douze décos ont maintenant une version rare à trouver dans les colis : roses bleues, banc des amoureux, lanterne de fée, puits aux souhaits, bassin aux lotus… Une fois trouvée, elle peut habiller toutes tes décos du même genre, avec le bouton Style.',
+    ],
+  },
+  {
     id: '2026-11-18-ferme-animaux',
     date: '18 novembre',
     news: ['🐣 Les animaux de la ferme font peau neuve : plus grands, tout ronds, avec de grands yeux brillants et des joues roses, et les races rares aussi ! À la petite mare, les promeneurs nourrissent maintenant des canetons.'],

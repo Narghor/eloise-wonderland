@@ -1,4 +1,4 @@
-import type { AnimalId, BoosterId, BreedId, DecorId, Rarity } from './types';
+import type { AnimalId, BoosterId, BreedId, DecorId, DecorStyleId, Rarity, StyleId } from './types';
 
 // -----------------------------------------------
 // GASTON'S PARCELS: the surprise of the farm (docs/ferme.md 13)
@@ -29,7 +29,11 @@ export type Prize =
   | { kind: 'nuts'; perLevel: number; base: number }
   | { kind: 'boosters'; boosters: Partial<Record<BoosterId, number>> }
   | { kind: 'decor'; decor: DecorId }
-  | { kind: 'breed'; breed: BreedId };
+  | { kind: 'breed'; breed: BreedId }
+  /** A building style: once found, every building may wear it, and it never comes again. */
+  | { kind: 'style'; style: StyleId }
+  /** A decoration style: once found, every copy of its decoration may wear it; it only comes once that decoration is sold. */
+  | { kind: 'decorStyle'; style: DecorStyleId };
 
 export const PRIZES: Record<Rarity, readonly Prize[]> = {
   common: [
@@ -44,6 +48,14 @@ export const PRIZES: Record<Rarity, readonly Prize[]> = {
     { kind: 'decor', decor: 'gnome' },
     { kind: 'decor', decor: 'hayBales' },
     { kind: 'decor', decor: 'teaTable' },
+    { kind: 'style', style: 'cherry' },
+    // Lot 3 (docs/ferme.md 27): each comes once its decoration is sold at the player's level (farmParcels.isPrizeOpen).
+    { kind: 'decorStyle', style: 'blueRoses' },
+    { kind: 'decorStyle', style: 'faiencePot' },
+    { kind: 'decorStyle', style: 'parrotTulips' },
+    { kind: 'decorStyle', style: 'gingerbreadBirdhouse' },
+    { kind: 'decorStyle', style: 'moonHydrangeas' },
+    { kind: 'decorStyle', style: 'rainbowParasol' },
   ],
   epic: [
     { kind: 'decor', decor: 'flowerArch' },
@@ -56,11 +68,20 @@ export const PRIZES: Record<Rarity, readonly Prize[]> = {
     { kind: 'breed', breed: 'snowGoat' },
     { kind: 'breed', breed: 'mandarinDuck' },
     { kind: 'breed', breed: 'lopRabbit' },
+    { kind: 'style', style: 'icing' },
+    { kind: 'style', style: 'winter' },
+    { kind: 'decorStyle', style: 'lovebirdBench' },
+    { kind: 'decorStyle', style: 'fairyLantern' },
+    { kind: 'decorStyle', style: 'pinkMarbleBirdBath' },
+    { kind: 'decorStyle', style: 'flowerSwing' },
   ],
   legendary: [
     { kind: 'decor', decor: 'fountain' },
     { kind: 'breed', breed: 'goldenHen' },
     { kind: 'breed', breed: 'queenBee' },
+    { kind: 'style', style: 'golden' },
+    { kind: 'decorStyle', style: 'wishingWell' },
+    { kind: 'decorStyle', style: 'lotusPond' },
   ],
 };
 
@@ -99,8 +120,16 @@ export function breed(id: BreedId): Breed {
 // THE ALBUM: every treasure, in the order shown
 // -----------------------------------------------
 
-export type TreasureId = DecorId | BreedId;
+export type TreasureId = DecorId | BreedId | StyleId | DecorStyleId;
+
+/** The treasure a prize holds, or null for Eloisettes and boosters. */
+export function treasureOf(p: Prize): TreasureId | null {
+  return p.kind === 'decor' ? p.decor : p.kind === 'breed' ? p.breed : p.kind === 'style' || p.kind === 'decorStyle' ? p.style : null;
+}
 
 export const TREASURES: readonly { id: TreasureId; rarity: Rarity }[] = (['rare', 'epic', 'legendary'] as const).flatMap((rarity) =>
-  PRIZES[rarity].flatMap((p): { id: TreasureId; rarity: Rarity }[] => (p.kind === 'decor' ? [{ id: p.decor, rarity }] : p.kind === 'breed' ? [{ id: p.breed, rarity }] : [])),
+  PRIZES[rarity].flatMap((p): { id: TreasureId; rarity: Rarity }[] => {
+    const id = treasureOf(p);
+    return id ? [{ id, rarity }] : [];
+  }),
 );

@@ -1617,3 +1617,38 @@
   text-align: left;
   font-size: 14px;
 }
+
+/* The style of a building (farmStylePicker.ts): the building big, then one small tile per style. */
+.farm-style-picker {
+  gap: 10px;
+}
+
+.farm-style-preview {
+  min-height: 100px;
+  display: grid;
+  place-items: end center;
+}
+
+.farm-style-tiles {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+.farm-style-tile {
+  padding: 5px 1px;
+  gap: 2px;
+  font-size: 10.5px;
+  line-height: 1.15;
+}
+
+.farm-style-tile .farm-art {
+  height: 62px;
+  place-items: end center;
+}
+
+.farm-style-tile small {
+  color: var(--ui-muted);
+  font-size: 10px;
+}

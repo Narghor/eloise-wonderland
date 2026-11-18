@@ -469,6 +469,8 @@ src/games/farm/
   farmPaths.ts     les cases où l'on marche et le chemin le moins cher entre deux cases (section 22)
   farmStrollers.ts les promeneurs : visites, arrêts devant les décos, pourboire, option (section 22)
   farmArt.ts       les dessins (et son moteur de sprites, exporté)
+  farmArtLot3.ts   les décos du lot 3, muret et porte ronde (section 27)
+  farmStyles.ts    styles de bâtiments et de décos : qui peut porter quoi, acheter, porter (sections 26, 27)
   farmPeopleArt.ts les villageois en pied (côté, face, dos) et le vélo de Gaston
   farmHud.ts       bandeau et barre du bas
   farmPanels.ts    grange, commandes, quêtes, boutique, bulles
@@ -1368,3 +1370,136 @@ mignons**). Choix de Flo : **« plus grand mignon », et le même style pour TOU
   est supprimé. Vu en capture (les deux sens de la mare, en route et en train de barboter) : l'eau se voit autour.
 - Sauvegarde des fichiers d'avant : `C:/Users/Flo/CouchRPG/.claude/backups/2026-11-17/eloise-animaux/` et
   `.../2026-11-18/eloise-canetons/`.
+
+## 26. Styles de bâtiments et nouvelles décos (demande de Flo du 18/11, rien de codé)
+
+Demande : plus de décos, et surtout des **styles (skins) de bâtiments** pour dépenser, plus des styles **rares dans
+les colis** (bâtiments et décos), en plus de ceux qu'on achète.
+
+**Tranché par Flo le 18/11** : les styles achetables se paient en **Éloisettes** (pas en pièces du site) ; un style
+acheté vaut **pour un bâtiment** (« Moulin en Chalet »), pas pour toute la ferme.
+
+**Méthode proposée (MESURE du 18/11)** : les 21 bâtiments (13 machines, 8 enclos) utilisent 314 couleurs, mais leurs
+toits passent par 12 gammes nommées (`Tones` : ROOF_RED, ROOF_SLATE…, farmPaint et farmArtMachines), le bois par
+`C.wood*` (18 bâtiments) et la pierre par `WARM_STONE` (14). Un **habillage** remplace ces gammes sur le dessin déjà
+fait (aucun redessin), et un habillage rare ajoute un détail calculé (neige au faîte, glaçage qui coule, pétales,
+paillettes). Planche : `docs/ferme-skins-board.js` (s'exécute dans la page via `page.eval`, rend un PNG).
+- Proposés à l'achat : Chaumière, Chalet, Provence, Bord de mer, Forêt. Rares (colis, album) : Cerisier (rare), Pain
+  d'épices et Hiver (épiques), Doré (légendaire) ; un habillage rare trouvé habille gratuitement tous les bâtiments.
+- **Limite vue sur la planche** : ça marche sur les maisons à toit en tuiles (Fournil, Cookiterie, Laiterie, Poulailler) ;
+  le Moulin (dôme), l'Étable (toit rouge à elle), la Bergerie (chaume à elle) ont des couleurs de toit en dur : il
+  faut d'abord les faire passer par une gamme `Tones` (retouche du code des dessins, pas un redessin). Pain d'épices
+  demande aussi des murs bruns (gamme des murs à nommer).
+- **Fait le 18/11 (non commité)** : toutes les gammes de toit vivent dans `farmPaint.ts` et sont listées dans
+  `ROOF_TONES` (un toit neuf doit y entrer). Le chaume de la Bergerie (`THATCH_SHEEPFOLD`), le chapeau du Moulin
+  (`MILL_CAP`) et les planches rouges de l'Étable (`BARN_RED`, la couleur de la grange compte comme son toit) sont
+  devenus des gammes nommées. MESURE : les 42 dessins (21 bâtiments × 2 vues) sont **identiques au pixel** avant/après
+  (scénario de comparaison : scratchpad, perdu à terme). Planche complète : les 21 suivent les 9 thèmes. Flo trouve les
+  thèmes « sympas ». Restent : Pain d'épices (murs crème : il faudrait une gamme des murs), puis le code du système.
+
+### Les styles de bâtiments CODÉS (18/11, go de Flo, non commité, pas joué sur téléphone)
+
+- **Pain d'épices devient « Sucre glace »** (Flo : « fais-toi confiance ») : toit glacé qui coule, bonbons, bois et
+  pierre couleur biscuit ; un vrai pain d'épices demandait une gamme des murs sur les 21 bâtiments.
+- **Données** : `data/styles.ts` (`STYLES` : nom, tons de toit / bois / pierre, `touch` = neige, glaçage, pétales,
+  paillettes). Un style **de boutique** a un `unlock` : Chaumière niv. 5, Provence 7, Bord de mer 9, Forêt 11,
+  Chalet 13. Un style **de colis** n'en a pas : sa rareté vit dans `PRIZES` (data/parcels.ts), un seul endroit :
+  Cerisier rare, Sucre glace et Hiver épiques, Doré légendaire. Prix d'un style de boutique : **1 000 + 10 × le prix du
+  bâtiment** (`stylePrice` : Cookiterie 1 400, Fournil 2 200, Étable 3 500, Crêperie 10 000 ; 105 achats possibles,
+  ~546 000 🌰 en tout).
+- **Sauvegarde** (pas de changement de version, champs neufs facultatifs) : `PlacedObject.style` (machines et enclos,
+  `isBuilding`), `FarmSave.boughtStyles` (par type de bâtiment : chaque exemplaire peut le porter). Un style de colis
+  est possédé dès qu'il est dans l'**album** (`TreasureId` inclut `StyleId`). La lecture jette un style sur autre chose
+  qu'un bâtiment et un style de colis noté « acheté ».
+- **Règles** : `farmStyles.ts` (`styleRefusal` : locked / missing / notBought, `buyStyle`, `wearStyle`). Un style de
+  colis ne ressort jamais une fois trouvé (`isPrizeOpen`) : pas de lot vide.
+- **Dessin** : `farmArtStyles.ts` (`styledSprite` : échange les couleurs de `ROOF_TONES`, `C.wood*`, `WARM_STONE` rang
+  pour rang, puis peint la touche sur les pixels de toit trouvés) ; `objectSprite(id, view, wearing)` le met en cache
+  par style ; `styleShowcase` = le Fournil dans le style (colis, album).
+- **Écran** : Aménager > toucher un bâtiment > bouton **Style** (`farmStylePicker.ts`) : grand aperçu, 10 vignettes
+  (d'origine + 9), toucher une vignette ne fait que montrer ; le bouton du bas porte, achète et porte, ou dit pourquoi
+  pas (« En vente au niv. 9 », « À trouver dans les colis de Gaston », « Il te manque … »). Note dans la Boutique >
+  Bâtiments et dans le colis qui apporte un style. Vu en capture (la carte avec 4 styles, la fenêtre, le chemin complet
+  au doigt) : la fenêtre tient entière sur 390 × 844, « Fermer » visible.
+- **MESURE (simulateur, graines 1 et 2, `NO_STYLES=1` pour comparer)** : chaque profil achète des styles avec ce qui
+  reste une fois la prochaine grande pièce ouverte payée et la réserve gardée. La régulière : 11 styles au niv. 10,
+  44 au niv. 15, 75 au niv. 20, 90 au niv. 30 (408 000 🌰) ; **les niveaux ne bougent pas** (± 2 jours, du bruit) ;
+  le manège passe après le niv. 30 (les styles et les grandes pièces se partagent le surplus). Les styles de colis
+  sortent tôt (~12 colis par jour dans le simulateur) : Hiver et Cerisier en 1 à 4 jours, Doré entre j2 et j30 selon
+  la graine (au début, la Reine des abeilles est fermée : Doré fait un tiers des légendaires).
+- farm-check : **115** (16 neuves : vente par niveau, prix, un achat par type, porter, colis une seule fois, sauvegarde
+  cassée nettoyée).
+- **Reste** (étape suivante, conversation dédiée) : un 3e lot de décos + des variantes rares de décos dans les colis.
+
+## 27. Le 3e lot de décos et les variantes rares (18/11, CODÉ le 18/11, non commité, pas joué sur téléphone)
+
+**MESURE du 18/11** (`FARM_DETAIL=1 node tools/farm-sim.mjs 200 1`, styles compris) : les niveaux 22 à 30 n'ouvrent
+aucune déco normale ; la régulière a 28 000 🌰 en poche au niv. 20, 175 000 au 25, 389 000 au 30, et n'achète pas le
+manège avant le 30. D'où un lot coupé en deux : une moitié là où Eloise joue, une moitié pour la fin.
+
+**Liste validée** (niveau · prix ; prix à remesurer au simulateur en codant) :
+- Tout de suite : Torche 6 · 25 (se pose sur barrière, muret, banc ; brille), Pas japonais 7 · 8 (plat), Muret de
+  pierre 8 · 20 (famille qui se raccorde, porte une petite déco), Cloches à semis 10 · 80, Topiaire en boule 12 · 150,
+  Marelle 14 · 60 (plat, 2×1), Bocal à lucioles 16 · 300 (se pose, brille), Cadran solaire 17 · 600, Salon en osier
+  19 · 1 500 (2×1), Bac à sable 20 · 1 000 (2×1).
+- Fin de partie : Topiaire lapin 22 · 1 500, Lanternes de papier 22 · 2 500 (2×1, brillent), Vasque sur colonne
+  23 · 2 000, Statue de biche 23 · 3 500, Toboggan 24 · 4 000 (2×1), Topiaire cœur 25 · 2 500, Cabane à outils
+  25 · 6 000 (2×2), Tipi 26 · 8 000 (2×2), Porte ronde 27 · 5 000 (2×1, se raccorde au muret), Cascade de rocaille
+  28 · 15 000 (2×2), Roulotte 29 · 25 000 (3×2), **Carrosse fleuri** 30 · 40 000 (3×2 ; « Calèche fleurie » à la
+  liste, devenue un carrosse sur la planche : la calèche ouverte ne se lisait pas en pixels).
+- Pas de nouvelle grande pièce. Écarté : le ruisseau qui se raccorde (on marcherait sur l'eau).
+
+**Variantes rares (12), modèle validé** : un recoloriage du dessin existant, plus une touche calculée (glaçage,
+pétales, paillettes, veines, pois, arc-en-ciel, fleurs) ; trouvée dans un colis, elle va dans l'album et habille
+gratuitement chaque exemplaire de sa déco (bouton Style) ; ne ressort jamais ; ne tombe que si sa déco est ouverte au
+niveau du joueur ; pas pour les familles qui se raccordent. **Décision d'architecture validée par Flo** : étendre
+`PlacedObject.style` aux décos et réutiliser `farmStylePicker`, pas de second système.
+Rares : Roses bleues (parterre de roses), Pot en faïence, Tulipes perroquet, Nichoir en pain d'épices, Hortensias de
+lune (blancs, scintillants ; « arc-en-ciel » à la liste, mais les hortensias d'aujourd'hui sont déjà multicolores),
+Parasol arc-en-ciel. Épiques : Banc des amoureux, Lanterne de fée (lumière bleue la nuit), Bain d'oiseaux en marbre
+rose, Balancelle fleurie. Légendaires : Puits aux souhaits (doré), Bassin aux lotus.
+
+**Planche** : https://claude.ai/artifact/Cg6qWRemAfuDfyRoDZd872 (jour et nuit, à ×4, le muret en scène avec ce qui s'y
+pose). Sources : `docs/ferme-lot3-board/` (`lot3Art.ts` = les dessins, à déplacer dans `farmArtDecor.ts` au codage ;
+`board.ts` = la mise en page et le moteur des variantes ; `build.sh` regroupe avec l'esbuild du projet). Vues de face
+seulement : les profils des pièces 2×1 et plus restent à dessiner. Points faibles connus : la biche (silhouette
+proche d'un lama), les cloches à semis, la porte ronde un peu massive.
+**Tri de Flo et Eloise (18/11)** : tout est **gardé**, sauf les **Cloches à semis, coupées** (le verre sur la terre se
+lit mal) et le **Bassin aux lotus, à refaire** : le recoloriage seul ne disait rien. Trois versions sur la planche, avec
+de grands lotus dessinés par-dessus (`lotus` / `goldFrog` dans `board.ts`) : A lotus roses, B lotus d'or sur eau bleu
+nuit, C grenouille d'or couronnée. **Choix de Flo : A, lotus roses** (marbre blanc semé d'or, eau turquoise qui
+scintille, deux grands lotus roses et un blanc, carpes dorées, les petites fleurs du bassin deviennent des feuilles).
+
+### Le lot 3 CODÉ (18/11, non commité, pas joué sur téléphone)
+
+- **Les 21 décos** (`data/placeables.ts`, prix et niveaux de la liste) ; dessins dans **`farmArtLot3.ts`** et pas dans
+  `farmArtDecor.ts` (déjà 1 486 lignes ; même découpage que `farmArtMachines` / `farmArtAnimals`). `lot3Decor(id, view)`,
+  `lot3Glows`, `LOT3_SYMMETRIC` (les pièces carrées ou rondes : un seul dessin, retourné). **Profils dessinés** pour
+  les pièces longues : marelle (le dessin à plat tourné d'un quart), salon en osier, bac à sable, lanternes de papier,
+  toboggan, roulotte, carrosse. La cabane à outils, le tipi et la rocaille (2×2) gardent leur face.
+- **Muret** : famille qui se raccorde `wall` (`joins`, porte une petite déco, siège `WALL_SEAT`). **Porte ronde** :
+  2×1 de la même famille, jamais tournée ; `joinIndex` l'inscrit sur ses deux cases, les murets voisins s'y raccordent ;
+  on passe dessous comme sous le portillon (`farmPaths`). Les promeneurs ne s'arrêtent pas devant (comme la haie).
+- **Torche et bocal à lucioles** se posent (`perches`) sur barrière, muret, banc, puits, tas de bûches ; la torche
+  posée n'a plus que sa coupe. **Les lumières ont leur couleur** (`Glow.tint`) : torche orange, bocal vert, lanternes
+  roses ; sans couleur, la lumière chaude d'avant.
+- **Styles de décos** (le nom de code des « variantes rares ») : `DecorStyleId`, `data/styles.ts DECOR_STYLES` (nom,
+  déco), rareté dans `PRIZES` (prix `decorStyle`), recettes de dessin dans `farmArtStyles.ts` (`DECOR_RECIPES` :
+  couleurs échangées, touche, dessin ajouté sur la face seulement, lumières). `PlacedObject.style` est un
+  `ObjectStyleId` (style de bâtiment ou de déco) ; la lecture de la sauvegarde jette un style qui ne va pas sur
+  l'objet (`fitsStyle`). Règles : `farmStyles.ts` (`stylesFor`, `hasStyles`, `styleRefusal`, `wearStyle`) ; écran :
+  le même `farmStylePicker` (bouton Style sur une déco qui a des styles). Un style de déco ne sort d'un colis que si sa
+  déco est en vente au niveau du joueur (`isPrizeOpen`), une seule fois ; il ne donne pas de Charme.
+- **Profil d'une déco habillée** : couleurs et touche seulement ; le dessin ajouté (cœur du banc, pièces du puits) et
+  les lumières propres au style ne vont que sur la face.
+- **MESURE (simulateur, graines 1 et 2, avant / après)** : les niveaux ne bougent pas (au plus 2,5 jours au niv. 30,
+  dans les deux sens). Les colis rares et épiques ont plus de lots tant que les styles de déco ne sont pas trouvés :
+  un peu moins de boosters (accro : 784/91/381 contre 844/103/424, graine 1). Les styles de déco sortent peu après
+  leur déco (régulière : rares j2 à j24, Balancelle fleurie ~j76, légendaires j8 à j103 selon profil et graine).
+  **Prix gardés** : la régulière a ~180 000 🌰 au niv. 25 et ~400 000 au 30 ; une pièce de chaque déco de fin coûte
+  115 000 ; le Carrosse (40 000) vaut quelques jours d'épargne, sous les grandes pièces.
+- farm-check : **134** (19 neuves : muret et porte ronde, ce qui s'y pose, styles de déco portés / refusés /
+  sauvegardés / jetés, colis qui n'en donne qu'à leur niveau, une fois chacun).
+- Vu en capture (390 × 844, ferme de démonstration niv. 30) : jour, nuit, carte Style du bassin, album. La planche
+  `docs/ferme-lot3-board/` est **figée** (elle a servi au choix) : les dessins vivent dans le jeu.
+- **Reste** : l'entrée des Nouveautés (à valider par Flo avant publication) ; le test sur téléphone.

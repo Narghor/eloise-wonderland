@@ -47,13 +47,29 @@ export type DecorId =
   // Showpieces: one of each, very dear (data/placeables.ts).
   | 'pergola' | 'bandstand' | 'greenhouse' | 'treehouse' | 'dovecote' | 'carousel' | 'hedgeMaze'
   // Treasures: found first in Gaston's parcels, then bought in the shop.
-  | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain';
+  | 'gnome' | 'hayBales' | 'teaTable' | 'flowerArch' | 'swing' | 'fountain'
+  // Lot 3 (docs/ferme.md 27): now, then the late game.
+  | 'torch' | 'steppingStones' | 'stoneWall' | 'topiaryBall' | 'hopscotch' | 'fireflyJar' | 'sundial' | 'wickerSet' | 'sandbox'
+  | 'topiaryRabbit' | 'paperLanterns' | 'columnUrn' | 'doeStatue' | 'slide' | 'topiaryHeart' | 'toolShed' | 'tipi'
+  | 'moonGate' | 'rockery' | 'roulotte' | 'carriage';
 
-/** Pieces that join their neighbours of the same family: a fence and its gate, a hedge, each kind of path. */
-export type JoinFamily = 'fence' | 'hedge' | 'pathDirt' | 'pathStone' | 'pathFlag' | 'pathGravel' | 'pathPlank';
+/** Pieces that join their neighbours of the same family: a fence and its gate, a hedge, each kind of path, a wall. */
+export type JoinFamily = 'fence' | 'hedge' | 'pathDirt' | 'pathStone' | 'pathFlag' | 'pathGravel' | 'pathPlank' | 'wall';
 
 /** The looks a joined piece can wear (data/skins.ts). */
 export type SkinId = 'fenceRanch' | 'fencePicket' | 'fenceWattle';
+
+/** What wears a building style: the machines and the pens. */
+export type BuildingId = MachineId | PenId;
+/** The looks a building can wear (data/styles.ts). */
+export type StyleId = 'thatch' | 'provence' | 'seaside' | 'forest' | 'chalet' | 'cherry' | 'icing' | 'winter' | 'golden';
+/** The rare looks of one decoration, found in parcels (data/styles.ts DECOR_STYLES). */
+export type DecorStyleId =
+  | 'blueRoses' | 'faiencePot' | 'parrotTulips' | 'gingerbreadBirdhouse' | 'moonHydrangeas' | 'rainbowParasol'
+  | 'lovebirdBench' | 'fairyLantern' | 'pinkMarbleBirdBath' | 'flowerSwing'
+  | 'wishingWell' | 'lotusPond';
+/** What an object may wear: a building style on a machine or a pen, a decoration style on its decoration. */
+export type ObjectStyleId = StyleId | DecorStyleId;
 export type ObstacleId = 'bush' | 'stump' | 'rock' | 'bigRock';
 
 /** Everything that stands on the map. The mailbox is Gaston's: one per farm, given, moved like the rest. */

@@ -38,6 +38,8 @@ import { JOIN_EAST, JOIN_WEST } from '../src/games/farm/data/skins';
 import { MINUTE_MS } from '../src/games/farm/farmTime';
 import { claimQuest, settle } from '../src/games/farm/farmProgress';
 import { MAX_LEVEL, xpToNext } from '../src/games/farm/data/levels';
+import { DECOR_STYLES, stylePrice } from '../src/games/farm/data/styles';
+import { buyStyle, styleRefusal, stylesFor, wearStyle } from '../src/games/farm/farmStyles';
 
 let failures = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -742,5 +744,146 @@ function placeAnywhere(farm: FarmSave, id: 'cookiery' | 'mill' | 'coop') {
   const can = buyAndPlace(farm, 'wateringCan', 0, 0, 0, now, bench);
   check('the watering can sits on a bench', !!can && can.on === bench.uid);
 }
+
+// -----------------------------------------------
+// BUILDING STYLES (docs/ferme.md 26)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.level = 4;
+  farm.nuts = 100000;
+  const mill = placeAnywhere(farm, 'mill')!;
+  const cookiery = placeAnywhere(farm, 'cookiery')!;
+  check('a shop style is not sold before its level', styleRefusal(farm, 'mill', 'thatch') === 'locked' && !buyStyle(farm, 'mill', 'thatch'));
+
+  farm.level = 5;
+  const before = farm.nuts;
+  const bought = buyStyle(farm, 'mill', 'thatch');
+  check('a shop style is bought for its price, once per kind of building',
+    bought && farm.nuts === before - stylePrice('mill') && !buyStyle(farm, 'mill', 'thatch') && farm.nuts === before - stylePrice('mill'));
+  check('bought for the mill, it dresses the mill, not the cookiery',
+    wearStyle(farm, mill, 'thatch') && mill.style === 'thatch' && !wearStyle(farm, cookiery, 'thatch') && cookiery.style === undefined);
+
+  farm.nuts = 10;
+  const poor = farm.nuts;
+  farm.level = 7;
+  check('without the Eloisettes nothing is bought nor taken', !buyStyle(farm, 'cookiery', 'provence') && farm.nuts === poor && styleRefusal(farm, 'cookiery', 'provence') === 'notBought');
+
+  check('a treasure style not found cannot be worn', styleRefusal(farm, 'cookiery', 'winter') === 'missing' && !wearStyle(farm, cookiery, 'winter'));
+  farm.album.push('winter');
+  check('found once, a treasure style dresses every building', wearStyle(farm, cookiery, 'winter') && wearStyle(farm, mill, 'winter'));
+  check('a building goes back to its own look', wearStyle(farm, mill, null) && mill.style === undefined);
+  check('the mailbox wears no style', !wearStyle(farm, farm.objects.find((o) => o.type === 'mailbox')!, 'winter'));
+
+  saveFarm(farm);
+  const loaded = loadFarm()!;
+  check('styles survive a save and a load', loaded.objects.find((o) => o.uid === cookiery.uid)?.style === 'winter' && loaded.boughtStyles.mill?.join() === 'thatch');
+
+  // A broken save: a style on a field, a treasure style "bought", an unknown building.
+  const raw = JSON.parse(JSON.stringify(farm)) as FarmSave & { boughtStyles: Record<string, string[]> };
+  raw.objects.find((o) => o.type === 'field')!.style = 'chalet';
+  raw.boughtStyles = { mill: ['thatch', 'golden', 'thatch'], field: ['chalet'], nowhere: ['chalet'] };
+  saveFarm(raw);
+  const cleaned = loadFarm()!;
+  check('a broken save keeps only what makes sense',
+    cleaned.objects.every((o) => o.type !== 'field' || o.style === undefined) && JSON.stringify(cleaned.boughtStyles) === '{"mill":["thatch"]}',
+    JSON.stringify(cleaned.boughtStyles));
+
+  // Every parcel style comes once, then never again; each rarity still has something to give.
+  const opener = newFarm(now);
+  opener.level = 30;
+  const random = mulberry32(26);
+  let styleFinds = 0;
+  for (let i = 0; i < 3000; i++) {
+    opener.mail.waiting = 1;
+    const opened = openParcel(opener, random)!;
+    if (opened.prize.kind === 'style') styleFinds++;
+  }
+  const styles = (['cherry', 'icing', 'winter', 'golden'] as const);
+  check('each parcel style is found exactly once', styleFinds === styles.length && styles.every((s) => opener.album.includes(s)), `${styleFinds} trouvés`);
+  check('once every style is found, every rarity still has prizes', (['common', 'rare', 'epic', 'legendary'] as const).every((r) => PRIZES[r].some((p) => isPrizeOpen(opener, p))));
+}
+// -----------------------------------------------
+// LOT 3: THE WALL, THE ROUND GATE, WHAT SITS ON THEM (docs/ferme.md 27)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.level = 30;
+  farm.nuts = 1000000;
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 5, 2)!;
+  // wall, round gate (two tiles), wall
+  const west = buyAndPlace(farm, 'stoneWall', x, y, 0, now)!;
+  const gate = buyAndPlace(farm, 'moonGate', x + 1, y, 0, now)!;
+  const east = buyAndPlace(farm, 'stoneWall', x + 3, y, 0, now)!;
+  check('the round gate and the walls are placed', !!west && !!gate && !!east);
+  const index = joinIndex(farm.objects);
+  check('a wall joins the round gate on either side', joinMask(index, x, y, 'wall') === JOIN_EAST && joinMask(index, x + 3, y, 'wall') === JOIN_WEST);
+  check('one walks through the round gate, not through the wall', isWalkable(farm, x + 1, y) && isWalkable(farm, x + 2, y) && !isWalkable(farm, x, y));
+  check('the round gate is never turned', footprint(gate).join() === '2,1' && placeable('moonGate').joins === 'wall');
+
+  const torch = buyAndPlace(farm, 'torch', 0, 0, 0, now, west);
+  check('a torch sits on a wall', !!torch && torch.on === west.uid);
+  const jar = buyAndPlace(farm, 'fireflyJar', 0, 0, 0, now, east);
+  check('a firefly jar sits on a wall too', !!jar && jar.on === east.uid);
+  check('nothing sits on the round gate', !canPerch(farm, 'torch', gate));
+
+  const flat = PLACEABLES.filter((p) => ['steppingStones', 'hopscotch'].includes(p.id)).every((p) => p.flat);
+  check('the stepping stones and the hopscotch lie flat (walked over)', flat);
+}
+
+// -----------------------------------------------
+// DECORATION STYLES (docs/ferme.md 27)
+// -----------------------------------------------
+{
+  const farm = newFarm(now);
+  farm.level = 20;
+  farm.nuts = 100000;
+  const [x, y] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 2, 1)!;
+  const bench = buyAndPlace(farm, 'bench', x, y, 0, now)!;
+  const [px, py] = freeSpotNear(farm, MAP_SIZE / 2, MAP_SIZE / 2, 2, 2)!;
+  const pond = buyAndPlace(farm, 'lilyPond', px, py, 0, now)!;
+  const mill = placeAnywhere(farm, 'mill')!;
+  check('every decoration style belongs to a decoration that does not join', DECOR_STYLES.every((s) => placeable(s.decor).kind === 'deco' && !placeable(s.decor).joins));
+  check('the bench has its styles, the mill the building styles', stylesFor('bench').join() === 'lovebirdBench' && stylesFor('mill').length === 9 && stylesFor('hedge').length === 0);
+  check('a decoration style not found cannot be worn', styleRefusal(farm, 'bench', 'lovebirdBench') === 'missing' && !wearStyle(farm, bench, 'lovebirdBench'));
+  farm.album.push('lovebirdBench', 'lotusPond', 'winter');
+  check('found once, it dresses its decoration', wearStyle(farm, bench, 'lovebirdBench') && bench.style === 'lovebirdBench');
+  check('never another decoration, never a building, and a building style never a decoration',
+    !wearStyle(farm, pond, 'lovebirdBench') && !wearStyle(farm, mill, 'lovebirdBench') && !wearStyle(farm, bench, 'winter') && pond.style === undefined && mill.style === undefined);
+  check('the pond wears its lotus, then back to its own look', wearStyle(farm, pond, 'lotusPond') && wearStyle(farm, pond, null) && pond.style === undefined);
+  wearStyle(farm, pond, 'lotusPond');
+
+  saveFarm(farm);
+  const loaded = loadFarm()!;
+  check('decoration styles survive a save and a load', loaded.objects.find((o) => o.uid === bench.uid)?.style === 'lovebirdBench' && loaded.objects.find((o) => o.uid === pond.uid)?.style === 'lotusPond');
+  const raw = JSON.parse(JSON.stringify(farm)) as FarmSave;
+  raw.objects.find((o) => o.uid === bench.uid)!.style = 'lotusPond';
+  raw.objects.find((o) => o.uid === mill.uid)!.style = 'lovebirdBench';
+  saveFarm(raw);
+  const cleaned = loadFarm()!;
+  check('a style on the wrong object is dropped on load', cleaned.objects.find((o) => o.uid === bench.uid)?.style === undefined && cleaned.objects.find((o) => o.uid === mill.uid)?.style === undefined);
+
+  // A decoration style comes only once its decoration is sold, and only once.
+  const early = newFarm(now);
+  early.level = 1;
+  const random = mulberry32(27);
+  let earlyFinds = 0;
+  for (let i = 0; i < 2000; i++) {
+    early.mail.waiting = 1;
+    if (openParcel(early, random)!.prize.kind === 'decorStyle') earlyFinds++;
+  }
+  check('at level 1 no decoration style comes (none of their decorations is sold yet)', earlyFinds === 0, `${earlyFinds}`);
+  const late = newFarm(now);
+  late.level = 30;
+  const found = new Map<string, number>();
+  for (let i = 0; i < 4000; i++) {
+    late.mail.waiting = 1;
+    const prize = openParcel(late, random)!.prize;
+    if (prize.kind === 'decorStyle') found.set(prize.style, (found.get(prize.style) ?? 0) + 1);
+  }
+  check('each decoration style is found exactly once', found.size === DECOR_STYLES.length && [...found.values()].every((n) => n === 1), `${found.size} / ${DECOR_STYLES.length}`);
+  check('they all fill the album', TREASURES.filter((t) => DECOR_STYLES.some((s) => s.id === t.id)).every((t) => late.album.includes(t.id)));
+}
+
 console.log(failures === 0 ? '\nTout est bon.' : `\n${failures} vérification(s) en échec.`);
 if (failures > 0) process.exitCode = 1;

@@ -33,12 +33,17 @@ export function isGate(type: PlaceableId): boolean {
   return type === 'fenceGate';
 }
 
-/** Every joined piece by "x,y"; a ghost stands where it is, in place of the object it moves. */
+/**
+ * Every joined piece by "x,y", on each tile it takes (the round gate takes two, never turned); a ghost stands where it
+ * is, in place of the object it moves.
+ */
 export function joinIndex(objects: readonly PlacedObject[], ghost?: Piece | null): Map<string, JoinCell> {
   const index = new Map<string, JoinCell>();
   const add = (o: Piece) => {
     const key = joinKey(o);
-    if (key) index.set(`${o.x},${o.y}`, { key, gate: isGate(o.type) });
+    if (!key) return;
+    const [w, h] = placeable(o.type).size;
+    for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) index.set(`${o.x + dx},${o.y + dy}`, { key, gate: isGate(o.type) });
   };
   for (const o of objects) if (o.uid !== ghost?.uid) add(o);
   if (ghost) add(ghost);

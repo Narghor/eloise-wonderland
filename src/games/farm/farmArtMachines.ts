@@ -1,5 +1,6 @@
 import {
-  sprite, C, DOOR, DOOR_BLUE, GLINT, IRON, IRON_LIGHT, TIMBER, TIMBER_LIGHT, WARM_STONE,
+  sprite, C, DOOR, DOOR_BLUE, GLINT, IRON, IRON_LIGHT, TIMBER, TIMBER_LIGHT, WARM_STONE, ROOF_BRETON, ROOF_CHOCO, ROOF_LAVENDER,
+  ROOF_MOSS, ROOF_MUSTARD, ROOF_SKY, ROOF_TEAL, THATCH,
   eave, framedWindow, plankDoor, planks, stones, tiledGable, tiledRoof,
   type Painter, type Sprite, type Tones, type View,
 } from './farmPaint';
@@ -40,14 +41,6 @@ export const LOT2_CHIMNEYS: Partial<Record<Lot2Machine, Partial<Record<View, { x
 // TONES
 // -----------------------------------------------
 
-const ROOF_TEAL: Tones = ['#a6dfd3', '#62b3a4', '#468f83', '#356f66'];
-const THATCH: Tones = ['#f7e6a8', '#e2c472', '#c4a052', '#9a7a38'];
-const ROOF_MOSS: Tones = ['#c2e08a', '#86b350', '#64903a', '#4a6d2b'];
-const ROOF_SKY: Tones = ['#d8ecfb', '#9cc8ef', '#78a8d6', '#5a88b8'];
-const ROOF_MUSTARD: Tones = ['#f8dc86', '#e0ae46', '#bb8a2e', '#946a22'];
-const ROOF_CHOCO: Tones = ['#a87563', '#7b4a3c', '#5f362c', '#47271f'];
-const ROOF_LAVENDER: Tones = ['#dccaf2', '#ab8fd8', '#8a6dbb', '#6a5199'];
-const ROOF_BRETON: Tones = ['#9aa8b6', '#66768a', '#4c5a6c', '#38434f'];
 const DOOR_TEAL: Tones = ['#a6dfd3', '#5aa596', '#438579', '#2f6158'];
 const DOOR_BRETON: Tones = ['#8fbaf0', '#3d7cc4', '#2f62a0', '#234a7a'];
 const DOOR_PINK: Tones = ['#ffd0e0', '#f27aa8', '#d4568a', '#a8526c'];

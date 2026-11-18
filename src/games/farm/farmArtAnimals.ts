@@ -1,7 +1,7 @@
 import { mulberry32 } from '../../random';
 import type { AnimalId, BreedId } from './data/types';
 import {
-  C, OUTLINE, ROOF_BLUE, ROOF_BROWN, ROOF_SLATE, TIMBER, TIMBER_LIGHT, WARM_STONE, backFence, framedWindow, plankDoor, planks,
+  C, OUTLINE, ROOF_BLUE, ROOF_BROWN, ROOF_SAGE, ROOF_SLATE, THATCH_SHEEPFOLD, TIMBER, TIMBER_LIGHT, WARM_STONE, backFence, framedWindow, plankDoor, planks,
   sideAndFrontFence, sprite, stones, tiledGable, yard, type Painter, type Sprite, type Tones, type View,
 } from './farmPaint';
 
@@ -94,7 +94,6 @@ function shingles(P: Painter, x: number, y: number, w: number, h: number, t: Ton
   P.px(x, y, t[0]);
 }
 
-const THATCH: Tones = ['#f7e3a6', '#e3c271', '#c69f52', '#a07c3a'];
 
 /** A thatched roof seen from its long side: rounded ridge, straw courses, a ragged fringe. */
 function thatch(P: Painter, x: number, top: number, w: number, h: number, seed: number): void {
@@ -102,23 +101,23 @@ function thatch(P: Painter, x: number, top: number, w: number, h: number, seed: 
   const r = mulberry32(seed);
   for (let i = 0; i < h; i++) {
     const inset = insets[i] ?? 0;
-    P.rect(x + inset, top + i, w - 2 * inset, 1, i < 2 ? THATCH[0] : THATCH[1]);
-    P.rect(x + w - inset - 4, top + i, 4, 1, THATCH[2]);
-    P.px(x + inset, top + i, THATCH[0]);
+    P.rect(x + inset, top + i, w - 2 * inset, 1, i < 2 ? THATCH_SHEEPFOLD[0] : THATCH_SHEEPFOLD[1]);
+    P.rect(x + w - inset - 4, top + i, 4, 1, THATCH_SHEEPFOLD[2]);
+    P.px(x + inset, top + i, THATCH_SHEEPFOLD[0]);
   }
   for (let i = 4; i < h - 2; i += 4) {
-    P.rect(x + 1, top + i, w - 2, 1, THATCH[2]);
-    P.rect(x + 1, top + i + 1, w - 6, 1, THATCH[0]);
+    P.rect(x + 1, top + i, w - 2, 1, THATCH_SHEEPFOLD[2]);
+    P.rect(x + 1, top + i + 1, w - 6, 1, THATCH_SHEEPFOLD[0]);
   }
   for (let i = 0; i < 40; i++) {
     const sx = x + 2 + Math.floor(r() * (w - 4));
     const sy = top + 2 + Math.floor(r() * (h - 4));
-    P.px(sx, sy, r() < 0.6 ? THATCH[2] : THATCH[0]);
+    P.px(sx, sy, r() < 0.6 ? THATCH_SHEEPFOLD[2] : THATCH_SHEEPFOLD[0]);
   }
   // The fringe, hanging unevenly.
   for (let fx = x; fx < x + w; fx++) {
-    P.px(fx, top + h - 1, THATCH[3]);
-    if ((fx * 7) % 3 === 0) P.px(fx, top + h, THATCH[3]);
+    P.px(fx, top + h - 1, THATCH_SHEEPFOLD[3]);
+    if ((fx * 7) % 3 === 0) P.px(fx, top + h, THATCH_SHEEPFOLD[3]);
   }
 }
 
@@ -174,11 +173,11 @@ function sheepfold(view: View): Sprite {
       const cx = 29;
       for (let i = 0; i < 17; i++) {
         const half = Math.round(i * 0.75) + 2;
-        P.rect(cx - half - 2, 1 + i, 2 * half + 5, 1, i < 3 ? THATCH[0] : THATCH[1]);
-        P.rect(cx + half, 1 + i, 3, 1, THATCH[2]);
-        P.px(cx - half - 2, 1 + i, THATCH[0]);
-        if (i % 3 === 2) P.px(cx - half - 1, 1 + i, THATCH[2]);
-        if (i % 3 === 1) P.px(cx + half + 1, 1 + i, THATCH[3]);
+        P.rect(cx - half - 2, 1 + i, 2 * half + 5, 1, i < 3 ? THATCH_SHEEPFOLD[0] : THATCH_SHEEPFOLD[1]);
+        P.rect(cx + half, 1 + i, 3, 1, THATCH_SHEEPFOLD[2]);
+        P.px(cx - half - 2, 1 + i, THATCH_SHEEPFOLD[0]);
+        if (i % 3 === 2) P.px(cx - half - 1, 1 + i, THATCH_SHEEPFOLD[2]);
+        if (i % 3 === 1) P.px(cx + half + 1, 1 + i, THATCH_SHEEPFOLD[3]);
       }
       for (let i = 4; i < 17; i++) {
         const half = Math.round(i * 0.75) - 1;
@@ -187,7 +186,7 @@ function sheepfold(view: View): Sprite {
       }
       stones(P, 15, 18, 30, 14, WARM_STONE);
       P.rect(39, 18, 6, 14, '#cdb791');
-      P.rect(14, 17, 32, 1, THATCH[3]);
+      P.rect(14, 17, 32, 1, THATCH_SHEEPFOLD[3]);
       P.rect(15, 18, 30, 1, '#b49a76');
       P.rect(15, 18, 2, 14, TIMBER);
       P.rect(43, 18, 2, 14, TIMBER);
@@ -503,7 +502,6 @@ function duckPond(view: View): Sprite {
 // HUTCH: rabbit hutches on legs, wire mesh, a carrot patch
 // -----------------------------------------------
 
-const ROOF_SAGE: Tones = ['#c8e3a6', '#93c06f', '#6f9c52', '#557d3e'];
 
 function mesh(P: Painter, x: number, y: number, w: number, h: number): void {
   P.rect(x, y, w, h, DARK_INSIDE);

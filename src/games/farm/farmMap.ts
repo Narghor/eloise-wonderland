@@ -395,6 +395,7 @@ export function newFarm(now: number): FarmSave {
     album: [],
     waitingBreeds: [],
     lastSkins: {},
+    boughtStyles: {},
     cart: { order: null, nextAt: 0 },
   };
   const fieldsAt: [number, number][] = [[10, 10], [11, 10], [12, 10], [10, 11], [11, 11], [12, 11]];

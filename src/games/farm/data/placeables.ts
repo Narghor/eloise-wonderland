@@ -1,4 +1,4 @@
-import { atLevel, type DecorId, type ItemId, type JoinFamily, type MachineId, type ObstacleId, type PenId, type PlaceableId, type TreeId, type Unlock } from './types';
+import { atLevel, type BuildingId, type DecorId, type ItemId, type JoinFamily, type MachineId, type ObstacleId, type PenId, type PlaceableId, type TreeId, type Unlock } from './types';
 
 // -----------------------------------------------
 // EVERYTHING THAT STANDS ON THE MAP (docs/ferme.md 4.2)
@@ -120,6 +120,29 @@ export const PLACEABLES: readonly Placeable[] = [
   deco('planter', 'Jardinière', [2, 1], 200, 18),
   deco('gardenBridge', 'Pont de jardin', [3, 2], 5000, 19),
   deco('porchSwing', 'Balancelle', [2, 1], 3000, 21),
+  // Lot 3 (docs/ferme.md 27): half where the player is now, half for levels 22 to 30, which opened nothing.
+  { ...deco('torch', 'Torche', [1, 1], 25, 6), perches: true },
+  deco('steppingStones', 'Pas japonais', [1, 1], 8, 7, true),
+  { ...deco('stoneWall', 'Muret de pierre', [1, 1], 20, 8), joins: 'wall', carries: true },
+  deco('topiaryBall', 'Topiaire en boule', [1, 1], 150, 12),
+  deco('hopscotch', 'Marelle', [2, 1], 60, 14, true),
+  { ...deco('fireflyJar', 'Bocal à lucioles', [1, 1], 300, 16), perches: true },
+  deco('sundial', 'Cadran solaire', [1, 1], 600, 17),
+  deco('wickerSet', 'Salon en osier', [2, 1], 1500, 19),
+  deco('sandbox', 'Bac à sable', [2, 1], 1000, 20),
+  deco('topiaryRabbit', 'Topiaire lapin', [1, 1], 1500, 22),
+  deco('paperLanterns', 'Lanternes de papier', [2, 1], 2500, 22),
+  deco('columnUrn', 'Vasque sur colonne', [1, 1], 2000, 23),
+  deco('doeStatue', 'Statue de biche', [1, 1], 3500, 23),
+  deco('slide', 'Toboggan', [2, 1], 4000, 24),
+  deco('topiaryHeart', 'Topiaire cœur', [1, 1], 2500, 25),
+  deco('toolShed', 'Cabane à outils', [2, 2], 6000, 25),
+  deco('tipi', 'Tipi', [2, 2], 8000, 26),
+  // Two tiles of the wall family: the walls beside it join it; it is never turned, and one walks through it.
+  { ...deco('moonGate', 'Porte ronde', [2, 1], 5000, 27), joins: 'wall' },
+  deco('rockery', 'Cascade de rocaille', [2, 2], 15000, 28),
+  deco('roulotte', 'Roulotte', [3, 2], 25000, 29),
+  deco('carriage', 'Carrosse fleuri', [3, 2], 40000, 30),
   // Showpieces: one of each, from two days to two weeks of a regular player's Eloisettes at their level (docs/ferme.md 23).
   showpiece('pergola', 'Pergola fleurie', [3, 2], 10000, 10),
   showpiece('bandstand', 'Kiosque à musique', [3, 3], 40000, 14),
@@ -167,6 +190,12 @@ export function hasCopies(p: Placeable): boolean {
 export function copyLevel(p: Placeable, n: number): number | null {
   const after = COPY_LEVELS[n - 1];
   return after === undefined ? null : ('level' in p.unlock ? p.unlock.level : 1) + after;
+}
+
+/** Machines and pens: what wears a building style (data/styles.ts). */
+export function isBuilding(id: PlaceableId): id is BuildingId {
+  const kind = placeable(id).kind;
+  return kind === 'machine' || kind === 'pen';
 }
 
 export function isTree(id: PlaceableId): id is TreeId {
