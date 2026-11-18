@@ -18,6 +18,11 @@ interface Update {
 
 const UPDATES: Update[] = [
   {
+    id: '2026-11-18-ferme-animaux',
+    date: '18 novembre',
+    news: ['🐣 Les animaux de la ferme font peau neuve : plus grands, tout ronds, avec de grands yeux brillants et des joues roses, et les races rares aussi ! À la petite mare, les promeneurs nourrissent maintenant des canetons.'],
+  },
+  {
     id: '2026-11-17-ferme',
     date: '17 novembre',
     news: [
