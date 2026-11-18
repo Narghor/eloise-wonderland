@@ -1,5 +1,5 @@
 import type { PersonId } from './data/types';
-import { C, OUTLINE, TILE, animalSprite, butterflySprite, swingSeatSprite, type Sprite } from './farmArt';
+import { C, OUTLINE, TILE, butterflySprite, swingSeatSprite, type Sprite } from './farmArt';
 import { footprint } from './farmMap';
 import { IRON, IRON_LIGHT, cached, mapSprite } from './farmPaint';
 import type { Tile, WalkMap } from './farmPaths';
@@ -579,6 +579,14 @@ const BIRD_ROWS: Record<BirdLook, string[]> = {
 };
 const NOTE = ['..bb', '..b.', '..b.', 'bbb.', 'bb..'];
 const FISH = ['.oo.o', 'oooo.', '.oo.o'];
+// The pond's ducklings: the farm animals' round style (shining eyes, a pink cheek), small enough for a 2 x 2 pond.
+const DUCKLING = { L: '#fff6b0', w: '#ffe36e', s: '#e9b93f', o: '#f7a53a', O: '#d9862a', k: OUTLINE, e: '#ffffff', p: '#f7a3b0' };
+const DUCKLING_ROWS = [
+  ['....LLL..', '...LLekoo', 'L..LwkkO.', 'LL.wwpw..', 'wLLwwwww.', 'swwwwwws.', '.ssssss..', '..o..o...'],
+  ['.........', '.........', 'L........', 'LL..LLL..', 'wLLLLLLw.', 'swwwwkkoo', '.sssspwO.', '..o..o...'],
+] as const;
+/** The feet are on the last row: a swimming duckling is drawn only above it (sprite rows, margin included). */
+const DUCKLING_WATERLINE = 8;
 const BREAD = '#f6e5c8';
 const SEED = '#d9a339';
 
@@ -690,7 +698,8 @@ function marksOf(d: Doing): Mark[] {
           // Toward the bread, then back home: the drawing looks right.
           const mirrored = going ? meals[i].x < home.x : home.x < meals[i].x;
           // The feet are under the water: the drawing is cut above them.
-          out.push(art('deco', `duck${frame}`, animalSprite('duck', frame), x - 5, y - 6, mirrored, alpha, 7));
+          const duckling = cached(`stroller-duckling-${frame}`, () => mapSprite(DUCKLING_ROWS[frame], DUCKLING));
+          out.push(art('deco', `duckling${frame}`, duckling, x - Math.floor(duckling.width / 2), y - DUCKLING_WATERLINE + 1, mirrored, alpha, DUCKLING_WATERLINE));
         });
       }
       return out;

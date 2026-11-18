@@ -10,7 +10,7 @@ import {
 import type { Sprite, View, FieldStage, Painter, PixelMap } from './farmPaint';
 import { LOT2_CROP_PAINT, LOT2_ITEM_MAPS, type Lot2Crop, type Lot2Item } from './farmArtItems';
 import { LOT2_CHIMNEYS, lot2Machine } from './farmArtMachines';
-import { LOT2_PEN_AREAS, lot2Animal, lot2Breed, lot2Pen, type Lot2Pen } from './farmArtAnimals';
+import { LOT2_PEN_AREAS, animalArt, breedArt, lot2Pen, type Lot2Pen } from './farmArtAnimals';
 import { faceSprite } from './farmArtFaces';
 import { GARDEN_SYMMETRIC, gardenDecor, gardenGlows, gardenPath, isGardenDecor, isGardenPath, type GardenDecor, type GardenPath, type Glow } from './farmArtDecor';
 export type { Glow } from './farmArtDecor';
@@ -2243,61 +2243,12 @@ export function penAreaOf(id: PlaceableId, view: View): { x0: number; y0: number
 }
 
 export function animalSprite(id: AnimalId, frame: 0 | 1): Sprite {
-  return cached(`animal-${id}-${frame}`, () => (id === 'chicken' ? hen(frame, C.white, '#efe3d2', false) : id === 'cow' ? cow(frame, '#4a3a3a') : lot2Animal(id, frame)));
+  return cached(`animal-${id}-${frame}`, () => animalArt(id, frame));
 }
 
-/** A rare animal, same canvas size and pose/frames as animalSprite of its kind (redHen and goldenHen like the hen, pinkCow like the cow). redHen: russet hen; goldenHen: golden hen with a tiny sparkle; pinkCow: cow with pink spots. */
+/** A rare animal, same canvas size and pose/frames as animalSprite of its kind. */
 export function breedSprite(breed: BreedId, frame: 0 | 1): Sprite {
-  return cached(`breed-${breed}-${frame}`, () => {
-    if (breed === 'redHen') return hen(frame, '#c8693a', '#a4532c', false);
-    if (breed === 'goldenHen') return hen(frame, C.gold, C.goldDark, true);
-    if (breed === 'pinkCow') return cow(frame, '#f48fb1');
-    return lot2Breed(breed, frame);
-  });
-}
-
-function hen(frame: 0 | 1, body: string, shade: string, golden: boolean): Sprite {
-  return sprite(8, 7, (P) => {
-    P.ellipse(4, 4, 3, 2, body);
-    P.px(1, 2, body);
-    P.px(0, 1, body);
-    P.px(3, 4, shade);
-    P.px(4, 5, shade);
-    const hy = frame ? 3 : 0;
-    P.rect(5, hy, 2, 2, body);
-    P.px(6, Math.max(0, hy - 1), C.red);
-    P.px(7, hy + 1, '#f2a33a');
-    P.px(6, hy, OUTLINE);
-    P.px(3, 6, '#f2a33a');
-    P.px(5, 6, '#f2a33a');
-    if (golden) {
-      P.px(2, 3, '#fff1b0');
-      P.px(3, 3, C.goldLight);
-      P.px(0, 6, SPARKLE);
-    }
-  });
-}
-
-function cow(frame: 0 | 1, spot: string): Sprite {
-  return sprite(14, 10, (P) => {
-    P.ellipse(6, 5, 5, 3, C.white);
-    P.rect(1, 4, 10, 3, C.white);
-    P.rect(3, 3, 3, 2, spot);
-    P.rect(8, 5, 2, 2, spot);
-    P.px(2, 6, spot);
-    P.rect(2, 7, 9, 1, '#efe3d2');
-    for (const x of [2, 4, 8, 10]) P.rect(x, 8, 1, 2, '#5b4a48');
-    P.px(0, 4, C.white);
-    P.px(0, 5, spot);
-    P.px(6, 8, '#f5b3b8');
-    const hy = frame ? 3 : 1;
-    P.rect(11, hy, 3, 4, C.white);
-    P.rect(12, hy + 3, 2, 2, '#f5b3b8');
-    P.px(12, hy + 1, OUTLINE);
-    P.px(11, hy - 1, '#e8e0d2');
-    P.px(13, hy - 1, '#e8e0d2');
-    P.px(10, hy + 1, spot);
-  });
+  return cached(`breed-${breed}-${frame}`, () => breedArt(breed, frame));
 }
 
 // -----------------------------------------------
@@ -2890,11 +2841,10 @@ export function artBoard(): HTMLElement {
   ], 4);
   section('Barrières : un enclos par style (angles, T, bouts, poteau seul, portillons)', SKINS.map((s): [Sprite, string] => [fenceYard(s.id), s.name]), 3);
   section('Objets (face / profil)', BOARD_OBJECTS.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
-  section('Arbres, ailes, animaux', [
+  section('Arbres, ailes', [
     [treeSprite('hazel', false), 'noisetier'], [treeSprite('hazel', true), 'noisetier prêt'], [treeSprite('apple', true), 'pommier prêt'], [treeSprite('cherry', true), 'cerisier prêt'],
     [wildTreeSprite(0), 'sauvage 0'], [wildTreeSprite(1), 'sauvage 1'], [wildTreeSprite(2), 'sauvage 2'],
     [millSails('face', 0), 'ailes 0'], [millSails('face', 1), 'ailes 1'], [millSails('profile', 0), 'ailes profil 0'], [millSails('profile', 1), 'ailes profil 1'],
-    [animalSprite('chicken', 0), 'poule'], [animalSprite('chicken', 1), 'poule picore'], [animalSprite('cow', 0), 'vache'], [animalSprite('cow', 1), 'vache broute'],
     [readyBubble(), 'bulle'], [signSprite(), 'panneau'],
   ]);
   section('Trésors des colis (face / profil)', BOARD_TREASURES.flatMap((id): [Sprite, string][] => [[objectSprite(id, 'face'), `${id}`], [objectSprite(id, 'profile'), `${id} profil`]]));
@@ -2910,7 +2860,8 @@ export function artBoard(): HTMLElement {
     [parcelSprite(null), 'colis'], [parcelSprite('common'), 'commun'], [parcelSprite('rare'), 'rare'], [parcelSprite('epic'), 'épique'], [parcelSprite('legendary'), 'légendaire'],
     [heartSprite(), 'cœur'],
   ], 4);
-  section('Races rares', (['redHen', 'goldenHen', 'pinkCow'] as const).flatMap((b): [Sprite, string][] => [[breedSprite(b, 0), b], [breedSprite(b, 1), `${b} 1`]]), 4);
+  section('Animaux (repos / geste)', (['chicken', 'cow', 'sheep', 'pig', 'bee', 'goat', 'duck', 'rabbit'] as const).flatMap((id): [Sprite, string][] => [[animalSprite(id, 0), id], [animalSprite(id, 1), `${id} 1`]]), 4);
+  section('Races rares', (['redHen', 'goldenHen', 'pinkCow', 'blackSheep', 'spottedPig', 'queenBee', 'snowGoat', 'mandarinDuck', 'lopRabbit'] as const).flatMap((b): [Sprite, string][] => [[breedSprite(b, 0), b], [breedSprite(b, 1), `${b} 1`]]), 4);
   section('Produits', BOARD_ITEMS.map((id): [Sprite, string] => [itemIcon(id), id]));
   section('Boosters', BOARD_BOOSTERS.map((id): [Sprite, string] => [boosterIcon(id), id]));
   section('Interface', BOARD_UI.map((id): [Sprite, string] => [uiIcon(id), id]));

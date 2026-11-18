@@ -276,7 +276,8 @@ export function penBubble(ui: FarmUi, pen: PlacedObject): Node[] {
 function penLooks(ui: FarmUi, pen: PlacedObject): Node[] {
   const a = penAnimal(pen);
   const spare = ui.save.waitingBreeds.filter((b) => breed(b).animal === a.id).length;
-  const scale = Math.max(2, Math.floor(20 / animalSprite(a.id, 0).width));
+  const plain = animalSprite(a.id, 0);
+  const scale = Math.max(1, Math.floor(44 / Math.max(plain.width, plain.height)));
   const looks = pen.animals!.map((b, i) => {
     const look = el('button', { class: `farm-look${b ? ' is-rare' : ''}`, type: 'button', 'aria-label': b ? breed(b).name : a.name }, img(b ? breedSprite(b, 0) : animalSprite(a.id, 0), scale));
     look.addEventListener('click', () => ui.restyleAnimal(pen, i));

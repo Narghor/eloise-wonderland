@@ -1338,3 +1338,33 @@ d'une rangée et restent dessinées au même endroit. Places des promeneurs écr
 capture (puits de face et de profil, fontaine). GARDÉS en 2 x 2 : le pigeonnier (presque 4 cases de haut, il cacherait
 3 rangées ; pièce unique, le réduire ne fait rien placer de plus) et les mares (eau plate : sur 2 x 1, un banc
 derrière semblerait dans l'eau ; à redessiner plus petites si Eloise le demande). farm-check 103.
+
+## 25. Le polish des animaux (demande d'Eloise du 17/11 ; style C choisi par Flo, CODÉ le 17/11, non commité, pas joué sur téléphone)
+
+MESURE du 17/11 : les bêtes étaient minuscules (poule 8 × 7, vache 14 × 10, abeille 6 × 4 ; au zoom normal d'un
+téléphone, 1 pixel de dessin = 2 px d'écran), deux tons au plus, la poule de face n'avait pas de crête visible.
+Planche : https://claude.ai/artifact/5Fmv82J2US7My4bUoygoNQ (A même taille, B plus grands naturels, **C plus grands
+mignons**). Choix de Flo : **« plus grand mignon », et le même style pour TOUS les animaux.**
+
+- **Le style C** : en boule, grands yeux 2 × 2 avec un reflet blanc, joues roses (comme les villageois) ; au geste
+  (frame 1 : picorer, brouter, fouiller, barboter, grignoter) la tête descend et les yeux se ferment.
+- **Tailles** (dessin, sans le contour) : poule 12 × 11, vache 19 × 14, mouton 17 × 11, cochon 16 × 11, chèvre 16 × 14,
+  canard 12 × 10, lapin 12 × 12, abeille 10 × 8. Les races gardent la taille de leur espèce.
+- **Code** : tous les animaux vivent dans `farmArtAnimals.ts` (section ANIMALS, la poule et la vache y ont déménagé
+  de farmArt) : des cartes de pixels (corps + tête posée dessus), les mêmes lettres partout (L clair, w base, s ombre,
+  k œil, e reflet, p joue) ; une race = la même carte avec une autre palette (le canard mandarin a ses propres cartes).
+  `animalArt` / `breedArt` remplacent `lot2Animal` / `lot2Breed` ; farmArt garde `animalSprite` / `breedSprite` (cache).
+- **Recalé** : `LOT2_PEN_AREAS` (canards centrés au même endroit de la mare, pieds au même niveau ; abeilles dans le même
+  ciel), les boutons de race de la
+  bulle d'enclos (40 -> 48 px, le dessin le plus grand qui tient), la planche des dessins (les 8 animaux et 9 races).
+- **Vu en capture** : les 8 enclos pleins avec une race chacun (de nuit), la boutique Animaux et les races en attente,
+  les bulles de l'étable et du poulailler (6 poules = 2 rangées de boutons), les promeneurs qui nourrissent les canards.
+  farm-check : tout est bon ; build OK. PAS VU : le colis qui donne une race (dessin × 6 : la vache fait 126 px de
+  large, dans un cadre de 180).
+- **Les canetons de la mare-déco (18/11, « go » de Flo)** : le canard de la ferme (12 × 10) était aussi gros que le
+  villageois et couvrait presque toute l'eau de la mare 2 × 2. Les promeneurs nourrissent maintenant deux **canetons**
+  jaunes, 9 × 8, même style (yeux brillants, joue rose, tête baissée pour barboter), dessinés à côté de leurs oiseaux
+  dans `farmStrollerActs.ts` (`DUCKLING_ROWS`, `DUCKLING_WATERLINE` : coupés au-dessus des pattes) ; `DUCK_WATERLINE`
+  est supprimé. Vu en capture (les deux sens de la mare, en route et en train de barboter) : l'eau se voit autour.
+- Sauvegarde des fichiers d'avant : `C:/Users/Flo/CouchRPG/.claude/backups/2026-11-17/eloise-animaux/` et
+  `.../2026-11-18/eloise-canetons/`.

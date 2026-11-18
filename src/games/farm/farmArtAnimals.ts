@@ -1,26 +1,26 @@
 import { mulberry32 } from '../../random';
+import type { AnimalId, BreedId } from './data/types';
 import {
   C, OUTLINE, ROOF_BLUE, ROOF_BROWN, ROOF_SLATE, TIMBER, TIMBER_LIGHT, WARM_STONE, backFence, framedWindow, plankDoor, planks,
   sideAndFrontFence, sprite, stones, tiledGable, yard, type Painter, type Sprite, type Tones, type View,
 } from './farmPaint';
 
 // -----------------------------------------------
-// LOT 2 PENS (3 x 3) AND THEIR ANIMALS (docs/ferme.md 18)
+// LOT 2 PENS (3 x 3) (docs/ferme.md 18), THEN EVERY ANIMAL
 // -----------------------------------------------
-// Built like lot 1's coop and cowshed (farmArt.ts); farmArt caches them.
+// The pens are built like lot 1's coop and cowshed (farmArt.ts); farmArt caches pens and animals.
 // Each pen keeps its building in the upper half: the animals wander in the lower half, drawn over it.
 
 export type Lot2Pen = 'sheepfold' | 'pigsty' | 'hive' | 'goatShed' | 'duckPond' | 'hutch';
-export type Lot2Animal = 'sheep' | 'pig' | 'bee' | 'goat' | 'duck' | 'rabbit';
-export type Lot2Breed = 'blackSheep' | 'spottedPig' | 'queenBee' | 'snowGoat' | 'mandarinDuck' | 'lopRabbit';
 
 /**
  * Where an animal sprite's top-left corner may stand, in pen sprite pixels (margin included): the duck pond's water
- * (a whole duck on it, above the front rail), the air the bees fly in. Kept in step with pondWater and apiary below.
+ * (a whole duck on it, above the front rail), the air the bees fly in. Kept in step with pondWater, apiary and the
+ * size of the duck and bee drawings below.
  */
 export const LOT2_PEN_AREAS: Partial<Record<Lot2Pen, Partial<Record<View, { x0: number; y0: number; x1: number; y1: number }>>>> = {
-  duckPond: { face: { x0: 9, y0: 36, x1: 28, y1: 43 }, profile: { x0: 11, y0: 36, x1: 30, y1: 43 } },
-  hive: { face: { x0: 3, y0: 6, x1: 37, y1: 42 }, profile: { x0: 3, y0: 6, x1: 37, y1: 42 } },
+  duckPond: { face: { x0: 7, y0: 33, x1: 26, y1: 40 }, profile: { x0: 9, y0: 33, x1: 28, y1: 40 } },
+  hive: { face: { x0: 3, y0: 6, x1: 33, y1: 38 }, profile: { x0: 3, y0: 6, x1: 33, y1: 38 } },
 };
 
 export function lot2Pen(id: Lot2Pen, view: View): Sprite {
@@ -31,30 +31,6 @@ export function lot2Pen(id: Lot2Pen, view: View): Sprite {
     case 'goatShed': return goatShed(view);
     case 'duckPond': return duckPond(view);
     case 'hutch': return hutch(view);
-  }
-}
-
-/** Frame 1 is the idle gesture (grazing, rooting, dabbling...), shown while the animal stands still. */
-export function lot2Animal(id: Lot2Animal, frame: 0 | 1): Sprite {
-  switch (id) {
-    case 'sheep': return sheep(frame, SHEEP);
-    case 'pig': return pig(frame, PIG, false);
-    case 'bee': return bee(frame, false);
-    case 'goat': return goat(frame, GOAT);
-    case 'duck': return duck(frame, false);
-    case 'rabbit': return rabbit(frame, RABBIT, false);
-  }
-}
-
-/** A rare animal: same canvas size, pose and frames as its kind. */
-export function lot2Breed(id: Lot2Breed, frame: 0 | 1): Sprite {
-  switch (id) {
-    case 'blackSheep': return sheep(frame, BLACK_SHEEP);
-    case 'spottedPig': return pig(frame, PIG, true);
-    case 'queenBee': return bee(frame, true);
-    case 'snowGoat': return goat(frame, SNOW_GOAT);
-    case 'mandarinDuck': return duck(frame, true);
-    case 'lopRabbit': return rabbit(frame, LOP_RABBIT, true);
   }
 }
 
@@ -595,152 +571,411 @@ function hutch(view: View): Sprite {
   });
 }
 
-
 // -----------------------------------------------
-// ANIMALS: pixel maps facing right; the scene mirrors them
+// ANIMALS: round and cute, facing right (the scene mirrors them); style C of docs/ferme.md 25
 // -----------------------------------------------
+// Each animal is a pixel map, or a body with a head laid over it. Frame 1 is the idle gesture: the head goes down
+// and the eyes close. The letters mean the same thing in every map: L light, w base, s shade, k eye, e eye shine,
+// p pink cheek. A rare breed is the same maps with another palette (or its own maps when its colours sit elsewhere).
 
-function mapped(rows: readonly string[], pal: Record<string, string>): Sprite {
-  return sprite(rows[0].length, rows.length, (P) => P.map(0, 0, rows, pal));
-}
+type Palette = Record<string, string>;
+type Rows = readonly string[];
 
-const SHEEP_ROWS = [
-  ['..ll.ll.l..', '.lwwlwwlww.', 'lwwwwwwafef', 'wwwwwwwwffn', 'swwwwwwwff.', '.ssswwss...', '.k.k.k.k...', '.k.k.k.k...'],
-  ['..ll.ll....', '.lwwlwwl...', 'lwwwwwwwl..', 'wwwwwwwwww.', 'swwwwwwawwf', '.ssswwssfef', '.k.k.k.kffn', '.k.k.k.k...'],
-] as const;
-const SHEEP = { l: '#ffffff', w: '#f3ece0', s: '#d9cdb9', f: '#b0928a', a: '#866a64', n: '#866a64', e: '#2e2224', k: '#6b5450' };
-const BLACK_SHEEP = { l: '#8a7f8c', w: '#665c6a', s: '#4c4352', f: '#3c3238', a: '#2c2428', n: '#2c2428', e: '#f6e5c8', k: '#3c3238' };
+const EYE = OUTLINE;
+const SHINE = '#ffffff';
+const CHEEK = '#f7a3b0';
 
-/** 11 x 8: a fluffy body, a dark face; frame 1 grazes. */
-function sheep(frame: 0 | 1, pal: Record<string, string>): Sprite {
-  return mapped(SHEEP_ROWS[frame], pal);
-}
-
-const PIG = { light: '#ffd3dc', base: '#f7b0bf', shade: '#e48aa0', ear: '#e07a92', snout: '#f08aa2', nostril: '#b85a72', hoof: '#8f5a5a', spot: '#a8673f' };
-
-/** 11 x 8: round and pink, a curly tail; frame 1 roots with its snout down. */
-function pig(frame: 0 | 1, p: typeof PIG, spotted: boolean): Sprite {
-  return sprite(11, 8, (P) => {
-    for (const x of [2, 4, 6, 8]) P.rect(x, 6, 1, 2, p.hoof);
-    P.ellipse(4, 4, 4, 2, p.base);
-    P.rect(1, 2, 7, 1, p.base);
-    P.rect(2, 2, 5, 1, p.light);
-    P.px(1, 3, p.light);
-    P.rect(2, 6, 5, 1, p.shade);
-    P.px(0, 2, p.shade);
-    P.px(0, 1, p.ear);
-    if (spotted) {
-      P.rect(2, 3, 2, 2, p.spot);
-      P.px(5, 5, p.spot);
-      P.px(6, 3, p.spot);
-    }
-    const hy = frame ? 2 : 0;
-    P.rect(7, hy + 1, 3, 4, p.base);
-    P.px(7, hy + 1, p.light);
-    P.rect(10, hy + 2, 1, 3, p.snout);
-    P.px(10, hy + 3, p.nostril);
-    P.px(8, hy + 2, OUTLINE);
-    P.px(9, hy + 4, p.light);
-    P.px(8, hy, p.ear);
-    P.px(9, hy, p.ear);
-    P.px(9, hy + 1, p.ear);
-    if (spotted) P.px(7, hy + 3, p.spot);
+/** A w x h drawing: `under` paints first (legs, a tail), then each map at its place. */
+function layered(w: number, h: number, pal: Palette, maps: readonly (readonly [number, number, Rows])[], under?: (P: Painter) => void): Sprite {
+  return sprite(w, h, (P) => {
+    under?.(P);
+    for (const [x, y, rows] of maps) P.map(x, y, rows, pal);
   });
 }
+
+/** Legs of `width` px from `top` to the bottom row, the last row in `foot`; the back pair in `back`. */
+function legs(P: Painter, front: readonly number[], back: readonly number[], top: number, bottom: number, width: number, leg: string, backLeg: string, foot: string): void {
+  for (const [xs, col] of [[back, backLeg], [front, leg]] as const) {
+    for (const x of xs) {
+      P.rect(x, top, width, bottom - top, col);
+      P.rect(x, bottom, width, 1, foot);
+    }
+  }
+}
+
+/** The head maps of frame 1: the eyes' top row (shine and pupil) becomes plain face, the bottom row stays as a closed eye. */
+function sleepy(rows: Rows, eyeRow: number, face: string): Rows {
+  return rows.map((row, i) => (i === eyeRow ? row.replace(/[ek]/g, face) : row));
+}
+
+// -----------------------------------------------
+// HEN (12 x 11): a ball of feathers, a three-bump comb
+// -----------------------------------------------
+
+const HEN_ROWS = [
+  [
+    '......rr....',
+    '.t...LrRrL..',
+    'tLt.LLLLLLw.',
+    'tLLLLLLLekw.',
+    '.tLLLwwwkkwo',
+    '.twLLLLwwpwO',
+    '.twwsssswwws',
+    '..swwwwwwws.',
+    '...swwwwss..',
+    '....ssss....',
+    '.....y.y....',
+  ],
+  [
+    '............',
+    '.t....rr....',
+    'tLt..LrRrL..',
+    'tLLLLLLLLLw.',
+    '.tLLLLwwLLw.',
+    '.twLLLLwwwww',
+    '.twwsssswkkw',
+    '..swwwwwwwpo',
+    '...swwwwwsO.',
+    '....ssss....',
+    '.....y.y....',
+  ],
+] as const;
+
+const HEN_BEAK = { r: '#e0475b', R: '#b4353f', o: '#f2a33a', O: '#d9862a', y: '#f2a33a', k: EYE, e: SHINE, p: CHEEK };
+const HEN: Palette = { ...HEN_BEAK, L: '#ffffff', w: '#f4ede2', s: '#d9cab4', t: '#e3d6c2' };
+const RED_HEN: Palette = { ...HEN_BEAK, L: '#e8955e', w: '#c8693a', s: '#a4532c', t: '#83401f' };
+const GOLDEN_HEN: Palette = { ...HEN_BEAK, L: '#fff1a8', w: C.gold, s: C.goldDark, t: '#e0ae3c', x: SPARKLE };
+
+function hen(frame: 0 | 1, pal: Palette): Sprite {
+  const rows: string[] = [...HEN_ROWS[frame]];
+  // The golden hen twinkles: two sparkles off her body.
+  if (pal.x) {
+    rows[0] = rows[0].slice(0, 11) + 'x';
+    rows[8] = 'x' + rows[8].slice(1);
+  }
+  return layered(12, 11, pal, [[0, 0, rows]]);
+}
+
+// -----------------------------------------------
+// COW (19 x 14): a big head, short legs, spots
+// -----------------------------------------------
+
+const COW_BODY = [
+  '.LLLLLLLLLL.',
+  'LLbbLLLLLLLw',
+  'LbbbwwwwbBww',
+  'wbbwwwwwbbww',
+  'wwwwwwwwwwws',
+  'swwwwwwwwwss',
+  '.ssssssssss.',
+];
+const COW_HEAD = [
+  '..h....h..',
+  '.LLLbbLLw.',
+  'ELLbbLLLwE',
+  'ELLLLLLLwE',
+  '.ekLLLekw.',
+  '.kkLLLkkw.',
+  '.pmmmmmmp.',
+  '.wmnmmnmw.',
+  '..mmmmmm..',
+];
+
+const HIDE = { L: '#ffffff', w: '#f4ede2', s: '#d9cab4', h: '#f3e6c8', E: '#f5b3b8', m: '#f5b3b8', n: '#b85a72', k: EYE, e: SHINE, p: CHEEK };
+const COW: Palette = { ...HIDE, b: '#4a3a3a', B: '#6a5656' };
+const PINK_COW: Palette = { ...HIDE, b: '#f48fb1', B: '#ffc4d8' };
+
+function cow(frame: 0 | 1, pal: Palette): Sprite {
+  const head = frame ? sleepy(COW_HEAD, 4, 'L') : COW_HEAD;
+  return layered(19, 14, pal, [[1, 5, COW_BODY], [9, frame ? 4 : 0, head]], (P) => {
+    legs(P, [4, 10], [2, 8], 11, 13, 2, pal.w, pal.s, '#5b4a48');
+    P.rect(0, 6, 1, 2, pal.s);
+    P.rect(0, 8, 1, 2, pal.b);
+    P.rect(6, 12, 2, 1, pal.m);
+  });
+}
+
+// -----------------------------------------------
+// SHEEP (17 x 11): a woolly cloud, a soft face
+// -----------------------------------------------
+
+const SHEEP_BODY = [
+  '.LL.LL.LL...',
+  'LwwLwwLwwL..',
+  'LwwwwwwwwwL.',
+  'wwwwwwwwwwww',
+  'swwwwwwwwwww',
+  'swwwwwwwwwws',
+  '.sswwsswwss.',
+  '..ss.ss.ss..',
+];
+const SHEEP_HEAD = [
+  '..LwL..',
+  '.LwwwL.',
+  'aFFFFFa',
+  '.ekFek.',
+  '.kkFkk.',
+  '.pFFFp.',
+  '..FnF..',
+];
+
+const SHEEP: Palette = { L: '#ffffff', w: '#f3ece0', s: '#d9cdb9', F: '#c4a59b', a: '#9c7e76', n: '#866a64', k: EYE, e: SHINE, p: CHEEK };
+const BLACK_SHEEP: Palette = { L: '#8a7f8c', w: '#665c6a', s: '#4c4352', F: '#4a3f46', a: '#2c2428', n: '#2c2428', k: '#1a1216', e: SHINE, p: '#c98a96' };
+
+function sheep(frame: 0 | 1, pal: Palette): Sprite {
+  const head = frame ? sleepy(SHEEP_HEAD, 3, 'F') : SHEEP_HEAD;
+  return layered(17, 11, pal, [[0, 1, SHEEP_BODY], [10, frame ? 3 : 0, head]], (P) => legs(P, [5, 10], [3, 8], 9, 10, 1, pal.n, pal.a, pal.n));
+}
+
+// -----------------------------------------------
+// PIG (16 x 11): round and pink, a big snout, a curly tail
+// -----------------------------------------------
+
+const PIG_BODY = [
+  '.LLLLLLLL..',
+  'LLLbbLLLLww',
+  'LLwbbwwwwww',
+  'wwwwwwwbbww',
+  'swwwwwwbbws',
+  '.sswwwwwss.',
+  '..sssssss..',
+];
+const PIG_HEAD = [
+  'E.....E',
+  'EL...LE',
+  'LLLLLLw',
+  'LekLekw',
+  'LkkLkkw',
+  'pLmmmLp',
+  'wmnmnmw',
+  '.smmms.',
+];
+
+const PINK = { L: '#ffd3dc', w: '#f7b0bf', s: '#e48aa0', E: '#e07a92', m: '#f08aa2', n: '#b85a72', k: EYE, e: SHINE, p: '#f27a8a' };
+const PIG: Palette = { ...PINK, b: PINK.w };
+const SPOTTED_PIG: Palette = { ...PINK, b: '#a8673f' };
+
+function pig(frame: 0 | 1, pal: Palette): Sprite {
+  const head = frame ? sleepy(PIG_HEAD, 3, 'L') : PIG_HEAD;
+  return layered(16, 11, pal, [[1, 3, PIG_BODY], [9, frame ? 3 : 0, head]], (P) => {
+    legs(P, [5, 10], [3, 8], 10, 10, 1, pal.s, pal.s, '#8f5a5a');
+    // The curly tail.
+    P.px(0, 4, pal.s);
+    P.px(0, 3, pal.s);
+    P.px(1, 2, pal.s);
+  });
+}
+
+// -----------------------------------------------
+// BEE (10 x 8): a striped ball with glassy wings
+// -----------------------------------------------
 
 const BEE_ROWS = [
-  ['.wWw..', '.kykyk', 'ykykyk', '.kyky.'],
-  ['.W..w.', '.kWkyk', 'ykykyk', '.kyky.'],
+  [
+    '..WW.WW...',
+    '.WwwWwwW..',
+    '..WW.WW...',
+    '..ykykyyy.',
+    '.yykykyeky',
+    'kyykykykky',
+    '.yykykyypy',
+    '..ykykyy..',
+  ],
+  [
+    '..........',
+    '..........',
+    '.WWW.WWW..',
+    '..ykykyyy.',
+    '.yykykyeky',
+    'kyykykykky',
+    '.yykykyypy',
+    '..ykykyy..',
+  ],
 ] as const;
-const BEE = { y: '#f7cf3c', k: '#4a3135', w: '#dff1fb', W: '#ffffff' };
-const QUEEN_BEE = { y: '#fbe38a', k: '#c98a2a', w: '#dff1fb', W: '#ffffff', c: '#e0a020', s: SPARKLE };
 
-/** 6 x 4: striped, glassy wings; frame 1 flutters them. The queen is golden, crowned, sparkling. */
+const BEE: Palette = { y: '#f7cf3c', k: '#4a3135', W: '#ffffff', w: '#dff1fb', e: SHINE, p: CHEEK };
+const QUEEN_BEE: Palette = { ...BEE, y: '#fbe38a', k: '#c98a2a', c: '#e0a020', C: SPARKLE };
+
+/** Frame 1 flutters the wings. The queen is golden and crowned. */
 function bee(frame: 0 | 1, queen: boolean): Sprite {
-  if (!queen) return mapped(BEE_ROWS[frame], BEE);
   const rows: string[] = [...BEE_ROWS[frame]];
-  rows[0] = 's' + rows[0].slice(1, 4) + 'cc';
-  rows[1] = rows[1].slice(0, 5) + 'c';
-  return mapped(rows, QUEEN_BEE);
+  if (queen) {
+    rows[1] = rows[1].slice(0, 7) + 'c.c';
+    rows[2] = rows[2].slice(0, 7) + 'cCc';
+  }
+  return layered(10, 8, queen ? QUEEN_BEE : BEE, [[0, 0, rows]]);
 }
 
-interface Coat { light: string; base: string; shade: string; leg: string; horn: string; beard: string; muzzle: string; hoof: string }
-const GOAT: Coat = { light: '#e8cfac', base: '#d2ad82', shade: '#b48d64', leg: '#b48d64', horn: '#9c958d', beard: '#f6e5c8', muzzle: '#f2cfae', hoof: '#5b4a48' };
-const SNOW_GOAT: Coat = { light: '#ffffff', base: '#f6f4f0', shade: '#d3e4f2', leg: '#eef0f2', horn: '#86c3ea', beard: '#ffffff', muzzle: '#f6dfe4', hoof: '#7d9ab3' };
+// -----------------------------------------------
+// GOAT (16 x 14): long legs, horns, a beard
+// -----------------------------------------------
 
-/** 11 x 10: long legs, horns curving back, a beard; frame 1 nibbles at the ground. */
-function goat(frame: 0 | 1, c: Coat): Sprite {
-  return sprite(11, 10, (P) => {
-    for (const x of [1, 3, 5, 7]) {
-      P.rect(x, 6, 1, 4, c.leg);
-      P.px(x, 9, c.hoof);
-    }
-    P.rect(1, 4, 7, 3, c.base);
-    P.rect(1, 4, 6, 1, c.light);
-    P.rect(2, 6, 5, 1, c.shade);
-    P.px(0, 3, c.base);
-    P.px(1, 3, c.light);
-    const hy = frame ? 4 : 0;
-    P.rect(7, hy + 2, 2, 3, c.base);
-    P.rect(8, hy + 1, 3, 2, c.base);
-    P.px(8, hy + 1, c.light);
-    P.px(10, hy + 3, c.muzzle);
-    P.px(9, hy + 3, c.base);
-    P.px(9, hy + 4, c.beard);
-    P.px(9, hy + 1, OUTLINE);
-    P.px(7, hy + 2, c.shade);
-    P.px(7, hy, c.horn);
-    P.px(8, hy, c.horn);
-    P.px(6, hy + 1, c.horn);
+const GOAT_BODY = [
+  '.LLLLLLLL.',
+  'LLwwwwwwww',
+  'wwwwwwwwww',
+  'swwwwwwwws',
+  '.ssssssss.',
+];
+const GOAT_HEAD = [
+  '.h....h.',
+  '..hLwh..',
+  'ELLLLLwE',
+  '.ekLekw.',
+  '.kkLkkw.',
+  '.pLmmLp.',
+  '..mnnm..',
+  '...bb...',
+  '...b....',
+];
+
+const GOAT: Palette = { L: '#e8cfac', w: '#d2ad82', s: '#b48d64', h: '#9c958d', E: '#b48d64', m: '#f2cfae', n: '#b85a72', b: '#f6e5c8', f: '#5b4a48', k: EYE, e: SHINE, p: CHEEK };
+const SNOW_GOAT: Palette = { L: '#ffffff', w: '#f6f4f0', s: '#d3e4f2', h: '#86c3ea', E: '#d3e4f2', m: '#f6dfe4', n: '#c98a96', b: '#ffffff', f: '#7d9ab3', k: EYE, e: SHINE, p: CHEEK };
+
+function goat(frame: 0 | 1, pal: Palette): Sprite {
+  const head = frame ? sleepy(GOAT_HEAD, 3, 'L') : GOAT_HEAD;
+  return layered(16, 14, pal, [[1, 5, GOAT_BODY], [8, frame ? 4 : 0, head]], (P) => {
+    legs(P, [4, 9], [2, 7], 10, 13, 1, pal.w, pal.s, pal.f);
+    P.px(0, 4, pal.L);
+    P.px(0, 5, pal.w);
   });
 }
+
+// -----------------------------------------------
+// DUCK (12 x 10): a cream farm duck, or the colourful mandarin
+// -----------------------------------------------
 
 const DUCK_ROWS = [
-  ['....ww..', '...wwkoo', 'w...ww..', 'wwwwwww.', 'wwssswW.', '.ssssss.', '..o.o...'],
-  ['........', 'w.......', 'ww......', 'wwwwww..', 'wwssswww', '.sssswko', '..o.o..o'],
+  [
+    '......LLL...',
+    '.....LLLLw..',
+    '.....LLekwoo',
+    'L....LLkkwO.',
+    'LL...wwpww..',
+    'LwLLLLLwww..',
+    'wwLLwwwwwww.',
+    'swwsssswwws.',
+    '.sswwwwwss..',
+    '...o..o.....',
+  ],
+  [
+    '............',
+    '............',
+    '............',
+    'L...........',
+    'LL...LLLL...',
+    'LwLLLLLLLw..',
+    'wwLLwwwkkwoo',
+    'swwsssswwpO.',
+    '.sswwwwwss..',
+    '...o..o.....',
+  ],
 ] as const;
-const DUCK = { w: '#fff8e4', W: '#ffffff', s: '#e6d9bd', k: OUTLINE, o: '#f7a53a' };
 const MANDARIN_ROWS = [
-  ['....gg..', '...gWkrr', 's...oo..', 'sBOOOpp.', 'bbbbbbp.', '.dddddd.', '..f.f...'],
-  ['........', 's.......', 'sO......', 'sBOOpp..', 'bbbbpggg', '.dddoWkr', '..f.f..r'],
+  [
+    '......ggg...',
+    '.....gggWg..',
+    '.....WWekgrr',
+    's....OOkkOR.',
+    'ss...POOO...',
+    'sPOOOPPbbb..',
+    'PPOOPPbbbbb.',
+    'dPPddddbbbd.',
+    '.ddbbbbbdd..',
+    '...f..f.....',
+  ],
+  [
+    '............',
+    '............',
+    '............',
+    's...........',
+    'ss...gggg...',
+    'sPOOOggWgg..',
+    'PPOOPPgkkgrr',
+    'dPPddddOORR.',
+    '.ddbbbbbdd..',
+    '...f..f.....',
+  ],
 ] as const;
-const MANDARIN = { g: '#2f7a55', W: '#fff6e8', k: OUTLINE, r: '#e0475b', o: '#f08a2b', O: '#f5a55a', p: '#7a4a7a', b: '#d9935a', d: '#b0703f', B: '#5b86b8', s: '#5e4a46', f: '#f2a33a' };
 
-/** 8 x 7: a cream farm duck, or the colourful mandarin; frame 1 dabbles, tail up. */
+const DUCK: Palette = { L: '#ffffff', w: '#fff8e4', s: '#e6d9bd', o: '#f7a53a', O: '#d9862a', k: EYE, e: SHINE, p: CHEEK };
+const MANDARIN: Palette = { g: '#2f7a55', W: '#fff6e8', r: '#e0475b', R: '#b4353f', O: '#f08a2b', P: '#7a4a7a', b: '#d9935a', d: '#b0703f', s: '#5e4a46', f: '#f2a33a', k: EYE, e: SHINE };
+
 function duck(frame: 0 | 1, mandarin: boolean): Sprite {
-  return mandarin ? mapped(MANDARIN_ROWS[frame], MANDARIN) : mapped(DUCK_ROWS[frame], DUCK);
+  return layered(12, 10, mandarin ? MANDARIN : DUCK, [[0, 0, (mandarin ? MANDARIN_ROWS : DUCK_ROWS)[frame]]]);
 }
 
-interface Fur { light: string; base: string; shade: string; ear: string; tail: string }
-const RABBIT: Fur = { light: '#dfc4a3', base: '#c4a07c', shade: '#a68260', ear: '#f5b3b8', tail: '#ffffff' };
-const LOP_RABBIT: Fur = { light: '#fff6e8', base: '#f2e2c8', shade: '#d9c4a2', ear: '#b98a62', tail: '#ffffff' };
+// -----------------------------------------------
+// RABBIT (12 x 12): sitting, ears up (hanging for the lop)
+// -----------------------------------------------
 
-/** 7 x 7: a sitting bunny, its ears up (drooping for the lop); frame 1 nibbles. */
-function rabbit(frame: 0 | 1, f: Fur, lop: boolean): Sprite {
-  return sprite(7, 7, (P) => {
-    P.ellipse(2, 4, 2, 2, f.base);
-    P.rect(1, 3, 3, 1, f.light);
-    P.rect(1, 6, 3, 1, f.shade);
-    P.px(0, 4, f.tail);
-    P.px(4, 6, f.light);
-    const hy = frame ? 1 : 0;
-    P.rect(4, hy + 2, 3, 2, f.base);
-    P.px(4, hy + 2, f.light);
-    P.px(5, hy + 2, OUTLINE);
-    P.px(6, hy + 3, '#f08aa2');
-    if (lop) {
-      P.rect(5, hy + 1, 1, 1, f.base);
-      P.rect(3, hy + 1, 2, 1, f.ear);
-      P.rect(4, hy + 2, 1, 3, f.ear);
-      P.px(5, hy + 4, f.ear);
-    } else if (frame) {
-      P.px(3, 1, f.base);
-      P.px(4, 1, f.base);
-      P.px(2, 0, f.ear);
-      P.px(3, 0, f.base);
-    } else {
-      P.rect(4, 0, 1, 2, f.base);
-      P.rect(5, 0, 1, 2, f.ear);
-    }
-  });
+const RABBIT_BODY = [
+  '..LLLL..',
+  '.LLwwwL.',
+  'tLwwwwww',
+  'wwwwwwww',
+  'swwwwwws',
+  '.ss..ss.',
+];
+const RABBIT_HEAD = [
+  '..LE.LE.',
+  '..LE.LE.',
+  '..LE.LE.',
+  '.LLLLLLw',
+  'LekLLekw',
+  'LkkLLkkw',
+  'LpLnnLpw',
+  '.wwwwws.',
+];
+const LOP_HEAD = [
+  '........',
+  '........',
+  '..LLLL..',
+  'EEwLLwEE',
+  'EekLLekE',
+  'EkkLLkkE',
+  'EpLnnLpE',
+  '.Ewwwws.',
+];
+
+const RABBIT: Palette = { L: '#dfc4a3', w: '#c4a07c', s: '#a68260', E: '#f5b3b8', t: '#ffffff', n: '#f08aa2', k: EYE, e: SHINE, p: CHEEK };
+const LOP_RABBIT: Palette = { L: '#fff6e8', w: '#f2e2c8', s: '#d9c4a2', E: '#b98a62', t: '#ffffff', n: '#f08aa2', k: EYE, e: SHINE, p: CHEEK };
+
+function rabbit(frame: 0 | 1, lop: boolean): Sprite {
+  const face = lop ? LOP_HEAD : RABBIT_HEAD;
+  const head = frame ? sleepy(face, 4, 'L') : face;
+  return layered(12, 12, lop ? LOP_RABBIT : RABBIT, [[0, 6, RABBIT_BODY], [4, frame ? 2 : 1, head]]);
+}
+
+// -----------------------------------------------
+// THE DRAWINGS BY ID
+// -----------------------------------------------
+
+/** Frame 1 is the idle gesture (pecking, grazing, rooting, dabbling...), shown while the animal stands still. */
+export function animalArt(id: AnimalId, frame: 0 | 1): Sprite {
+  switch (id) {
+    case 'chicken': return hen(frame, HEN);
+    case 'cow': return cow(frame, COW);
+    case 'sheep': return sheep(frame, SHEEP);
+    case 'pig': return pig(frame, PIG);
+    case 'bee': return bee(frame, false);
+    case 'goat': return goat(frame, GOAT);
+    case 'duck': return duck(frame, false);
+    case 'rabbit': return rabbit(frame, false);
+  }
+}
+
+/** A rare animal: same canvas size, pose and frames as its kind. */
+export function breedArt(id: BreedId, frame: 0 | 1): Sprite {
+  switch (id) {
+    case 'redHen': return hen(frame, RED_HEN);
+    case 'goldenHen': return hen(frame, GOLDEN_HEN);
+    case 'pinkCow': return cow(frame, PINK_COW);
+    case 'blackSheep': return sheep(frame, BLACK_SHEEP);
+    case 'spottedPig': return pig(frame, SPOTTED_PIG);
+    case 'queenBee': return bee(frame, true);
+    case 'snowGoat': return goat(frame, SNOW_GOAT);
+    case 'mandarinDuck': return duck(frame, true);
+    case 'lopRabbit': return rabbit(frame, true);
+  }
 }
